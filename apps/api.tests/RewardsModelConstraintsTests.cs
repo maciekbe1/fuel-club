@@ -250,7 +250,15 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
     }
 
     [Fact]
-    public async Task Concurrent_offer_edits_are_detected()
+    public async Task Rejects_version_below_one()
+    {
+        var offer = Offer();
+        offer.Version = 0;
+        await AssertRejectedAsync(PostgresErrorCodes.CheckViolation, "CK_RewardOffers_Version_Positive", offer);
+    }
+
+    [Fact]
+    public async Task Concurrent_ef_edits_are_detected_and_each_raises_the_version()
     {
         var offer = Offer();
         await SaveAsync(offer);
@@ -264,7 +272,19 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
 
         a.PointsCost = 600;
         await firstDb.SaveChangesAsync();
+        Assert.Equal(2, a.Version);
+
         b.PointsCost = 700;
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => secondDb.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task A_new_offer_starts_at_version_one_without_setting_it()
+    {
+        var offer = Offer();
+        await SaveAsync(offer);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, (await db.RewardOffers.AsNoTracking().SingleAsync(o => o.Id == offer.Id)).Version);
     }
 }

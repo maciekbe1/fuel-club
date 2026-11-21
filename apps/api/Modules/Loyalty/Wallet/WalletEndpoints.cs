@@ -69,7 +69,7 @@ public static class WalletEndpoints
                 errors.Add(new("cursor", LoyaltyErrorCodes.InvalidCursor));
         }
         if (errors.Count > 0)
-            return ValidationProblem(errors);
+            return LoyaltyProblems.Validation("Request is not valid", errors);
 
         var userId = users.GetUserId(http.User)!;
         var entries = db.PointsLedgerEntries.AsNoTracking().Where(entry => entry.UserId == userId);
@@ -135,15 +135,4 @@ public static class WalletEndpoints
             return false;
         }
     }
-
-    private static ProblemHttpResult ValidationProblem(IEnumerable<LoyaltyValidationError> errors) =>
-        TypedResults.Problem(
-            statusCode: StatusCodes.Status400BadRequest,
-            title: "Request is not valid",
-            extensions: new Dictionary<string, object?>
-            {
-                ["code"] = LoyaltyErrorCodes.ValidationFailed,
-                ["errors"] = errors.GroupBy(error => error.Field)
-                    .ToDictionary(group => group.Key, group => group.Select(error => new { error.Field, error.Code }).ToArray()),
-            });
 }

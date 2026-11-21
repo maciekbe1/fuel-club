@@ -4,7 +4,7 @@ namespace FuelClub.Api.Modules.Rewards.Domain;
 
 public sealed record RewardOfferInput(string? Name, string? Description, int PointsCost, decimal DiscountPerLiter, decimal MaxLiters);
 
-public sealed record RewardsValidationError(string Field, string Code);
+public sealed record RewardsValidationError(string Field, string Code) : FuelClub.Api.Infrastructure.IFieldError;
 
 /// <summary>
 /// Offer rules. Precision is checked here: PostgreSQL numeric(p,s) rounds extra decimals on write

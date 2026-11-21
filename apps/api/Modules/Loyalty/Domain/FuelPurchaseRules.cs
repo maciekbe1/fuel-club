@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace FuelClub.Api.Modules.Loyalty.Domain;
 
-public sealed record LoyaltyValidationError(string Field, string Code);
+public sealed record LoyaltyValidationError(string Field, string Code) : FuelClub.Api.Infrastructure.IFieldError;
 
 /// <summary>
 /// Business rules for a fuel purchase. The database repeats range, date and format checks

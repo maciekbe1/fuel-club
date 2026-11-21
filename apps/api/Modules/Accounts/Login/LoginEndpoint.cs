@@ -1,3 +1,4 @@
+using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Modules.Accounts.Application;
 
 namespace FuelClub.Api.Modules.Accounts
@@ -12,18 +13,10 @@ namespace FuelClub.Api.Modules.Accounts
             var result = await accountsService.LoginAsync(request);
             if (!result.Succeeded)
             {
-                return Results.Problem(
-                    statusCode: result.ErrorCode == AccountErrorCodes.RequiredFields
-                        ? StatusCodes.Status400BadRequest
-                        : StatusCodes.Status401Unauthorized,
-                    title: "Login failed",
-                    extensions: new Dictionary<string, object?>
-                    {
-                        ["code"] = result.ErrorCode!,
-                        ["errors"] = result.Errors.GroupBy(error => error.Field)
-                            .ToDictionary(group => group.Key, group => group.Select(error => new { error.Field, error.Code }).ToArray())
-                    }
-                );
+                var status = result.ErrorCode == AccountErrorCodes.RequiredFields
+                    ? StatusCodes.Status400BadRequest
+                    : StatusCodes.Status401Unauthorized;
+                return ApiProblems.Validation("Login failed", result.ErrorCode!, result.Errors, status);
             }
             return Results.NoContent();
         }

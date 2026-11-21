@@ -1,9 +1,10 @@
 "use client";
 
-import { Fuel, RotateCw } from "lucide-react";
+import { Fuel } from "lucide-react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { ApiError, NetworkError } from "@/lib/api/problem";
+import { RetryButton } from "@/components/ui/retry-button";
+import { readErrorMessage } from "@/lib/api/problem";
 import { cn } from "@/lib/utils";
 import { useHistory } from "../hooks";
 import type { Transaction } from "../services";
@@ -16,12 +17,6 @@ const dateTime = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeSty
 const saleDate = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeZone: "UTC" });
 
 const TYPE_LABELS: Record<string, string> = { FuelPurchase: "Tankowanie" };
-
-function errorMessage(error: Error) {
-  if (error instanceof NetworkError) return "Brak połączenia z serwerem.";
-  if (error instanceof ApiError && error.status === 401) return "Sesja wygasła. Zaloguj się ponownie.";
-  return "Nie udało się pobrać historii.";
-}
 
 export function HistoryList() {
   const history = useHistory();
@@ -39,11 +34,8 @@ export function HistoryList() {
   if (history.isError && !history.data)
     return (
       <div role="alert" className="flex flex-col items-start gap-3 rounded-2xl border p-5">
-        <p>{errorMessage(history.error)} Spróbuj ponownie.</p>
-        <Button size="sm" onClick={() => history.refetch()} disabled={history.isFetching}>
-          <RotateCw className={cn("size-4", history.isFetching && "animate-spin")} aria-hidden />
-          Spróbuj ponownie
-        </Button>
+        <p>{readErrorMessage(history.error, "Nie udało się pobrać historii. Spróbuj ponownie.")}</p>
+        <RetryButton busy={history.isFetching} onClick={() => history.refetch()} />
       </div>
     );
 
@@ -74,7 +66,7 @@ export function HistoryList() {
 
       {history.isFetchNextPageError && (
         <p role="alert" className="text-sm text-destructive">
-          {errorMessage(history.error!)} Spróbuj ponownie.
+          {readErrorMessage(history.error, "Nie udało się pobrać historii. Spróbuj ponownie.")}
         </p>
       )}
 

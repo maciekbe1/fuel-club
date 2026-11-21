@@ -34,6 +34,7 @@ internal sealed class RewardOfferConfiguration : IEntityTypeConfiguration<Reward
         {
             RewardsSql.BenefitChecks(table, "RewardOffers");
             table.HasCheckConstraint("CK_RewardOffers_Name_NotBlank", "btrim(\"Name\") <> ''");
+            table.HasCheckConstraint("CK_RewardOffers_Version_Positive", "\"Version\" >= 1");
         });
 
         builder.HasKey(offer => offer.Id);
@@ -46,7 +47,8 @@ internal sealed class RewardOfferConfiguration : IEntityTypeConfiguration<Reward
             .HasPrecision(RewardOfferRules.MaxLitersPrecision, RewardOfferRules.MaxLitersScale);
         builder.Property(offer => offer.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(offer => offer.UpdatedAt).HasDefaultValueSql("now()");
-        builder.Property(offer => offer.Version).IsRowVersion();
+        // EF updates compare the original version and AppDbContext raises it (see BumpRewardOfferVersions).
+        builder.Property(offer => offer.Version).IsConcurrencyToken();
         builder.HasIndex(offer => offer.IsActive);
     }
 }

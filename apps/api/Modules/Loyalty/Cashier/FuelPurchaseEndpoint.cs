@@ -52,7 +52,7 @@ public static class FuelPurchaseEndpoint
         var station = await db.CashierStations.AsNoTracking()
             .SingleOrDefaultAsync(row => row.UserId == cashierId, cancellationToken);
         if (station is null)
-            return Problem(StatusCodes.Status404NotFound, "Cashier station not assigned", LoyaltyErrorCodes.CashierStationMissing);
+            return ApiProblems.Problem(StatusCodes.Status404NotFound, "Cashier station not assigned", LoyaltyErrorCodes.CashierStationMissing);
 
         var input = FuelPurchaseRules.Normalize(new FuelPurchaseInput(
             request.Amount,
@@ -60,21 +60,21 @@ public static class FuelPurchaseEndpoint
             new ReceiptKey(station.StationCode, station.RegisterCode, request.SaleDate, request.ReceiptNumber ?? string.Empty)));
         errors.AddRange(FuelPurchaseRules.Validate(input, stationClock.Today));
         if (errors.Count > 0)
-            return ValidationProblem(errors);
+            return LoyaltyProblems.Validation("Purchase is not valid", errors);
 
         var card = await db.LoyaltyCards.AsNoTracking()
             .Where(c => c.Code == cardCode && c.RevokedAt == null)
             .Select(c => new { c.Id, c.UserId })
             .SingleOrDefaultAsync(cancellationToken);
         if (card is null)
-            return CardNotFound();
+            return LoyaltyProblems.CardNotFound();
 
         if (!await customerLock.TryAcquireAsync(card.UserId, cancellationToken))
-            return CustomerBusy(http);
+            return LoyaltyProblems.CustomerBusy(http);
 
         // A new statement after the lock sees rotations committed while this request waited.
         if (!await db.LoyaltyCards.AnyAsync(c => c.Id == card.Id && c.RevokedAt == null, cancellationToken))
-            return CardNotFound();
+            return LoyaltyProblems.CardNotFound();
 
         // No coupon yet: nothing is discounted, the customer pays the gross amount.
         var points = PointsPolicy.ForPaidAmount(input.Amount);
@@ -102,7 +102,7 @@ public static class FuelPurchaseEndpoint
             when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: ReceiptConstraint })
         {
             // No owner information: the receipt may belong to another customer.
-            return Problem(StatusCodes.Status409Conflict, "Receipt already registered", LoyaltyErrorCodes.ReceiptAlreadyRegistered);
+            return ApiProblems.Problem(StatusCodes.Status409Conflict, "Receipt already registered", LoyaltyErrorCodes.ReceiptAlreadyRegistered);
         }
 
         // Below 1 zł: the purchase is recorded, balance and history stay unchanged.
@@ -138,31 +138,4 @@ public static class FuelPurchaseEndpoint
             """).ToListAsync(cancellationToken);
         return balances.Single();
     }
-
-    private static ProblemHttpResult CardNotFound() =>
-        Problem(StatusCodes.Status404NotFound, "Loyalty card not found", LoyaltyErrorCodes.CardNotFound);
-
-    /// <summary>Transient and not stored by idempotency (5xx): the client retries with the same key.</summary>
-    private static ProblemHttpResult CustomerBusy(HttpContext http)
-    {
-        http.Response.Headers.RetryAfter = "1";
-        return Problem(StatusCodes.Status503ServiceUnavailable, "Another operation on this customer is in progress", LoyaltyErrorCodes.CustomerBusy);
-    }
-
-    private static ProblemHttpResult ValidationProblem(IEnumerable<LoyaltyValidationError> errors) =>
-        TypedResults.Problem(
-            statusCode: StatusCodes.Status400BadRequest,
-            title: "Purchase is not valid",
-            extensions: new Dictionary<string, object?>
-            {
-                ["code"] = LoyaltyErrorCodes.ValidationFailed,
-                ["errors"] = errors.GroupBy(error => error.Field)
-                    .ToDictionary(group => group.Key, group => group.Select(error => new { error.Field, error.Code }).ToArray()),
-            });
-
-    private static ProblemHttpResult Problem(int status, string title, string code) =>
-        TypedResults.Problem(
-            statusCode: status,
-            title: title,
-            extensions: new Dictionary<string, object?> { ["code"] = code });
 }

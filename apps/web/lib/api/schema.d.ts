@@ -637,13 +637,259 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rewards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RewardsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/rewards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRewardsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description UUID chosen by the client; reuse it only to retry the same request. */
+                    "Idempotency-Key": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateRewardRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRewardResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/rewards/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRewardResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        /** @description Replaces the whole offer, including isActive. 'version' must be the version the form was loaded with: a stale version returns 409 rewards.offer_version_conflict and nothing is saved. Not idempotent: after a lost response a retry gets 409 because the first attempt already raised the version, which does not prove that someone else changed the offer - reload it. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateRewardRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRewardResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AdminRewardResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            /** Format: int32 */
+            pointsCost: number;
+            /** Format: double */
+            discountPerLiter: number;
+            /** Format: double */
+            maxLiters: number;
+            isActive: boolean;
+            /** Format: int32 */
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AdminRewardsResponse: {
+            items: components["schemas"]["AdminRewardResponse"][];
+        };
         CashierStationResponse: {
             stationCode: string;
             registerCode: string;
+        };
+        CreateRewardRequest: {
+            name: null | string;
+            description: null | string;
+            /** Format: int32 */
+            pointsCost: null | number;
+            /** Format: double */
+            discountPerLiter: null | number;
+            /** Format: double */
+            maxLiters: null | number;
+            isActive: null | boolean;
         };
         CsrfTokenResponse: {
             token: string;
@@ -692,6 +938,21 @@ export interface components {
             password: string;
             displayName: string;
         };
+        RewardResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            /** Format: int32 */
+            pointsCost: number;
+            /** Format: double */
+            discountPerLiter: number;
+            /** Format: double */
+            maxLiters: number;
+        };
+        RewardsResponse: {
+            items: components["schemas"]["RewardResponse"][];
+        };
         TransactionFuelPurchase: {
             /** Format: uuid */
             purchaseId: string;
@@ -718,6 +979,19 @@ export interface components {
         TransactionsResponse: {
             items: components["schemas"]["TransactionItem"][];
             nextCursor: null | string;
+        };
+        UpdateRewardRequest: {
+            name: null | string;
+            description: null | string;
+            /** Format: int32 */
+            pointsCost: null | number;
+            /** Format: double */
+            discountPerLiter: null | number;
+            /** Format: double */
+            maxLiters: null | number;
+            isActive: null | boolean;
+            /** Format: int32 */
+            version: null | number;
         };
         WalletResponse: {
             /** Format: int32 */

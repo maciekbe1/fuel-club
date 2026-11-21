@@ -18,6 +18,34 @@ namespace FuelClub.Api.Infrastructure
         public DbSet<Coupon> Coupons => Set<Coupon>();
         public DbSet<Idempotency.IdempotencyRecord> IdempotencyRecords => Set<Idempotency.IdempotencyRecord>();
 
+        /// <summary>
+        /// Every tracked EF update of an offer raises its version and UpdatedAt, so a form loaded before
+        /// that change gets 409. The admin endpoint writes with a conditional UPDATE and bumps both itself.
+        /// ExecuteUpdate bypasses SaveChanges: it must set "Version" = "Version" + 1 explicitly.
+        /// </summary>
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            BumpRewardOfferVersions();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            BumpRewardOfferVersions();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        private void BumpRewardOfferVersions()
+        {
+            // Entries() runs change detection only when AutoDetectChangesEnabled, like SaveChanges itself.
+            foreach (var entry in ChangeTracker.Entries<RewardOffer>().Where(entry => entry.State == EntityState.Modified))
+            {
+                var version = entry.Property(offer => offer.Version);
+                version.CurrentValue = version.OriginalValue + 1;
+                entry.Entity.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

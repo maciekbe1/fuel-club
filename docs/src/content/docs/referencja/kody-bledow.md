@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-Błędy domenowe mają format ProblemDetails z dwoma rozszerzeniami:
+Błędy domenowe mają format ProblemDetails z dwoma rozszerzeniami. Kształt buduje w jednym miejscu `Infrastructure/ApiProblems.cs` (moduły podają tylko kod i tytuł; błędy pól implementują `IFieldError`):
 
 ```json
 {
@@ -59,6 +59,17 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `loyalty.validation_failed` | - | `400`: błędy pól w `errors` (zakup: kody `loyalty.*` wyżej, także `cardCode`; historia: `limit`, `cursor`) |
 | `loyalty.limit_out_of_range` | `limit` | `limit` historii poza zakresem 1-100 |
 | `loyalty.invalid_cursor` | `cursor` | kursor historii niepoprawny |
+| `rewards.validation_failed` | - | `400`: błędy pól oferty w `errors` |
+| `rewards.required_field` | `name`, `pointsCost`, `discountPerLiter`, `maxLiters`, `isActive`, `version` | brak wartości (brak liczby to `required_field`, nie „poza zakresem”) |
+| `rewards.too_long` | `name`, `description` | maks. 100 / 500 znaków |
+| `rewards.points_cost_out_of_range` | `pointsCost` | 1 - 1 000 000 |
+| `rewards.discount_per_liter_out_of_range` | `discountPerLiter` | `0 < stawka ≤ 10` zł/l |
+| `rewards.discount_per_liter_precision` | `discountPerLiter` | maks. 2 miejsca po przecinku |
+| `rewards.max_liters_out_of_range` | `maxLiters` | `0 < limit ≤ 1000` l |
+| `rewards.max_liters_precision` | `maxLiters` | maks. 3 miejsca po przecinku |
+| `rewards.version_out_of_range` | `version` | wersja `< 1` |
+| `rewards.offer_not_found` | - | `404`: brak oferty |
+| `rewards.offer_version_conflict` | - | `409`: wersja z formularza nie jest aktualna; nic nie zapisano |
 | `loyalty.card_not_found` | - | `404`: kod karty nieznany albo unieważniony - celowo bez rozróżnienia |
 | `loyalty.receipt_already_registered` | - | `409`: paragon (stacja, kasa, data, numer) już zapisany; bez informacji o właścicielu |
 | `loyalty.customer_busy` | - | `503` + `Retry-After`: inna operacja na tym kliencie trwa dłużej niż `Loyalty:CustomerLockTimeout`; ponów z tym samym kluczem (niezapisywany) |

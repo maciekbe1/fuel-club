@@ -69,7 +69,7 @@ Klucze i mapa „co unieważnić po operacji” są w `lib/query-keys.ts`. Wylog
 
 ### 9. Formularze
 
-RHF + zod (`features/*/schemas.ts`). Błędy z ProblemDetails (`errors[field][].code`) mapuje `applyFieldErrors()`, a słownik `kod -> komunikat PL` leży w schemas danego feature.
+RHF + zod (`features/*/schemas.ts`). Błędy z ProblemDetails (`errors[field][].code`) mapuje `applyFieldErrors()`, wspólne komunikaty odczytu (brak połączenia, sesja wygasła) daje `readErrorMessage()` z `lib/api/problem.ts`, a słownik `kod -> komunikat PL` leży w schemas danego feature.
 
 ## Struktura
 

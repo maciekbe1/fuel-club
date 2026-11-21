@@ -48,11 +48,7 @@ internal sealed class CsrfValidationFilter(IAntiforgery antiforgery) : IEndpoint
             return await next(context);
 
         if (!await antiforgery.IsRequestValidAsync(http))
-            return Results.Problem(
-                statusCode: StatusCodes.Status403Forbidden,
-                title: "Invalid CSRF token",
-                extensions: new Dictionary<string, object?> { ["code"] = Csrf.InvalidCode }
-            );
+            return ApiProblems.Problem(StatusCodes.Status403Forbidden, "Invalid CSRF token", Csrf.InvalidCode);
 
         return await next(context);
     }

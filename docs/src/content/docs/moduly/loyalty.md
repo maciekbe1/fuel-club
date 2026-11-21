@@ -233,7 +233,7 @@ Stany ładowania i błędu salda sprawdzone ręcznie (telefon 390 px i desktop).
 - Kod wyświetlany w grupach po 4 znaki; „Kopiuj kod” kopiuje surowy kod (26 znaków).
 - Wydanie i wymiana: `useIdempotentMutation`. Odpowiedź mutacji **nie jest wyświetlana** - odtworzona odpowiedź opisuje pierwotną operację, a nie bieżący stan. Po każdej próbie (sukces lub błąd) karta jest pobierana ponownie przez `GET`; mutacja pozostaje w toku do końca tego odczytu.
 - Wymiana wymaga potwierdzenia („Tak, wymień” / „Anuluj”). „Anuluj” jest tylko **przed wysłaniem**. Przy nieznanym wyniku nie ma czego anulować - serwer mógł już wymienić kod - więc zostaje wyłącznie „Ponów wymianę” z informacją, że ponowienie jest bezpieczne.
-- Mutacje (`useIssueCard`, `useRotateCard`) są w `LoyaltyCardPanel`, nad zmiennymi widokami (ładowanie, błąd, brak karty, karta). Klucz niezakończonej operacji przetrwa więc nieudany odczyt karty między próbami. Nieudane odświeżenie przy znanej karcie pokazuje ostrzeżenie „pokazany stan może być nieaktualny” zamiast zastępować widok; pełny ekran błędu jest tylko wtedy, gdy karta nie została jeszcze ani razu wczytana.
+- Mutacje (`useIssueCard`, `useRotateCard`) są w `LoyaltyCardPanel`, nad zmiennymi widokami (`NoCard`, `ActiveCard`) (ładowanie, błąd, brak karty, karta). Klucz niezakończonej operacji przetrwa więc nieudany odczyt karty między próbami. Nieudane odświeżenie przy znanej karcie pokazuje ostrzeżenie „pokazany stan może być nieaktualny” zamiast zastępować widok; pełny ekran błędu jest tylko wtedy, gdy karta nie została jeszcze ani razu wczytana.
 - Brak odpowiedzi (błąd sieci): komunikat, że wynik jest nieznany, i przycisk „Ponów”, który wysyła **ten sam** `Idempotency-Key`.
 
 Klucz w `useIdempotentMutation` (`lib/idempotency.ts`):
@@ -271,7 +271,7 @@ QR odczytuje czytnik w [panelu kasjera](#frontend---panel-kasjera).
 
 `/kasa` renderuje `CashierPanel` z `features/cashier/` (`services.ts` → `hooks.ts` → `schemas.ts`, `components/`). Na ekranie głównym odnośnik „Kasa” widzi tylko konto z rolą `Cashier`. Konto bez stanowiska (np. klient) dostaje komunikat zamiast formularza - o dostępie i tak decyduje API.
 
-- Zakup w toku (formularz, mutacja z kluczem, dane do ponowienia) jest w `CashierPanel`, nad widokami stanowiska. Nieudane odświeżenie stanowiska (np. po powrocie do okna) pokazuje ostrzeżenie i nie usuwa formularza.
+- Zakup w toku (formularz, mutacja z kluczem, dane do ponowienia) to `usePurchaseFlow`, wywoływany w `CashierPanel` nad widokami stanowiska; `PurchaseForm` i `UnknownOutcome` dostają go z góry. Nieudane odświeżenie stanowiska (np. po powrocie do okna) pokazuje ostrzeżenie i nie usuwa formularza.
 - Stanowisko: `GET /api/cashier/station`, tylko do odczytu. Formularz nie wysyła stacji ani kasy - API bierze je ze stanowiska zalogowanego kasjera.
 - Pola: kod karty, kwota, litry, data sprzedaży (domyślnie dziś w Europe/Warsaw, bez przyszłych dat), numer paragonu. Kwota i litry przyjmują przecinek i są wysyłane jako **liczby JSON** (`"123,45"` → `123.45`); kod karty bez spacji, wielkimi literami.
 - Wynik: „Zakup zapisany. Przyznano N pkt.” (przy 0 pkt dopisek o kwocie poniżej 1 zł); formularz czyszczony dla następnego klienta. Kasjer nie widzi salda klienta.

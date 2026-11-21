@@ -59,11 +59,7 @@ public static class Idempotency
             return Task.CompletedTask;
         });
 
-    internal static IResult Problem(int status, string title, string code) =>
-        Results.Problem(
-            statusCode: status,
-            title: title,
-            extensions: new Dictionary<string, object?> { ["code"] = code });
+    internal static IResult Problem(int status, string title, string code) => ApiProblems.Problem(status, title, code);
 }
 
 public sealed class IdempotentEndpointMetadata;

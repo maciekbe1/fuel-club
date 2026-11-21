@@ -1,9 +1,9 @@
 "use client";
 
-import { RotateCw } from "lucide-react";
 import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { ApiError, NetworkError } from "@/lib/api/problem";
+import { buttonVariants } from "@/components/ui/button";
+import { RetryButton } from "@/components/ui/retry-button";
+import { ApiError, readErrorMessage } from "@/lib/api/problem";
 import { cn } from "@/lib/utils";
 import { useWallet } from "../hooks";
 
@@ -11,12 +11,6 @@ const points = new Intl.NumberFormat("pl-PL");
 
 export function formatPoints(value: number) {
   return `${points.format(value)} pkt`;
-}
-
-function errorMessage(error: Error) {
-  if (error instanceof NetworkError) return "Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie.";
-  if (error instanceof ApiError && error.status === 401) return "Sesja wygasła. Zaloguj się ponownie.";
-  return "Nie udało się pobrać salda. Spróbuj ponownie za chwilę.";
 }
 
 export function BalanceCard({ className }: { className?: string }) {
@@ -47,7 +41,7 @@ export function BalanceCard({ className }: { className?: string }) {
 
         {wallet.isError && (
           <div className="flex flex-col items-start gap-3" role="alert">
-            <p className="text-sm text-white/90">{errorMessage(wallet.error)}</p>
+            <p className="text-sm text-white/90">{readErrorMessage(wallet.error, "Nie udało się pobrać salda. Spróbuj ponownie za chwilę.")}</p>
             {wallet.error instanceof ApiError && wallet.error.status === 401 ? (
               <Link
                 href="/login"
@@ -56,15 +50,11 @@ export function BalanceCard({ className }: { className?: string }) {
                 Zaloguj się
               </Link>
             ) : (
-              <Button
-                size="sm"
+              <RetryButton
+                busy={wallet.isFetching}
                 onClick={() => wallet.refetch()}
-                disabled={wallet.isFetching}
                 className="bg-brand-orange text-brand-navy hover:bg-brand-orange/90"
-              >
-                <RotateCw className={cn("size-4", wallet.isFetching && "animate-spin")} aria-hidden />
-                Spróbuj ponownie
-              </Button>
+              />
             )}
           </div>
         )}

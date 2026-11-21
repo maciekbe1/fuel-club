@@ -492,11 +492,9 @@ namespace FuelClub.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<uint>("Version")
+                    b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -511,6 +509,8 @@ namespace FuelClub.Api.Migrations
                             t.HasCheckConstraint("CK_RewardOffers_Name_NotBlank", "btrim(\"Name\") <> ''");
 
                             t.HasCheckConstraint("CK_RewardOffers_PointsCost_Range", "\"PointsCost\" >= 1 AND \"PointsCost\" <= 1000000");
+
+                            t.HasCheckConstraint("CK_RewardOffers_Version_Positive", "\"Version\" >= 1");
                         });
                 });
 

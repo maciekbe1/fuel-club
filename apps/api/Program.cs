@@ -1,3 +1,4 @@
+using FuelClub.Api.Modules.Rewards;
 using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Csrf;
 using FuelClub.Api.Infrastructure.DemoData;
@@ -42,6 +43,7 @@ app.MapCsrfEndpoint();
 app.MapAccountsEndpoints();
 app.MapAdminEndpoints();
 app.MapLoyaltyEndpoints();
+app.MapRewardsEndpoints();
 
 foreach (var additional in app.Services.GetServices<IAdditionalEndpoints>())
     additional.Map(app);

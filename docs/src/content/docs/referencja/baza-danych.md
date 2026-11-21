@@ -17,6 +17,7 @@ Jeden `AppDbContext` (EF Core + Npgsql), dziedziczy po `IdentityDbContext<Applic
 | `*_CashierStations` | `CashierStations` - stanowisko kasjera |
 | `*_LedgerSequence` | `PointsLedgerEntries.Sequence` (identity, `UNIQUE`, indeks `(UserId, Sequence)`); jawne uzupełnienie istniejących wpisów według `(CreatedAt, Id)` - przybliżenie |
 | `*_RewardsModel` | `RewardOffers`, `Coupons`; `FuelPurchases.Amount` → `GrossAmount` (zmiana nazwy, dane zachowane), nowe `Discount` i `PaidAmount` uzupełnione jawnie (`0`, `GrossAmount`); typ `CouponExchange` i znak `Delta` w historii punktów |
+| `*_RewardOfferVersion` | `RewardOffers.Version` (`integer`, `CHECK >= 1`) zamiast `xmin`; istniejące oferty dostają `1`, bez wartości domyślnej |
 | `*_LoyaltyCards` | `LoyaltyCards` - karty, jedna aktywna na użytkownika |
 | `*_IdempotencyRecords` | `IdempotencyRecords` - klucze idempotencji i zapisane odpowiedzi |
 

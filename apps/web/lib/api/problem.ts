@@ -52,3 +52,10 @@ export function applyFieldErrors<T extends FieldValues>(
   }
   return applied;
 }
+
+/** Message for a failed read: the shared cases (no connection, expired session) plus the screen's own fallback. */
+export function readErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof NetworkError) return "Brak połączenia z serwerem. Spróbuj ponownie.";
+  if (error instanceof ApiError && error.status === 401) return "Sesja wygasła. Zaloguj się ponownie.";
+  return fallback;
+}

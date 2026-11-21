@@ -66,6 +66,38 @@ test("issue, read and rotate the card; a retry after a lost response reuses the 
   expect(external).toEqual([]);
 });
 
+test("an unreadable response is an unknown outcome: retry only, with the same key", async ({ page, customer }) => {
+  void customer;
+  await page.goto("/karta");
+  await page.getByRole("button", { name: "Wydaj kartę" }).click();
+  const code = page.getByTestId("card-code");
+  await expect(code).toBeVisible();
+
+  const keys: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/me/loyalty-card/rotate")) keys.push(request.headers()["idempotency-key"]);
+  });
+  let committed: string | undefined;
+  // The server commits, but the browser gets 200 with a body that is not JSON.
+  await page.route(ROTATE, async (route) => {
+    const response = await route.fetch();
+    committed = ((await response.json()) as { code: string }).code;
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{" });
+  });
+
+  await page.getByRole("button", { name: "Wymień kod" }).click();
+  await page.getByRole("button", { name: "Tak, wymień" }).click();
+  const rotation = page.getByRole("region", { name: "Wymiana kodu" });
+  await expect(rotation.getByRole("alert")).toContainText("Nie wiemy, czy operacja się udała");
+  await expect(rotation.getByRole("button", { name: "Anuluj" })).toHaveCount(0);
+
+  await page.unroute(ROTATE);
+  await rotation.getByRole("button", { name: "Ponów wymianę" }).click();
+  await expect(code).toHaveAttribute("data-code", committed!);
+  expect(keys).toHaveLength(2);
+  expect(keys[1]).toBe(keys[0]);
+});
+
 test("copying puts the raw code on the clipboard", async ({ page, context, customer, browserName }) => {
   void customer;
   test.skip(browserName !== "chromium", "clipboard permissions are Chromium-only");

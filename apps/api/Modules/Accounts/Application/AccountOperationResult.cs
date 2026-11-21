@@ -1,6 +1,6 @@
 namespace FuelClub.Api.Modules.Accounts.Application;
 
-public sealed record AccountValidationError(string Field, string Code);
+public sealed record AccountValidationError(string Field, string Code) : FuelClub.Api.Infrastructure.IFieldError;
 
 public sealed record AccountOperationResult(bool Succeeded, string? ErrorCode, IReadOnlyList<AccountValidationError> Errors)
 {

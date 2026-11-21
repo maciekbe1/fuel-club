@@ -23,6 +23,9 @@ public sealed class RewardOffer
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
-    /// <summary>Maps to PostgreSQL xmin; guards concurrent edits.</summary>
-    public uint Version { get; set; }
+    /// <summary>
+    /// Edit version, starts at 1. An edit sends the version it was based on; the conditional UPDATE
+    /// increments it atomically and rejects a stale form (409).
+    /// </summary>
+    public int Version { get; set; } = 1;
 }

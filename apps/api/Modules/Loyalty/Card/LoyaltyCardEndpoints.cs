@@ -32,7 +32,7 @@ public static class LoyaltyCardEndpoints
             .Select(c => new LoyaltyCardResponse(c.Code, c.IssuedAt))
             .SingleOrDefaultAsync(cancellationToken);
 
-        return card is null ? CardMissing() : TypedResults.Ok(card);
+        return card is null ? LoyaltyProblems.CardMissing() : TypedResults.Ok(card);
     }
 
     public static async Task<Results<Created<LoyaltyCardResponse>, ProblemHttpResult>> Issue(
@@ -45,14 +45,10 @@ public static class LoyaltyCardEndpoints
     {
         var userId = users.GetUserId(http.User)!;
         if (!await customerLock.TryAcquireAsync(userId, cancellationToken))
-            return CustomerBusy(http);
+            return LoyaltyProblems.CustomerBusy(http);
 
         if (await ActiveCard(db, userId).AnyAsync(cancellationToken))
-            return Problem(
-                StatusCodes.Status409Conflict,
-                "Loyalty card already issued",
-                LoyaltyErrorCodes.CardAlreadyIssued
-            );
+            return ApiProblems.Problem(StatusCodes.Status409Conflict, "Loyalty card already issued", LoyaltyErrorCodes.CardAlreadyIssued);
 
         var card = await AddCardAsync(db, userId, cancellationToken);
         return TypedResults.Created(Path, new LoyaltyCardResponse(card.Code, card.IssuedAt));
@@ -68,11 +64,11 @@ public static class LoyaltyCardEndpoints
     {
         var userId = users.GetUserId(http.User)!;
         if (!await customerLock.TryAcquireAsync(userId, cancellationToken))
-            return CustomerBusy(http);
+            return LoyaltyProblems.CustomerBusy(http);
 
         var current = await ActiveCard(db, userId).SingleOrDefaultAsync(cancellationToken);
         if (current is null)
-            return CardMissing();
+            return LoyaltyProblems.CardMissing();
 
         // The old code stops working in the same commit that activates the new one.
         current.RevokedAt = DateTimeOffset.UtcNow;
@@ -102,25 +98,4 @@ public static class LoyaltyCardEndpoints
         await db.SaveChangesAsync(cancellationToken);
         return card;
     }
-
-    /// <summary>Transient and not stored by idempotency (5xx): the client retries with the same key.</summary>
-    private static ProblemHttpResult CustomerBusy(HttpContext http)
-    {
-        http.Response.Headers.RetryAfter = "1";
-        return Problem(StatusCodes.Status503ServiceUnavailable, "Another operation on this customer is in progress", LoyaltyErrorCodes.CustomerBusy);
-    }
-
-    private static ProblemHttpResult CardMissing() =>
-        Problem(
-            StatusCodes.Status404NotFound,
-            "Loyalty card not issued",
-            LoyaltyErrorCodes.CardMissing
-        );
-
-    private static ProblemHttpResult Problem(int status, string title, string code) =>
-        TypedResults.Problem(
-            statusCode: status,
-            title: title,
-            extensions: new Dictionary<string, object?> { ["code"] = code }
-        );
 }

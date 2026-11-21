@@ -15,6 +15,11 @@ Pełny, aktualny kontrakt: `GET /openapi/v1.json` (Development). Ta tabela opisu
 | `POST /api/auth/logout` | zalogowany | tak | `204` | `401`, `403 csrf.invalid` |
 | `GET /api/auth/me` | zalogowany | - | `200 { id, email, displayName, roles }` | `401` |
 | `GET /api/admin/access` | rola `Admin` | - | `204` | `401`, `403` |
+| `GET /api/rewards` | rola `User` | - | `200 { items[] }`: aktywne oferty, kolejność koszt → nazwa → `id` | `401`, `403` |
+| `GET /api/admin/rewards` | rola `Admin` | - | `200 { items[] }`: wszystkie oferty z `isActive`, `version` | `401`, `403` |
+| `GET /api/admin/rewards/{id}` | rola `Admin` | - | `200` oferta z `version` | `401`, `403`, `404 rewards.offer_not_found` |
+| `POST /api/admin/rewards` | rola `Admin`, CSRF, `Idempotency-Key` | `{ name, description, pointsCost, discountPerLiter, maxLiters, isActive }` | `201` + `Location`, `version: 1` | `400 rewards.validation_failed`, `400` brak/zły klucz idempotencji, `401`, `403`, `403 csrf.invalid`, `409 idempotency.key_reused`, `409 idempotency.in_progress` |
+| `PUT /api/admin/rewards/{id}` | rola `Admin`, CSRF | cały formularz + `version` | `200` oferta z nową `version` | `400 rewards.validation_failed`, `401`, `403`, `403 csrf.invalid`, `404 rewards.offer_not_found`, `409 rewards.offer_version_conflict` |
 | `GET /api/me/wallet` | rola `User` | - | `200 { balance }` (0 bez konta) | `401`, `403` |
 | `GET /api/me/transactions?limit=&cursor=` | rola `User` | - | `200 { items[], nextCursor }`; zakupy za 0 pkt nie występują | `400 loyalty.validation_failed`, `401`, `403` |
 | `GET /api/me/loyalty-card` | rola `User` | - | `200 { code, issuedAt }` | `401`, `403`, `404 loyalty.card_missing` |
@@ -40,5 +45,5 @@ Liczby w JSON muszą być liczbami (`10`, nie `"10"`): API ma `JsonNumberHandlin
 Format błędów: [Kody błędów](/referencja/kody-bledow/).
 
 :::caution[Planowane]
-Nagrody, kupony, panel kasjera (realizacje kuponów), panel administratora (oferty), czat SSE i obserwowalność - patrz `PLAN-MVP.md`, sekcja „API - proponowane granice”.
+Wymiana punktów, kupony, realizacja kuponu w kasie, interfejs ofert, czat SSE i obserwowalność - patrz `PLAN-MVP.md`, sekcja „API - proponowane granice”.
 :::
