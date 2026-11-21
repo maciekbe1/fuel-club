@@ -1,0 +1,15 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local env files
+.env
+.env.*

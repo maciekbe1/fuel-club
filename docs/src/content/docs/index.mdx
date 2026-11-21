@@ -1,0 +1,45 @@
+---
+title: Fuel Club
+description: Dokumentacja demo programu lojalnościowego stacji paliw.
+---
+
+import { Card, CardGrid, Badge } from "@astrojs/starlight/components";
+
+Fuel Club to demo programu lojalnościowego stacji paliw: punkty za tankowanie, kupony i czat AI. Zakres MVP opisuje `PLAN-MVP.md` w katalogu głównym repozytorium.
+
+## Jak czytać tę dokumentację
+
+Dokumentacja jest ułożona według [Diátaxis](https://diataxis.fr/):
+
+<CardGrid>
+  <Card title="Nauka" icon="open-book">
+    Prowadzi krok po kroku. Zacznij od [pierwszej sesji](/nauka/pierwsza-sesja/).
+  </Card>
+  <Card title="Instrukcje" icon="list-format">
+    Konkretne zadania: [uruchomienie](/instrukcje/uruchomienie-lokalne/), testy, migracje, administrator.
+  </Card>
+  <Card title="Referencja" icon="information">
+    Fakty do sprawdzenia: [mapa projektu](/referencja/mapa-projektu/), endpointy, konfiguracja, kody błędów.
+  </Card>
+  <Card title="Wyjaśnienia" icon="puzzle">
+    Dlaczego tak działa: sesja, CSRF, role, transakcje.
+  </Card>
+</CardGrid>
+
+Każdy moduł ma stronę w sekcji **Moduły** w stałym układzie: co robi, gdzie jest kod, przepływ, dane, zabezpieczenia, testy. Istotne decyzje są w sekcji **Decyzje (ADR)**.
+
+## Stan modułów
+
+| Moduł | Stan | Zakres |
+| --- | --- | --- |
+| [Accounts](/moduly/accounts/) | <Badge text="zrealizowany" variant="success" /> | rejestracja, logowanie, sesja, role, CSRF, administrator startowy |
+| [Loyalty](/moduly/loyalty/) | <Badge text="w trakcie" variant="note" /> | model danych, reguła naliczania, API gotowe: kasjer, karta, idempotencja, zakup przez kasę, saldo i historia; frontend planowany |
+| Rewards | <Badge text="planowany" variant="caution" /> | oferty, wymiana, kupony, odbiór |
+| Assistant | <Badge text="planowany" variant="caution" /> | czat SSE, narzędzia, potwierdzenia |
+| Observability | <Badge text="planowany" variant="caution" /> | logi, anomalie |
+
+Elementy planowane oznaczamy w tekście jako <Badge text="planowane" variant="caution" />. Opisują zamiar, nie działający kod.
+
+## Zasada aktualności
+
+Zmiana zachowania aplikacji i aktualizacja dokumentacji trafiają do tego samego commita lub PR-a.

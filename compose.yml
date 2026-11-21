@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: fuelclub
+      POSTGRES_USER: fuelclub
+      POSTGRES_PASSWORD: fuelclub_local
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fuelclub -d fuelclub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  postgres-test:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: fuelclub_test
+      POSTGRES_USER: fuelclub_test
+      POSTGRES_PASSWORD: fuelclub_test
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fuelclub_test -d fuelclub_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  postgres_test_data:

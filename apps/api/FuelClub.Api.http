@@ -1,0 +1,11 @@
+@FuelClub.Api_HostAddress = http://localhost:5271
+
+GET {{FuelClub.Api_HostAddress}}/api/auth/csrf
+Accept: application/json
+
+###
+
+GET {{FuelClub.Api_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
