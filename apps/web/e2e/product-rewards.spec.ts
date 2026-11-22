@@ -196,7 +196,7 @@ test("lost handover response, then 429 on the retry: still unknown, the same key
   ]);
 });
 
-test("the state of one reward code does not carry over to another, the banner belongs to its card", async ({
+test("an unknown handover locks the till until the retry resolves it; the next code starts clean", async ({
   page,
   browser,
   customer,
@@ -214,7 +214,7 @@ test("the state of one reward code does not carry over to another, the banner be
   const coupon = register.getByLabel("Kod kuponu");
 
   await register.getByLabel("Kod karty klienta").fill(card);
-  // The second code first, so its terms are cached when the cashier comes back to it.
+  // Both panels appear for their codes.
   await coupon.fill(codes[1]);
   await expect(handover).toContainText(second);
   await coupon.fill(codes[0]);
@@ -236,7 +236,7 @@ test("the state of one reward code does not carry over to another, the banner be
       .filter({ hasText: `Wydano nagrodę „${first}”` }),
   ).toBeVisible();
 
-  // The second code (terms cached) starts clean.
+  // The next code starts with a clean panel.
   await coupon.fill(codes[1]);
   await expect(handover).toContainText(second);
   await expect(handover.getByRole("alert")).toHaveCount(0);
@@ -330,5 +330,44 @@ test("after an unknown outcome and a 401 the form stays locked, the retry resolv
   await cardField.fill(card);
   await expect(register.getByLabel("Kod karty klienta")).toHaveValue(card);
   await expect(banner).toHaveCount(0);
+  await context.close();
+});
+
+test("a final 409 from another till stays in the panel with that station and till", async ({
+  page,
+  browser,
+  customer,
+  staff,
+  baseURL,
+}) => {
+  void customer;
+  const name = offerName("Kawa");
+  const { card, codes } = await activeRewards(page, staff, baseURL!, [name]);
+  const { context, page: register } = await till(browser, baseURL!);
+  // Handed over elsewhere after this till read the terms (mocked: one cashier account in e2e).
+  await register.route(HANDOVERS, (route) =>
+    route.fulfill({
+      status: 409,
+      contentType: "application/problem+json",
+      body: JSON.stringify({
+        status: 409,
+        code: "rewards.coupon_redeemed",
+        handedOverAt: "2026-11-22T13:32:00Z",
+        stationCode: "S-99",
+        registerCode: "K9",
+      }),
+    }),
+  );
+  await register.getByLabel("Kod karty klienta").fill(card);
+  await register.getByLabel("Kod kuponu").fill(codes[0]);
+  const handover = register.getByTestId("reward-handover");
+  await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
+  const alert = handover.getByRole("alert");
+  await expect(alert).toContainText("na stanowisku S-99, kasa K9");
+  await expect(alert).toContainText("14:32");
+  // Not replaced by a refetched preview.
+  await register.waitForTimeout(500);
+  await expect(alert).toContainText("na stanowisku S-99, kasa K9");
+  await expect(register.getByLabel("Kod kuponu")).toBeEnabled();
   await context.close();
 });

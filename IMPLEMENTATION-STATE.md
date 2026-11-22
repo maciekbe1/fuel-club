@@ -358,6 +358,11 @@ Piąte review (`/code-review high`, 6 uwag, wszystkie przyjęte):
 - 409 opisany typem `RewardsConflictProblem` w OpenAPI (bez ręcznych pól w `ProblemDetails`); dokumentacja testów;
 - mutacje (bez blokady, bez porównania kasy) wywracają E2E.
 
+Szóste review (`/code-review high`, 5 uwag, wszystkie przyjęte):
+- ważne: ponowny podgląd po ostatecznej odpowiedzi (moja poprawka z piątej rundy) chował odpowiedź wydania i zużywał limit podglądów - wycofany;
+- regresja: E2E ostatecznego `409` z innej kasy (mutacja z ponownym podglądem wywraca test); pełne E2E 140/140 przed dopisaniem tego testu, który przechodzi osobno;
+- drobne: blokada nie ustawiana po odmontowaniu panelu; pola opcjonalne w `RewardsConflictProblem`; komentarz i dokumentacja blokady zgodne z kodem; nazwa i komentarze testu E2E.
+
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
 ## Następny krok

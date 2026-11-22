@@ -66,8 +66,9 @@ export function usePurchaseFlow() {
   // late success would clear the next customer's code.
   const handingOver =
     useIsMutating({ mutationKey: queryKeys.cashier.rewardHandover }) > 0;
-  // A handover with an unknown outcome locks the form like an unknown purchase: the next customer
-  // cannot be served before it is resolved (only "Ponów wydanie" stays enabled).
+  // A handover with an unknown outcome locks the card and coupon fields, scanners and the purchase
+  // submit, so the next customer cannot be served before it is resolved; "Ponów wydanie" stays
+  // enabled (amount, liters, date and receipt too - they change nothing on their own).
   const [handoverUnresolved, setHandoverUnresolved] = useState(false);
   const purchaseLocked = purchase.isPending || unknown !== null;
   // The whole form (fieldset): not the unresolved handover, whose retry button lives inside it.

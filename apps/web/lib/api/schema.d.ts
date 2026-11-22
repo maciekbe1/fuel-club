@@ -1843,15 +1843,15 @@ export interface components {
             version: number;
         };
         RewardsConflictProblem: {
-            type: null | string;
-            title: null | string;
-            /** Format: int32 */
-            status: null | number;
             code: string;
+            type?: null | string;
+            title?: null | string;
+            /** Format: int32 */
+            status?: null | number;
             /** Format: date-time */
-            handedOverAt: null | string;
-            stationCode: null | string;
-            registerCode: null | string;
+            handedOverAt?: null | string;
+            stationCode?: null | string;
+            registerCode?: null | string;
         };
         RewardsResponse: {
             items: components["schemas"]["RewardResponse"][];

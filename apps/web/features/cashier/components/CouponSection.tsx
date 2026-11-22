@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWatch } from "react-hook-form";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
@@ -286,7 +286,7 @@ const clock = new Intl.DateTimeFormat("pl-PL", {
  * of this till's own attempt is told apart from a handover elsewhere. Null without a usable time.
  */
 function handedOverMessage(error: ApiError, own: CashierStation | undefined) {
-  const problem = error.problem as Partial<RewardsConflictProblem>;
+  const problem = error.problem as RewardsConflictProblem;
   if (!problem.handedOverAt) return null;
   const at = new Date(problem.handedOverAt);
   if (Number.isNaN(at.getTime())) return null;
@@ -344,7 +344,10 @@ function RewardHandover({
   // (429, 503, 401) leaves it unknown. Nothing outlives the panel - after a remount the server's
   // 409 says when and where the reward was handed over (handedOverMessage).
   const [uncertain, setUncertainState] = useState(false);
+  // After unmount a late answer must not set the parent's lock: nothing could clear it.
+  const mounted = useRef(true);
   const setUncertain = (value: boolean) => {
+    if (!mounted.current) return;
     setUncertainState(value);
     onUnresolvedChange(value);
   };
@@ -355,7 +358,13 @@ function RewardHandover({
   const unknown =
     error !== null && (uncertain || (keepsIdempotencyKey(error) && !busy));
   // Unmounted (e.g. after signing in again): the lock goes, the server's 409 resolves it.
-  useEffect(() => () => onUnresolvedChange(false), [onUnresolvedChange]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      onUnresolvedChange(false);
+    };
+  }, [onUnresolvedChange]);
   const refusal = unknown ? null : busy;
 
   const send = async () => {
@@ -365,11 +374,10 @@ function RewardHandover({
       onDone();
     } catch (failure) {
       // Shown below from the mutation state.
-      if (!keepsPendingOperation(failure)) {
-        setUncertain(false);
-        // A final answer: the cached terms are outdated (e.g. already handed over).
-        forgetPreviews();
-      } else if (keepsIdempotencyKey(failure) && !busyMessage(failure))
+      // A final answer stays in this panel (no preview refetch: it would unmount the panel, hide
+      // the answer and spend the per-cashier preview limit); retyping the code gets the 409 again.
+      if (!keepsPendingOperation(failure)) setUncertain(false);
+      else if (keepsIdempotencyKey(failure) && !busyMessage(failure))
         setUncertain(true);
     }
   };

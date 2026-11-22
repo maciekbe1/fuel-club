@@ -10,13 +10,13 @@ namespace FuelClub.Api.Modules.Rewards;
 /// Documentation only - the responses are ProblemDetails with these extensions.
 /// </summary>
 public sealed record RewardsConflictProblem(
-    string? Type,
-    string? Title,
-    int? Status,
     string Code,
-    DateTimeOffset? HandedOverAt,
-    string? StationCode,
-    string? RegisterCode
+    string? Type = null,
+    string? Title = null,
+    int? Status = null,
+    DateTimeOffset? HandedOverAt = null,
+    string? StationCode = null,
+    string? RegisterCode = null
 );
 
 /// <summary>Error responses shared by Rewards endpoints.</summary>
