@@ -1,3 +1,4 @@
+using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Csrf;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
@@ -55,7 +56,7 @@ public static class LoyaltyModule
             .WithTags("Wallet")
             .WithDescription(WalletEndpoints.TransactionsDescription);
 
-        var card = me.MapGroup("/loyalty-card").WithTags("LoyaltyCard");
+        var card = me.MapGroup("/loyalty-card").WithTags("LoyaltyCard").DisableResponseStoring();
 
         card.MapGet("", LoyaltyCardEndpoints.Get).ProducesProblem(StatusCodes.Status404NotFound);
         card.MapPost("", LoyaltyCardEndpoints.Issue)

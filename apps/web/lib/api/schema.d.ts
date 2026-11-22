@@ -834,6 +834,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/coupons/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Activates an own coupon and returns its redemption code. Activating an active coupon returns the same code. A retry with the same Idempotency-Key replays the stored response even if the coupon was redeemed since: read the current state with GET. */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description UUID chosen by the client; reuse it only to retry the same request. */
+                    "Idempotency-Key": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CouponResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/rewards": {
         parameters: {
             query?: never;
@@ -1055,6 +1123,7 @@ export interface components {
             /** Format: double */
             maxLiters: number;
             status: string;
+            code: null | string;
             /** Format: date-time */
             purchasedAt: string;
             /** Format: date-time */

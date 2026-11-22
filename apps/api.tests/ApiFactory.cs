@@ -37,6 +37,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public CustomerLockGate LockGate { get; } = new();
 
+    /// <summary>
+    /// A host with the production session check interval. With the interval at zero every request
+    /// renews the auth cookie, and the cookie handler then adds no-store to every response, which
+    /// would hide a missing Cache-Control in caching tests.
+    /// </summary>
+    public WebApplicationFactory<Program> WithoutPerRequestSessionRenewal() =>
+        WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(30))));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
         builder.ConfigureLogging(logging =>
         {

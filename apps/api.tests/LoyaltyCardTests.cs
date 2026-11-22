@@ -33,12 +33,13 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
 
     private sealed record ProblemCode(string? Code);
 
-    private async Task<(HttpClient Client, string UserId)> LoggedInAsync(string role = RoleNames.User)
+    private async Task<(HttpClient Client, string UserId)> LoggedInAsync(
+        string role = RoleNames.User, WebApplicationFactory<Program>? host = null)
     {
         var email = $"card-{Guid.NewGuid():N}@example.test";
         _emails.Add(email);
         await factory.CreateTestUserAsync(email, Password, role);
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var client = (host ?? factory).CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
         await client.LoginAsync(email, Password);
         await using var scope = factory.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -237,6 +238,25 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(LoyaltyErrorCodes.CardMissing, await ErrorOf(first));
         Assert.True(IsReplayed(retry));
         Assert.Empty(await CardsOfAsync(userId));
+    }
+
+    [Fact]
+    public async Task Card_responses_are_never_stored_including_replays_and_errors()
+    {
+        await using var host = factory.WithoutPerRequestSessionRenewal();
+        var (client, _) = await LoggedInAsync(host: host);
+        var key = NewKey();
+
+        var missing = await client.GetAsync(Card);
+        var issued = await PostAsync(client, Card, key);
+        var replayed = await PostAsync(client, Card, key);
+        var read = await client.GetAsync(Card);
+
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.True(IsReplayed(replayed));
+        foreach (var response in new[] { missing, issued, replayed, read })
+            Assert.True(response.Headers.CacheControl?.NoStore, $"{response.RequestMessage!.Method} {(int)response.StatusCode}");
+        Assert.Null((await client.GetAsync("/api/me/wallet")).Headers.CacheControl);
     }
 
     [Fact]

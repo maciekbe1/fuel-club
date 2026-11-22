@@ -1,3 +1,4 @@
+using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Csrf;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
@@ -36,12 +37,20 @@ public static class RewardsModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
+        // Responses carry redemption codes.
         var coupons = app.MapGroup(MyCouponsEndpoints.Path)
             .WithTags("Coupons")
-            .RequireAuthorization(policy => policy.RequireRole(RoleNames.User));
+            .RequireAuthorization(policy => policy.RequireRole(RoleNames.User))
+            .RequireCsrf()
+            .DisableResponseStoring();
         coupons.MapGet("", MyCouponsEndpoints.GetAll);
         coupons.MapGet("/{id:guid}", MyCouponsEndpoints.GetOne)
             .ProducesProblem(StatusCodes.Status404NotFound);
+        coupons.MapPost("/{id:guid}/activate", ActivateEndpoint.Handle)
+            .RequireIdempotency()
+            .WithDescription(ActivateEndpoint.Description)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         // Admin manages offers; Cashier has no access.
         var admin = app.MapGroup(AdminRewardEndpoints.Path)

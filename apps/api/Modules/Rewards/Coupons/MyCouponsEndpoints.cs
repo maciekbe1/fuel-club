@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelClub.Api.Modules.Rewards.Coupons;
 
-/// <summary>The offer snapshot taken at the exchange. No redemption code until activation.</summary>
+/// <summary>The offer snapshot taken at the exchange. <c>Code</c> is null until activation; shown only to the owner.</summary>
 public sealed record CouponResponse(
     Guid Id,
     Guid OfferId,
@@ -16,13 +16,14 @@ public sealed record CouponResponse(
     decimal DiscountPerLiter,
     decimal MaxLiters,
     string Status,
+    string? Code,
     DateTimeOffset PurchasedAt,
     DateTimeOffset? ActivatedAt,
     DateTimeOffset? RedeemedAt);
 
 public sealed record CouponsResponse(IReadOnlyList<CouponResponse> Items);
 
-/// <summary>Read-only views of the logged-in customer's own coupons. No user parameter exists.</summary>
+/// <summary>Views of the logged-in customer's own coupons. No user parameter exists.</summary>
 public static class MyCouponsEndpoints
 {
     public const string Path = "/api/me/coupons";
@@ -47,14 +48,14 @@ public static class MyCouponsEndpoints
         return coupon is null ? RewardsProblems.CouponNotFound() : TypedResults.Ok(coupon);
     }
 
-    private static IQueryable<Coupon> Own(AppDbContext db, string userId) =>
+    internal static IQueryable<Coupon> Own(AppDbContext db, string userId) =>
         db.Coupons.AsNoTracking().Where(coupon => coupon.UserId == userId);
 
     public static CouponResponse ToResponse(Coupon coupon) => new(
         coupon.Id, coupon.OfferId, coupon.OfferName, coupon.PointsCost, coupon.DiscountPerLiter, coupon.MaxLiters,
-        coupon.Status.ToString(), coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
+        coupon.Status.ToString(), coupon.Code, coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
 
     private static readonly System.Linq.Expressions.Expression<Func<Coupon, CouponResponse>> Projection = coupon => new CouponResponse(
         coupon.Id, coupon.OfferId, coupon.OfferName, coupon.PointsCost, coupon.DiscountPerLiter, coupon.MaxLiters,
-        coupon.Status.ToString(), coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
+        coupon.Status.ToString(), coupon.Code, coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
 }

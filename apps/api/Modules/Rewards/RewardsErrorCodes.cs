@@ -18,4 +18,5 @@ public static class RewardsErrorCodes
     public const string OfferChanged = "rewards.offer_changed";
     public const string InsufficientPoints = "rewards.insufficient_points";
     public const string CouponNotFound = "rewards.coupon_not_found";
+    public const string CouponRedeemed = "rewards.coupon_redeemed";
 }
