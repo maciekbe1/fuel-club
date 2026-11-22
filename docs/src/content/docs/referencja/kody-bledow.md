@@ -78,6 +78,15 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd, zakup) |
 | `rewards.coupon_busy` | - | `503` + `Retry-After`: wiersz kuponu zablokowany dłużej niż `Rewards:CouponLockTimeout` przez inną transakcję (nie przez aktywację - kod trwającej aktywacji nie jest jeszcze widoczny, więc zakup dostaje `404`); ponów zakup z tym samym kluczem (niezapisywany) |
 | `rewards.invalid_format` | `couponCode` | kod nie jest kodem kuponu (`K` + 26 znaków; np. kod karty); przy zakupie także pusty tekst - brak kuponu to brak pola albo `null` |
+| `assistant.validation_failed` | - | `400`: błędy pól czatu w `errors` |
+| `assistant.required_field` | `message` | pusta wiadomość (po przycięciu) |
+| `assistant.too_long` | `message`, `history` | wiadomość > `Assistant:MaxMessageLength` znaków albo historia > `Assistant:MaxHistoryItems` wpisów |
+| `assistant.invalid_format` | `history` | wpis bez tekstu, z rolą inną niż `user`/`assistant` albo za długi |
+| `assistant.confirmation_invalid` | - | `404`: token potwierdzenia zły, zmieniony albo wydany innemu użytkownikowi - bez rozróżnienia |
+| `assistant.confirmation_expired` | - | `410`: token potwierdzenia po terminie; poproś czat o nową propozycję |
+| `assistant.timeout` | - | zdarzenie `error` w strumieniu: tura lub narzędzie przekroczyły limit czasu |
+| `assistant.tool_limit` | - | zdarzenie `error`: więcej wywołań narzędzi niż `Assistant:MaxToolCalls` |
+| `assistant.provider_error` | - | zdarzenie `error`: awaria modelu lub narzędzia; szczegóły tylko w logu serwera |
 | `loyalty.card_not_found` | - | `404`: kod karty nieznany albo unieważniony - celowo bez rozróżnienia |
 | `loyalty.receipt_already_registered` | - | `409`: paragon (stacja, kasa, data, numer) już zapisany; bez informacji o właścicielu |
 | `loyalty.customer_busy` | - | `503` + `Retry-After`: inna operacja na tym kliencie trwa dłużej niż `Loyalty:CustomerLockTimeout`; ponów z tym samym kluczem (niezapisywany) |

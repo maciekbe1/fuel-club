@@ -3,6 +3,7 @@ using FuelClub.Api.Infrastructure.Csrf;
 using FuelClub.Api.Infrastructure.DemoData;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
+using FuelClub.Api.Modules.Assistant;
 using FuelClub.Api.Modules.Loyalty;
 using FuelClub.Api.Modules.Rewards;
 
@@ -26,6 +27,7 @@ builder.Services.AddOpenApi(options => options.AddIdempotencyHeader());
 builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
 builder.Services.AddRewards(builder.Configuration);
+builder.Services.AddAssistant(builder.Configuration);
 builder.Services.AddHostedService<DemoAccountsSeeder>();
 
 var app = builder.Build();
@@ -60,6 +62,7 @@ app.MapAccountsEndpoints();
 app.MapAdminEndpoints();
 app.MapLoyaltyEndpoints();
 app.MapRewardsEndpoints();
+app.MapAssistantEndpoints();
 
 foreach (var additional in app.Services.GetServices<IAdditionalEndpoints>())
     additional.Map(app);

@@ -1157,6 +1157,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description One chat turn as a server-sent event stream (POST, read with fetch). Events: meta (first), tool, delta, confirmation, then exactly one of done or error; payloads are in ChatStreamContract. Comment lines (': ping') are heartbeats. Validation errors and 429 come as ProblemDetails before the stream starts. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChatRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["ChatStreamContract"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/confirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Confirms an activation proposed in the chat (the token from a confirmation event) and activates the coupon with the same logic as /api/me/coupons/{id}/activate. 404 for a token that is invalid or issued to someone else, 410 when it expired. Retrying is safe: an active coupon keeps its code. */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description UUID chosen by the client; reuse it only to retry the same request. */
+                    "Idempotency-Key": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConfirmationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CouponResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Gone */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1186,6 +1323,61 @@ export interface components {
         CashierStationResponse: {
             stationCode: string;
             registerCode: string;
+        };
+        ChatConfirmationEvent: {
+            /** Format: uuid */
+            proposalId: string;
+            /** Format: uuid */
+            couponId: string;
+            offerName: string;
+            /** Format: double */
+            discountPerLiter: number;
+            /** Format: double */
+            maxLiters: number;
+            /** Format: date-time */
+            expiresAt: string;
+            token: string;
+        };
+        ChatDeltaEvent: {
+            text: string;
+        };
+        ChatDoneEvent: {
+            /** Format: int32 */
+            toolCalls: number;
+        };
+        ChatErrorEvent: {
+            code: string;
+            message: string;
+        };
+        ChatHistoryItem: {
+            role: null | string;
+            text: null | string;
+        };
+        ChatMetaEvent: {
+            correlationId: string;
+            provider: string;
+            model: string;
+            promptVersion: string;
+            demo: boolean;
+        };
+        ChatRequest: {
+            message: null | string;
+            history: null | components["schemas"]["ChatHistoryItem"][];
+        };
+        ChatStreamContract: {
+            meta: components["schemas"]["ChatMetaEvent"];
+            tool: components["schemas"]["ChatToolEvent"];
+            delta: components["schemas"]["ChatDeltaEvent"];
+            confirmation: components["schemas"]["ChatConfirmationEvent"];
+            done: components["schemas"]["ChatDoneEvent"];
+            error: components["schemas"]["ChatErrorEvent"];
+        };
+        ChatToolEvent: {
+            name: string;
+            status: string;
+        };
+        ConfirmationRequest: {
+            token: null | string;
         };
         CouponPreviewCalculation: {
             /** Format: double */

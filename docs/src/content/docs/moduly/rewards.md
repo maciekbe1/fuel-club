@@ -25,7 +25,7 @@ Klient wymienia punkty na kupon z rabatem na paliwo, aktywuje go w telefonie i p
 | Zarządzanie ofertami (Admin) | `Admin/AdminRewardEndpoints.cs` |
 | Wymiana punktów | `Exchange/ExchangeEndpoint.cs` |
 | Moje kupony (odczyt) | `Coupons/MyCouponsEndpoints.cs` |
-| Aktywacja kuponu | `Coupons/ActivateEndpoint.cs` |
+| Aktywacja kuponu | `Coupons/ActivateEndpoint.cs` (HTTP) → `Coupons/CouponActivation.cs` (wspólna z potwierdzeniem czatu) |
 | Podgląd kuponu (kasjer) | `Cashier/CouponPreviewEndpoint.cs` |
 | Odbiór z zakupem | `Cashier/CouponRedemption.cs` (implementuje `Modules/Loyalty/Cashier/ICouponRedemption.cs`), wywołanie w `Modules/Loyalty/Cashier/FuelPurchaseEndpoint.cs` |
 | Limit prób (429) | `apps/api/Infrastructure/RateLimiting.cs`, polityka w `RewardsModule.cs` |

@@ -1,0 +1,80 @@
+using FuelClub.Api.Infrastructure;
+using FuelClub.Api.Infrastructure.Csrf;
+using FuelClub.Api.Infrastructure.Idempotency;
+using FuelClub.Api.Modules.Accounts;
+using FuelClub.Api.Modules.Assistant.Chat;
+using FuelClub.Api.Modules.Assistant.Confirmation;
+using FuelClub.Api.Modules.Assistant.Model;
+using FuelClub.Api.Modules.Assistant.Tools;
+using FuelClub.Api.Modules.Rewards.Coupons;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+
+namespace FuelClub.Api.Modules.Assistant;
+
+/// <summary>Chat with tools over the session user's data (ADR 0007).</summary>
+public static class AssistantModule
+{
+    public static IServiceCollection AddAssistant(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
+    {
+        services
+            .AddOptions<AssistantOptions>()
+            .Bind(configuration.GetSection(AssistantOptions.Section))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AssistantOptions>, AssistantOptionsValidator>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<ConfirmationTokens>();
+        // The demo model is the default; a provider adapter replaces this registration.
+        services.AddSingleton<IChatModel, DemoChatModel>();
+        services.AddScoped<AssistantTools>();
+        services.AddScoped<ChatService>();
+        services.AddRateLimiter(options =>
+            options.AddPolicy(
+                ChatEndpoints.RateLimitPolicy,
+                http =>
+                {
+                    var assistant = http
+                        .RequestServices.GetRequiredService<IOptions<AssistantOptions>>()
+                        .Value;
+                    return RateLimiting.PerUser(
+                        http,
+                        assistant.ChatPermitLimit,
+                        assistant.ChatWindow
+                    );
+                }
+            )
+        );
+        return services;
+    }
+
+    public static IEndpointRouteBuilder MapAssistantEndpoints(this IEndpointRouteBuilder app)
+    {
+        var chat = app.MapGroup("/api/chat")
+            .WithTags("Assistant")
+            .RequireAuthorization(policy => policy.RequireRole(RoleNames.User))
+            .RequireCsrf();
+        chat.MapPost("", ChatEndpoints.Chat)
+            .RequireRateLimiting(ChatEndpoints.RateLimitPolicy)
+            .WithDescription(ChatEndpoints.ChatDescription)
+            .Produces<ChatStreamContract>(StatusCodes.Status200OK, "text/event-stream")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+        // The response carries the coupon code: no-store on the group, so replays get it too.
+        var confirmations = app.MapGroup("/api/chat/confirmations")
+            .WithTags("Assistant")
+            .RequireAuthorization(policy => policy.RequireRole(RoleNames.User))
+            .RequireCsrf()
+            .DisableResponseStoring();
+        confirmations
+            .MapPost("", ChatEndpoints.Confirm)
+            .RequireIdempotency()
+            .WithDescription(ChatEndpoints.ConfirmDescription)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status410Gone);
+        return app;
+    }
+}

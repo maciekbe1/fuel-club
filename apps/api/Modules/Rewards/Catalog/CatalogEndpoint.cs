@@ -28,7 +28,13 @@ public static class CatalogEndpoint
         CancellationToken cancellationToken
     )
     {
-        var items = await db
+        var items = await ActiveOffers(db).ToListAsync(cancellationToken);
+        return TypedResults.Ok(new RewardsResponse(items));
+    }
+
+    /// <summary>The customer catalog; also read by the assistant's list_available_rewards.</summary>
+    public static IQueryable<RewardResponse> ActiveOffers(AppDbContext db) =>
+        db
             .RewardOffers.AsNoTracking()
             .Where(offer => offer.IsActive)
             .OrderBy(offer => offer.PointsCost)
@@ -42,8 +48,5 @@ public static class CatalogEndpoint
                 offer.DiscountPerLiter,
                 offer.MaxLiters,
                 offer.Version
-            ))
-            .ToListAsync(cancellationToken);
-        return TypedResults.Ok(new RewardsResponse(items));
-    }
+            ));
 }

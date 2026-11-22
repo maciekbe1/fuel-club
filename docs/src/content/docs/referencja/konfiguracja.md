@@ -24,6 +24,13 @@ sidebar:
 | `Rewards:CouponLockTimeout` | nie | `00:00:05`, zakres 1 ms - 30 s (inaczej API nie startuje); jak długo zakup z kuponem czeka na zablokowany wiersz kuponu, potem `503 rewards.coupon_busy` |
 | `Rewards:PreviewPermitLimit` | nie | `30`, zakres 1 - 1000 (inaczej API nie startuje); ile podglądów kuponu kasjer może zrobić w oknie, potem `429 rate_limit.exceeded` |
 | `Rewards:PreviewWindow` | nie | `00:01:00`, zakres 1 s - 1 h; długość stałego okna limitu podglądu |
+| `Assistant:MaxMessageLength` | nie | `1000` (1 - 10 000); maks. długość wiadomości czatu |
+| `Assistant:MaxHistoryItems` / `MaxHistoryTextLength` | nie | `20` (0 - 100) / `2000` (1 - 20 000); historia w żądaniu |
+| `Assistant:MaxToolCalls` | nie | `4` (1 - 20); wywołań narzędzi w jednej turze, potem `error assistant.tool_limit` |
+| `Assistant:TurnTimeout` / `ToolTimeout` | nie | `00:00:30` (do 5 min) / `00:00:05` (≤ `TurnTimeout`) |
+| `Assistant:HeartbeatInterval` | nie | `00:00:15` (do 1 min); komentarz `: ping` w strumieniu |
+| `Assistant:ConfirmationLifetime` | nie | `00:10:00` (30 s - 1 h); ważność tokenu potwierdzenia aktywacji |
+| `Assistant:ChatPermitLimit` / `ChatWindow` | nie | `20` / `00:01:00`; tur czatu na użytkownika w oknie, potem `429` |
 | `ASPNETCORE_ENVIRONMENT` | nie | `Development` włącza OpenAPI i `/health/db` |
 
 ## Frontend

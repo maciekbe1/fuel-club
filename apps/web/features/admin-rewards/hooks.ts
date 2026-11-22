@@ -19,7 +19,7 @@ export function useAdminRewards() {
 
 export function useAdminReward(id: string) {
   return useQuery({
-    queryKey: [...queryKeys.admin.rewards, id],
+    queryKey: queryKeys.admin.reward(id),
     queryFn: () => adminRewardsService.get(id),
   });
 }
@@ -69,7 +69,7 @@ export function useFetchCurrentReward() {
   const queryClient = useQueryClient();
   return (id: string) =>
     queryClient.fetchQuery({
-      queryKey: [...queryKeys.admin.rewards, id],
+      queryKey: queryKeys.admin.reward(id),
       queryFn: () => adminRewardsService.get(id),
       staleTime: 0,
     });

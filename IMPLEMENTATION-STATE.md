@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - pending
+Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - done; P6 - pending
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -55,6 +55,38 @@ Przeglądarka (Chrome, :3200, admin demo): skrót „Administracja ofert”, lis
 Review (`/code-review high`, 4 uwagi, wszystkie przyjęte): tworzenie bez trwałego klucza; „Zaloguj się” nawigacją klienta; wylogowanie przy 401 nic nie czyściło; odmontowany czytnik zwalniał cudzą blokadę kamery.
 Uwaga: ostrzeżenia dev `NEXT_REDIRECT` (instant validation) przy przekierowaniach strażników - to samo daje istniejący strażnik sesji; tylko tryb dev.
 
+## P5 - kontrakt czatu (done, 2026-11-22)
+
+Zakres: ADR 0007. Moduł `Assistant`:
+- `POST /api/chat` jako SSE: `meta`, `tool`, `delta`, `confirmation`, potem dokładnie jedno `done` albo `error`; heartbeat `: ping`.
+- Zamknięta lista 4 narzędzi tylko do odczytu, tożsamość z sesji.
+- `DemoChatModel` na regułach.
+- Bezstanowy token Data Protection; `POST /api/chat/confirmations` z idempotencją, `404` dla złego tokenu, `410` po terminie.
+- Aktywacja wydzielona do `Rewards/Coupons/CouponActivation`, wspólna z `/activate`.
+- Limity: długość wiadomości i historii, 4 narzędzia na turę, czas tury i narzędzia, 20 tur/min na użytkownika.
+- Typy `schema.d.ts` wygenerowane. UI czatu w P6.
+
+Testy (2026-11-22): `dotnet test` passed 441/441 (24 nowe w `AssistantTests`); typecheck i lint passed; `admin.spec` passed 10/10 po zmianie klucza zapytania; docs build passed.
+
+Próby negatywne, każda wywraca swój test:
+- token bez porównania użytkownika → test wiązania;
+- brak limitu narzędzi → test limitu;
+- `no-store` na endpoincie zamiast na grupie → test odtworzenia. Główny host tego nie łapał, bo odnawianie ciasteczka dokleja `no-store`, stąd osobny test na hoście bez odnawiania.
+
+Przeglądarka: bez UI. Na własnej instancji (:3200 → :5291) curl `-N` przez proxy Next: zdarzenia w kolejności, nagłówki SSE (`no-store`, `X-Accel-Buffering`, `identity`). Odpowiedź demo jest natychmiastowa, więc nie dało się sprawdzić, czy proxy buforuje wolny strumień - sprawdzi E2E w P6.
+
+Review (`/code-review high`, 9 uwag, 8 przyjętych):
+- odtworzenie potwierdzenia bez `no-store`;
+- „aktywne kupony” uruchamiało propozycję aktywacji;
+- nieznana oferta → propozycja innego kuponu;
+- model dostawał token potwierdzenia;
+- pusty wpis historii przechodził;
+- wyjątek heartbeatu maskował wynik tury;
+- brak `TimeProvider` w `AddAssistant`;
+- klucz zapytania oferty poza `query-keys.ts`.
+
+Odrzucona: jedno miejsce na klucz na operację w `sessionStorage` - katalog blokuje wszystkie wymiany przy nieznanym wyniku, także po powrocie na ekran, więc drugiej wymiany nie da się zacząć.
+
 ## Następny krok
 
-P5 - kontrakt czatu: ADR (decyzja moja), wg specs/PLAN.md i SPEC.md.
+P6 - transport i UI czatu, wg specs/PLAN.md i SPEC.md.

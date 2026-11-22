@@ -62,13 +62,25 @@ public static class WalletEndpoints
     )
     {
         var userId = users.GetUserId(http.User)!;
+        return TypedResults.Ok(
+            new WalletResponse(await BalanceAsync(db, userId, cancellationToken))
+        );
+    }
+
+    /// <summary>The balance; also read by the assistant's get_my_balance.</summary>
+    public static async Task<int> BalanceAsync(
+        AppDbContext db,
+        string userId,
+        CancellationToken cancellationToken
+    )
+    {
         var balance = await db
             .LoyaltyAccounts.AsNoTracking()
             .Where(account => account.UserId == userId)
             .Select(account => (int?)account.Balance)
             .SingleOrDefaultAsync(cancellationToken);
         // No account yet means nothing was ever credited.
-        return TypedResults.Ok(new WalletResponse(balance ?? 0));
+        return balance ?? 0;
     }
 
     public static async Task<Results<Ok<TransactionsResponse>, ProblemHttpResult>> GetTransactions(

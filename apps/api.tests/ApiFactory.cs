@@ -198,6 +198,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                     || user.Email.StartsWith("cashier-")
                     || user.Email.StartsWith("idempotency-")
                     || user.Email.StartsWith("card-")
+                    || user.Email.StartsWith("assistant-")
                 )
             )
             .ToListAsync();
