@@ -17,6 +17,7 @@ builder.Services.AddIdempotency(builder.Configuration);
 builder.Services.AddOpenApi(options => options.AddIdempotencyHeader());
 builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
+builder.Services.AddRewards(builder.Configuration);
 builder.Services.AddHostedService<DemoAccountsSeeder>();
 
 var app = builder.Build();

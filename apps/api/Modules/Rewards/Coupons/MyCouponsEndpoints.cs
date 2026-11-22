@@ -1,0 +1,60 @@
+using FuelClub.Api.Infrastructure;
+using FuelClub.Api.Modules.Accounts;
+using FuelClub.Api.Modules.Rewards.Domain;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
+namespace FuelClub.Api.Modules.Rewards.Coupons;
+
+/// <summary>The offer snapshot taken at the exchange. No redemption code until activation.</summary>
+public sealed record CouponResponse(
+    Guid Id,
+    Guid OfferId,
+    string OfferName,
+    int PointsCost,
+    decimal DiscountPerLiter,
+    decimal MaxLiters,
+    string Status,
+    DateTimeOffset PurchasedAt,
+    DateTimeOffset? ActivatedAt,
+    DateTimeOffset? RedeemedAt);
+
+public sealed record CouponsResponse(IReadOnlyList<CouponResponse> Items);
+
+/// <summary>Read-only views of the logged-in customer's own coupons. No user parameter exists.</summary>
+public static class MyCouponsEndpoints
+{
+    public const string Path = "/api/me/coupons";
+
+    public static async Task<Ok<CouponsResponse>> GetAll(
+        HttpContext http, UserManager<ApplicationUser> users, AppDbContext db, CancellationToken cancellationToken)
+    {
+        var userId = users.GetUserId(http.User)!;
+        var items = await Own(db, userId)
+            .OrderByDescending(coupon => coupon.PurchasedAt)
+            .ThenByDescending(coupon => coupon.Id)
+            .Select(Projection)
+            .ToListAsync(cancellationToken);
+        return TypedResults.Ok(new CouponsResponse(items));
+    }
+
+    public static async Task<Results<Ok<CouponResponse>, ProblemHttpResult>> GetOne(
+        Guid id, HttpContext http, UserManager<ApplicationUser> users, AppDbContext db, CancellationToken cancellationToken)
+    {
+        var userId = users.GetUserId(http.User)!;
+        var coupon = await Own(db, userId).Where(coupon => coupon.Id == id).Select(Projection).SingleOrDefaultAsync(cancellationToken);
+        return coupon is null ? RewardsProblems.CouponNotFound() : TypedResults.Ok(coupon);
+    }
+
+    private static IQueryable<Coupon> Own(AppDbContext db, string userId) =>
+        db.Coupons.AsNoTracking().Where(coupon => coupon.UserId == userId);
+
+    public static CouponResponse ToResponse(Coupon coupon) => new(
+        coupon.Id, coupon.OfferId, coupon.OfferName, coupon.PointsCost, coupon.DiscountPerLiter, coupon.MaxLiters,
+        coupon.Status.ToString(), coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
+
+    private static readonly System.Linq.Expressions.Expression<Func<Coupon, CouponResponse>> Projection = coupon => new CouponResponse(
+        coupon.Id, coupon.OfferId, coupon.OfferName, coupon.PointsCost, coupon.DiscountPerLiter, coupon.MaxLiters,
+        coupon.Status.ToString(), coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
+}

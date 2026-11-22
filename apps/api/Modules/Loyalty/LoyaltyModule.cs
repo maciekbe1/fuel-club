@@ -19,6 +19,7 @@ public static class LoyaltyModule
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<LoyaltyOptions>, LoyaltyOptionsValidator>();
         services.AddScoped<CustomerLock>();
+        services.AddScoped<Points.PointsSpending>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<StationClock>();
         services.AddHostedService<CashierAccountProvisioner>();

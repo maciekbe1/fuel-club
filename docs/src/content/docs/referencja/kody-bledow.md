@@ -70,6 +70,11 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.version_out_of_range` | `version` | wersja `< 1` |
 | `rewards.offer_not_found` | - | `404`: brak oferty |
 | `rewards.offer_version_conflict` | - | `409`: wersja z formularza nie jest aktualna; nic nie zapisano |
+| `rewards.offer_inactive` | - | `409`: oferta wyłączona; nic nie pobrano |
+| `rewards.offer_busy` | - | `503` + `Retry-After`: edycja oferty trwa dłużej niż `Rewards:OfferLockTimeout`; ponów z tym samym kluczem (niezapisywany) |
+| `rewards.offer_changed` | - | `409`: oferta zmieniła się od wyświetlenia (inna `version`); nic nie pobrano, pokaż nowe warunki |
+| `rewards.insufficient_points` | - | `409`: saldo mniejsze niż koszt (także brak konta); nic nie pobrano |
+| `rewards.coupon_not_found` | - | `404`: brak kuponu albo cudzy kupon |
 | `loyalty.card_not_found` | - | `404`: kod karty nieznany albo unieważniony - celowo bez rozróżnienia |
 | `loyalty.receipt_already_registered` | - | `409`: paragon (stacja, kasa, data, numer) już zapisany; bez informacji o właścicielu |
 | `loyalty.customer_busy` | - | `503` + `Retry-After`: inna operacja na tym kliencie trwa dłużej niż `Loyalty:CustomerLockTimeout`; ponów z tym samym kluczem (niezapisywany) |

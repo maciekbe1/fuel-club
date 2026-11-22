@@ -12,4 +12,11 @@ internal static class RewardsProblems
 
     public static ProblemHttpResult OfferNotFound() =>
         ApiProblems.Problem(StatusCodes.Status404NotFound, "Offer not found", RewardsErrorCodes.OfferNotFound);
+
+    /// <summary>Also for another customer's coupon: its existence is not revealed.</summary>
+    public static ProblemHttpResult CouponNotFound() =>
+        ApiProblems.Problem(StatusCodes.Status404NotFound, "Coupon not found", RewardsErrorCodes.CouponNotFound);
+
+    public static ProblemHttpResult OfferBusy(HttpContext http) =>
+        ApiProblems.Busy(http, "The offer is being changed", RewardsErrorCodes.OfferBusy);
 }

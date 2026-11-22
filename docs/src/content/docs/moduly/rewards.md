@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie]
-Zrealizowane: model danych, ograniczenia w bazie, reguły (kod kuponu, obliczenie rabatu, walidacja oferty), API ofert (katalog, zarządzanie przez Admin z wersją). Planowane: wymiana punktów, „Moje kupony” i aktywacja, podgląd z limitem prób i odbiór razem z zakupem, interfejs (katalog, panel administratora, kupon w kasie).
+Zrealizowane: model danych, ograniczenia w bazie, reguły (kod kuponu, obliczenie rabatu, walidacja oferty), API ofert (katalog, zarządzanie przez Admin z wersją), wymiana punktów na kupon, odczyt własnych kuponów. Planowane: aktywacja kuponu, podgląd z limitem prób i odbiór razem z zakupem, interfejs (katalog, panel administratora, kupon w kasie).
 :::
 
 ## Co robi
@@ -23,6 +23,9 @@ Klient wymienia punkty na kupon z rabatem na paliwo, aktywuje go w telefonie i p
 | Walidacja oferty | `Domain/RewardOfferRules.cs` |
 | Katalog (klient) | `Catalog/CatalogEndpoint.cs` |
 | Zarządzanie ofertami (Admin) | `Admin/AdminRewardEndpoints.cs` |
+| Wymiana punktów | `Exchange/ExchangeEndpoint.cs` |
+| Moje kupony (odczyt) | `Coupons/MyCouponsEndpoints.cs` |
+| Pobranie punktów (Loyalty) | `Modules/Loyalty/Points/PointsSpending.cs` |
 | Mapowanie, błędy modułu | `RewardsModule.cs`, `RewardsProblems.cs` |
 | Kody błędów | `RewardsErrorCodes.cs` |
 | Konfiguracja EF, `CHECK` | `Infrastructure/RewardsModelConfiguration.cs` |
@@ -122,13 +125,35 @@ RETURNING ...
 Po utracie odpowiedzi `PUT` UI pokazuje „wynik zapisu nieznany” (nie „zapis nie powiódł się”) i proponuje odświeżenie oferty. Przy `409` pokazuje aktualny stan, nie nadpisując wpisanych zmian automatycznie.
 :::
 
+## Wymiana punktów
+
+`POST /api/rewards/{id}/exchange` (rola `User`, CSRF, `Idempotency-Key`), treść `{ version }` - wersja oferty z katalogu, który klient widział. Odpowiedź `201 { coupon, balance }`, `Location: /api/me/coupons/{id}`. Kupon ma status `Purchased` i nie ma jeszcze kodu.
+
+Kolejność w transakcji idempotencji:
+
+1. `version` wymagane i `>= 1` → inaczej `400 rewards.validation_failed`.
+2. Oferta `SELECT ... FOR SHARE`: edycja admina czeka, aż wymiana się zatwierdzi, więc kupon odpowiada ofercie w chwili zatwierdzenia. Wymiana czeka na trwającą edycję najwyżej `Rewards:OfferLockTimeout` (`lock_timeout`), potem `503 rewards.offer_busy` z `Retry-After`.
+3. Brak oferty → `404 rewards.offer_not_found`; wyłączona → `409 rewards.offer_inactive`; inna wersja → `409 rewards.offer_changed`. Wyłączenie jest sprawdzane przed wersją, bo wyłączenie też podnosi wersję - klient ma dostać „niedostępna”, nie „zmieniona”.
+4. `PointsSpending.SpendAsync` (Loyalty): blokada klienta (`503 loyalty.customer_busy`), potem `UPDATE "LoyaltyAccounts" SET "Balance" = "Balance" - koszt WHERE "Balance" >= koszt RETURNING`. 0 wierszy (także brak konta) → `409 rewards.insufficient_points`. Wpis historii `CouponExchange` z `Delta = -koszt`, `SourceId` = id kuponu.
+5. Kupon z kopią nazwy, kosztu, stawki i limitu litrów oferty.
+
+Wszystko w jednej transakcji: nieudana próba nie zostawia ani obciążenia, ani kuponu (idempotencja cofa do savepointu przy odpowiedzi innej niż 2xx). Rewards nie pisze do tabel Loyalty - salda i historii dotyka tylko `PointsSpending`.
+
+- Wersja zamiast samego kosztu: chroni też stawkę i limit litrów. Każda edycja oferty (także opisu) wymaga ponownego potwierdzenia przez klienta.
+- `409 rewards.insufficient_points` jest zapisywany pod kluczem: ponowienie z tym samym kluczem zwraca go, nawet gdy klient zdobył już punkty. Nowa próba = nowy klucz (frontend zwalnia klucz po 4xx).
+- Brak limitu kuponów na klienta - ogranicza je saldo.
+
+## Moje kupony
+
+`GET /api/me/coupons` (wszystkie własne, od najnowszych, bez stronicowania) i `GET /api/me/coupons/{id}` (rola `User`). Cudzy albo nieistniejący kupon → `404 rewards.coupon_not_found` - odpowiedź nie zdradza, że kupon istnieje. Kodu w odpowiedzi nie ma (powstanie przy aktywacji).
+
 ## Zabezpieczenia
 
 - Rabat liczy serwer z kopii parametrów w kuponie; klient nie wysyła kwoty rabatu.
 - Kody kuponów nie trafiają do logów; w żądaniach tylko w treści (POST), nie w URL.
 
 :::caution[Planowane]
-Sprawdzanie właściciela (kupon = właściciel karty), warunkowa zmiana statusu przy odbiorze, idempotencja odbioru razem z zakupem i limit prób podglądu powstaną z endpointami.
+Aktywacja z kontrolą właściciela, sprawdzanie przy odbiorze (kupon = właściciel karty), warunkowa zmiana statusu, idempotencja odbioru razem z zakupem i limit prób podglądu powstaną z endpointami.
 :::
 
 ## Testy
@@ -139,7 +164,8 @@ Sprawdzanie właściciela (kupon = właściciel karty), warunkowa zmiana statusu
 | `RewardsRulesTests.cs` - `CouponCodeTests` | 27 znaków z prefiksem `K`, część losowa to pełny kod w formacie karty, unikalność; kod karty ≠ kod kuponu (w obie strony); normalizacja wpisanych wariantów |
 | `RewardsRulesTests.cs` - `RewardOfferRulesTests` | wymagana nazwa, długości, zakres kosztu, stawki i limitu; precyzja (0,205 zł/l, 50,0005 l) odrzucona |
 | `RewardsModelConstraintsTests.cs` | wszystkie poprawne stany kuponu; `CHECK` zakresów oferty i snapshotu; pusta nazwa; **baza zaokrągla 0,205 → 0,21** (dlatego walidacja w aplikacji); 7 niespójnych stanów kuponu; aktywacja przed zakupem; zły format kodu; duplikat kodu; jeden kupon na zakup; oferty z kuponami nie da się usunąć; `Version < 1` odrzucone; równoległe zapisy przez EF wykryte, każdy podnosi wersję |
+| `RewardExchangeTests.cs` | wymiana: `201`, kupon = migawka oferty, bez kodu, `Location`, saldo, odczyt kuponu i listy, wpis `CouponExchange` (`-koszt`, `balanceAfter`, `couponExchange`); całe saldo do wydania; brak punktów (499 i brak konta) → `409` bez zmian; kolejność: brak → `404`, wyłączona (z podniesioną wersją) → `offer_inactive`, zmieniona → `offer_changed`, bez obciążenia; `version` wymagane i `>= 1`; ten sam klucz → ten sam kupon, jedno obciążenie, także równolegle; **6 równoległych wymian przy saldzie na 2 → dokładnie 2 kupony, saldo 0, `balanceAfter` 500, 0**; **edycja admina czeka na trwającą wymianę (bramka), kupon ma warunki, które klient widział**, potem stara wersja → `offer_changed`; klient zajęty → `503` z `Retry-After`, bez zmian, ten sam klucz działa później; oferta zablokowana dłużej niż limit → `503 rewards.offer_busy`, bez zmian, ten sam klucz działa później; zakres `OfferLockTimeout`; cudzy kupon → `404`, lista tylko własnych; `401`, `403` kasjer, CSRF, brak klucza → `400` |
 | `RewardOfferTests.cs` | katalog: tylko aktywne, kolejność koszt → nazwa → `id` (także dla identycznego kosztu i nazwy), pola; dostęp: katalog tylko `User` (`401` anonim, `403` kasjer i sam Admin), część admina tylko `Admin`; tworzenie: `201` + `Location`, `version 1`, odczyt pojedynczy i na liście; idempotencja `POST` (jedna oferta), brak klucza → `400`; walidacja pól (w tym 0,205 zł/l i brak `isActive`) bez zapisu wiersza; brak liczb → `required_field` w `POST` i `PUT`; liczby jako tekst → `400`; zmiana przez EF podnosi wersję, więc starszy formularz dostaje `409`; `PUT` zastępuje formularz i podnosi wersję, odpowiedź = zapisany wiersz; **nieaktualny formularz → `409` bez nadpisania**; **8 równoległych `PUT` z tą samą wersją → dokładnie jeden `200`, 7 × `409`, wersja 2**; `version` wymagane i `>= 1`, walidacja przed konfliktem; nieznane `id` → `404`; wyłączenie ukrywa w katalogu, włączenie przywraca; edycja oferty nie zmienia wydanego kuponu; CSRF |
 | `LoyaltyModelConstraintsTests.cs` | rabat równy brutto (zapłata 0, 0 pkt) przyjęty; rabat poza `0 - brutto` i `PaidAmount ≠ GrossAmount - Discount` odrzucone; znak `Delta` zgodny z typem |
 
-Próby negatywne: zaokrąglenie bankierskie (`ToEven`) i brak ograniczenia do brutto wywracają testy obliczeń; `UPDATE` bez warunku na wersję wywraca testy nieaktualnego formularza i równoległej edycji; brak podnoszenia wersji w `SaveChanges` wywraca oba testy zapisu przez EF.
+Próby negatywne: zaokrąglenie bankierskie (`ToEven`) i brak ograniczenia do brutto wywracają testy obliczeń; `UPDATE` bez warunku na wersję wywraca testy nieaktualnego formularza i równoległej edycji; brak podnoszenia wersji w `SaveChanges` wywraca oba testy zapisu przez EF; wymiana bez warunku `Balance >= koszt`, bez `FOR SHARE` albo ze sprawdzeniem wersji przed wyłączeniem wywraca odpowiednie testy wymiany.

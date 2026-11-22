@@ -3,17 +3,45 @@ using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Rewards.Admin;
 using FuelClub.Api.Modules.Rewards.Catalog;
+using FuelClub.Api.Modules.Rewards.Coupons;
+using FuelClub.Api.Modules.Rewards.Exchange;
+using FuelClub.Api.Modules.Rewards.Infrastructure;
+using Microsoft.Extensions.Options;
 
 namespace FuelClub.Api.Modules.Rewards;
 
 public static class RewardsModule
 {
+    public static IServiceCollection AddRewards(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<RewardsOptions>()
+            .Bind(configuration.GetSection(RewardsOptions.Section))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<RewardsOptions>, RewardsOptionsValidator>();
+        return services;
+    }
+
     public static IEndpointRouteBuilder MapRewardsEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGroup("/api/rewards")
+        var customer = app.MapGroup("/api/rewards")
             .WithTags("Rewards")
             .RequireAuthorization(policy => policy.RequireRole(RoleNames.User))
-            .MapGet("", CatalogEndpoint.Handle);
+            .RequireCsrf();
+        customer.MapGet("", CatalogEndpoint.Handle);
+        customer.MapPost("/{id:guid}/exchange", ExchangeEndpoint.Handle)
+            .RequireIdempotency()
+            .WithDescription(ExchangeEndpoint.Description)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
+        var coupons = app.MapGroup(MyCouponsEndpoints.Path)
+            .WithTags("Coupons")
+            .RequireAuthorization(policy => policy.RequireRole(RoleNames.User));
+        coupons.MapGet("", MyCouponsEndpoints.GetAll);
+        coupons.MapGet("/{id:guid}", MyCouponsEndpoints.GetOne)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         // Admin manages offers; Cashier has no access.
         var admin = app.MapGroup(AdminRewardEndpoints.Path)

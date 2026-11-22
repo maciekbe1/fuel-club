@@ -672,6 +672,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rewards/{id}/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Buys a coupon with points. Send the offer version from the catalog: if the offer changed since, nothing is charged (409 rewards.offer_changed) and the customer should see the new terms. A stored 409 rewards.insufficient_points is replayed for the same Idempotency-Key, so a new attempt after earning points needs a new key. */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description UUID chosen by the client; reuse it only to retry the same request. */
+                    "Idempotency-Key": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExchangeRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExchangeResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/coupons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CouponsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/coupons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CouponResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/rewards": {
         parameters: {
             query?: never;
@@ -880,6 +1042,29 @@ export interface components {
             stationCode: string;
             registerCode: string;
         };
+        CouponResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            offerId: string;
+            offerName: string;
+            /** Format: int32 */
+            pointsCost: number;
+            /** Format: double */
+            discountPerLiter: number;
+            /** Format: double */
+            maxLiters: number;
+            status: string;
+            /** Format: date-time */
+            purchasedAt: string;
+            /** Format: date-time */
+            activatedAt: null | string;
+            /** Format: date-time */
+            redeemedAt: null | string;
+        };
+        CouponsResponse: {
+            items: components["schemas"]["CouponResponse"][];
+        };
         CreateRewardRequest: {
             name: null | string;
             description: null | string;
@@ -893,6 +1078,15 @@ export interface components {
         };
         CsrfTokenResponse: {
             token: string;
+        };
+        ExchangeRequest: {
+            /** Format: int32 */
+            version: null | number;
+        };
+        ExchangeResponse: {
+            coupon: components["schemas"]["CouponResponse"];
+            /** Format: int32 */
+            balance: number;
         };
         FuelPurchaseRequest: {
             cardCode: null | string;
@@ -949,9 +1143,16 @@ export interface components {
             discountPerLiter: number;
             /** Format: double */
             maxLiters: number;
+            /** Format: int32 */
+            version: number;
         };
         RewardsResponse: {
             items: components["schemas"]["RewardResponse"][];
+        };
+        TransactionCouponExchange: {
+            /** Format: uuid */
+            couponId: string;
+            offerName: string;
         };
         TransactionFuelPurchase: {
             /** Format: uuid */
@@ -975,6 +1176,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             fuelPurchase: null | components["schemas"]["TransactionFuelPurchase"];
+            couponExchange: null | components["schemas"]["TransactionCouponExchange"];
         };
         TransactionsResponse: {
             items: components["schemas"]["TransactionItem"][];

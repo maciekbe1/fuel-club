@@ -175,7 +175,8 @@ Tę samą blokadę bierze zakup przez kasę (blokada właściciela karty, potem 
 - zakup trzyma blokadę pierwszy → naliczenie na starej (jeszcze ważnej) karcie jest poprawne, wymiana czeka na koniec zakupu.
 
 Blokada chroni też saldo przed równoległymi zakupami tego klienta; wiersz salda i tak blokuje `INSERT ... ON CONFLICT`.
-- Format kodu: 16 losowych bajtów (CSPRNG) jako 26 znaków Crockford Base32, pierwszy znak `0-7`. Kasa przyjmuje wpisany ręcznie wariant (`LoyaltyCardCode.Normalize`: myślniki, spacje, małe litery, `O`→`0`, `I`/`L`→`1`).
+
+Bierze ją też `PointsSpending` (`Points/PointsSpending.cs`) - jedyna droga, którą inne moduły pobierają punkty (wymiana na kupon w Rewards): blokada → `UPDATE ... WHERE "Balance" >= punkty` → wpis historii z ujemnym `Delta`, w transakcji wywołującego.
 
 ### `LoyaltyCards`
 
@@ -187,6 +188,8 @@ Blokada chroni też saldo przed równoległymi zakupami tego klienta; wiersz sal
 | `IssuedAt` | `timestamptz` | |
 | `RevokedAt` | `timestamptz NULL` | `CHECK (RevokedAt IS NULL OR RevokedAt >= IssuedAt)` |
 
+Format kodu: 16 losowych bajtów (CSPRNG) jako 26 znaków Crockford Base32, pierwszy znak `0-7`. Kasa przyjmuje wpisany ręcznie wariant (`LoyaltyCardCode.Normalize`: myślniki, spacje, małe litery, `O`→`0`, `I`/`L`→`1`).
+
 Kod jest też w treści zapisanej odpowiedzi w `IdempotencyRecords` (odtworzenie musi go zwrócić). Kod nie jest hasłem, ale identyfikuje klienta, więc ani kod, ani treść tej odpowiedzi nie trafia do logów. EF Core loguje SQL z maskowanymi parametrami (`EnableSensitiveDataLogging` jest wyłączone); test sprawdza to na wszystkich logach do poziomu Trace.
 
 ## Saldo i historia
@@ -196,7 +199,7 @@ Kod jest też w treści zapisanej odpowiedzi w `IdempotencyRecords` (odtworzenie
 | `GET /api/me/wallet` | `200 { balance }`; brak konta lojalnościowego → `balance: 0` |
 | `GET /api/me/transactions?limit=&cursor=` | `200 { items, nextCursor }`, od najnowszych |
 
-Pozycja historii: `{ id, type, delta, balanceAfter, createdAt, fuelPurchase }`. `fuelPurchase` (`purchaseId`, `stationCode`, `saleDate`, `amount`, `liters`) jest **nullable**: przyszłe operacje (np. wymiana punktów na kupon) nie są tankowaniem. Zakup pokazuje się tylko wtedy, gdy należy do zalogowanego klienta - samo dopasowanie `SourceId` nie wystarcza.
+Pozycja historii: `{ id, type, delta, balanceAfter, createdAt, fuelPurchase, couponExchange }`. `fuelPurchase` (`purchaseId`, `stationCode`, `saleDate`, `amount`, `liters`) jest wypełnione tylko dla `FuelPurchase`, `couponExchange` (`couponId`, `offerName`) tylko dla `CouponExchange`; drugie pole jest `null`. Zakup i kupon pokazują się tylko wtedy, gdy należą do zalogowanego klienta - samo dopasowanie `SourceId` nie wystarcza. Kupon jest czytany z tabeli Rewards (wspólna baza).
 
 :::note[Zakupy bez punktów]
 Historia to zmiany punktów, nie lista zakupów. Zakup za mniej niż 1 zł (np. 0,99 zł, 0 pkt) nie ma wpisu w historii i **nie pojawia się** w `GET /api/me/transactions`. Saldo zawsze równa się sumie `delta` z historii. Osobna lista zakupów nie jest częścią MVP.
@@ -263,7 +266,7 @@ QR odczytuje czytnik w [panelu kasjera](#frontend---panel-kasjera).
 `/historia` renderuje `HistoryList` z `features/history/` (`services.ts` → `hooks.ts` → `components/`).
 
 - `useHistory`: `useInfiniteQuery` (`queryKeys.transactions`), strona 20 wpisów, następna strona z `nextCursor`. „Pokaż więcej” znika, gdy `nextCursor` jest `null`.
-- Wpis: typ („Tankowanie”), zmiana punktów ze znakiem, saldo po operacji, data i godzina zapisu (Europe/Warsaw). Dla tankowania: stacja, data sprzedaży, kwota (zł), litry.
+- Wpis: typ („Tankowanie”, „Wymiana na kupon” z nazwą oferty), zmiana punktów ze znakiem, saldo po operacji, data i godzina zapisu (Europe/Warsaw). Dla tankowania: stacja, data sprzedaży, kwota (zł), litry.
 - Stany: szkielet przy ładowaniu; błąd pierwszej strony z „Spróbuj ponownie”; błąd kolejnej strony pod listą (wczytane wpisy zostają); pusta historia z odnośnikiem do karty.
 - Pod listą informacja, że zakup za mniej niż 1 zł nie daje punktów i nie pojawia się w historii.
 

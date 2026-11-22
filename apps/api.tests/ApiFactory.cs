@@ -68,6 +68,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["BootstrapCashier:RegisterCode"] = "",
                 ["Idempotency:LockTimeout"] = "00:00:01",
                 ["Loyalty:CustomerLockTimeout"] = "00:00:01",
+                ["Rewards:OfferLockTimeout"] = "00:00:01",
             }
         ));
 

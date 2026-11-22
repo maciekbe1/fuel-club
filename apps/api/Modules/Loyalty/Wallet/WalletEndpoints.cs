@@ -11,8 +11,11 @@ namespace FuelClub.Api.Modules.Loyalty.Wallet;
 
 public sealed record WalletResponse(int Balance);
 
-/// <summary>Fuel purchase behind a history entry; null for entries of other types (e.g. future coupon exchanges).</summary>
+/// <summary>Fuel purchase behind a history entry; null for entries of other types.</summary>
 public sealed record TransactionFuelPurchase(Guid PurchaseId, string StationCode, DateOnly SaleDate, decimal Amount, decimal Liters);
+
+/// <summary>Coupon bought by a CouponExchange entry; null for entries of other types.</summary>
+public sealed record TransactionCouponExchange(Guid CouponId, string OfferName);
 
 public sealed record TransactionItem(
     Guid Id,
@@ -20,7 +23,8 @@ public sealed record TransactionItem(
     int Delta,
     int BalanceAfter,
     DateTimeOffset CreatedAt,
-    TransactionFuelPurchase? FuelPurchase);
+    TransactionFuelPurchase? FuelPurchase,
+    TransactionCouponExchange? CouponExchange);
 
 public sealed record TransactionsResponse(IReadOnlyList<TransactionItem> Items, string? NextCursor);
 
@@ -77,11 +81,15 @@ public static class WalletEndpoints
             entries = entries.Where(entry => entry.Sequence < last);
 
         // The linked purchase must belong to the same user, not just match the SourceId.
+        // Same for the coupon of an exchange (read from the Rewards table in the shared database).
         var ownPurchases = db.FuelPurchases.AsNoTracking().Where(purchase => purchase.UserId == userId);
+        var ownCoupons = db.Coupons.AsNoTracking().Where(coupon => coupon.UserId == userId);
         var rows = await (
                 from entry in entries
                 join purchase in ownPurchases on entry.SourceId equals purchase.Id into matches
                 from purchase in matches.DefaultIfEmpty()
+                join coupon in ownCoupons on entry.SourceId equals coupon.Id into couponMatches
+                from coupon in couponMatches.DefaultIfEmpty()
                 orderby entry.Sequence descending
                 select new
                 {
@@ -96,6 +104,8 @@ public static class WalletEndpoints
                     SaleDate = (DateOnly?)purchase.SaleDate,
                     Amount = (decimal?)purchase.GrossAmount,
                     Liters = (decimal?)purchase.Liters,
+                    CouponId = (Guid?)coupon.Id,
+                    coupon.OfferName,
                 })
             // One extra row tells whether another page exists.
             .Take(pageSize + 1)
@@ -110,6 +120,9 @@ public static class WalletEndpoints
                 row.CreatedAt,
                 row.Type == PointsLedgerEntryType.FuelPurchase && row.PurchaseId is { } purchaseId
                     ? new TransactionFuelPurchase(purchaseId, row.StationCode!, row.SaleDate!.Value, row.Amount!.Value, row.Liters!.Value)
+                    : null,
+                row.Type == PointsLedgerEntryType.CouponExchange && row.CouponId is { } couponId
+                    ? new TransactionCouponExchange(couponId, row.OfferName!)
                     : null))
             .ToList();
         var nextCursor = rows.Count > pageSize ? EncodeCursor(page[^1].Sequence) : null;

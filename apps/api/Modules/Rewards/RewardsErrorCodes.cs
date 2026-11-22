@@ -13,4 +13,9 @@ public static class RewardsErrorCodes
     public const string ValidationFailed = "rewards.validation_failed";
     public const string OfferNotFound = "rewards.offer_not_found";
     public const string OfferVersionConflict = "rewards.offer_version_conflict";
+    public const string OfferInactive = "rewards.offer_inactive";
+    public const string OfferBusy = "rewards.offer_busy";
+    public const string OfferChanged = "rewards.offer_changed";
+    public const string InsufficientPoints = "rewards.insufficient_points";
+    public const string CouponNotFound = "rewards.coupon_not_found";
 }

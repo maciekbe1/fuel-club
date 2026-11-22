@@ -1,6 +1,6 @@
 "use client";
 
-import { Fuel } from "lucide-react";
+import { Fuel, Ticket } from "lucide-react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
@@ -16,7 +16,7 @@ const liters = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
 const dateTime = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Warsaw" });
 const saleDate = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeZone: "UTC" });
 
-const TYPE_LABELS: Record<string, string> = { FuelPurchase: "Tankowanie" };
+const TYPE_LABELS: Record<string, string> = { FuelPurchase: "Tankowanie", CouponExchange: "Wymiana na kupon" };
 
 export function HistoryList() {
   const history = useHistory();
@@ -90,12 +90,14 @@ export function HistoryList() {
 
 function HistoryItem({ item }: { item: Transaction }) {
   const purchase = item.fuelPurchase;
+  const exchange = item.couponExchange;
   const positive = item.delta > 0;
+  const Icon = item.type === "CouponExchange" ? Ticket : Fuel;
 
   return (
     <li data-testid="history-item" data-id={item.id} className="flex gap-4 rounded-2xl border bg-card p-4">
       <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-orange/15 text-primary">
-        <Fuel className="size-5" aria-hidden />
+        <Icon className="size-5" aria-hidden />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-baseline justify-between gap-3">
@@ -117,6 +119,7 @@ function HistoryItem({ item }: { item: Transaction }) {
             ].join(" · ")}
           </p>
         )}
+        {exchange && <p className="text-sm text-muted-foreground">{exchange.offerName}</p>}
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-muted-foreground">
           <time dateTime={item.createdAt}>{dateTime.format(new Date(item.createdAt))}</time>
           <span>

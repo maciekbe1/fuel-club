@@ -42,7 +42,12 @@ namespace FuelClub.Api.Infrastructure
             {
                 var version = entry.Property(offer => offer.Version);
                 version.CurrentValue = version.OriginalValue + 1;
-                entry.Entity.UpdatedAt = DateTimeOffset.UtcNow;
+                // The previous value may come from the database clock (now()), which can run slightly
+                // ahead of this process: never move UpdatedAt backwards (1 µs is the column's resolution).
+                var updatedAt = entry.Property(offer => offer.UpdatedAt);
+                var next = updatedAt.OriginalValue.AddTicks(10);
+                var now = DateTimeOffset.UtcNow;
+                updatedAt.CurrentValue = now > next ? now : next;
             }
         }
 

@@ -20,6 +20,7 @@ sidebar:
 | `Idempotency:LockTimeout` | nie | `00:00:05`, zakres 1 ms - 30 s (inaczej API nie startuje); jak długo żądanie czeka na równoległe żądanie z tym samym kluczem, potem `409 idempotency.in_progress` |
 | `Loyalty:CustomerLockTimeout` | nie | `00:00:05`, zakres 1 ms - 30 s (inaczej API nie startuje); jak długo operacja czeka na blokadę klienta, potem `503 loyalty.customer_busy` |
 | `Loyalty:StationTimeZone` | nie | `Europe/Warsaw`; strefa IANA stacji, względem której liczona jest data „dziś” dla daty sprzedaży; nieznana strefa zatrzymuje start |
+| `Rewards:OfferLockTimeout` | nie | `00:00:05`, zakres 1 ms - 30 s (inaczej API nie startuje); jak długo wymiana punktów czeka na trwającą edycję oferty, potem `503 rewards.offer_busy` |
 | `ASPNETCORE_ENVIRONMENT` | nie | `Development` włącza OpenAPI i `/health/db` |
 
 ## Frontend
