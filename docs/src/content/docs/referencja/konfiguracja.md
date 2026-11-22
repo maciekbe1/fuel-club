@@ -33,6 +33,15 @@ sidebar:
 | `Assistant:ChatPermitLimit` / `ChatWindow` | nie | `20` / `00:01:00`; tur czatu na użytkownika w oknie, potem `429` |
 | `Assistant:PseudonymKey` | poza `Development` tak (inaczej API nie startuje) | sekret (env / user-secrets), base64 ≥ 32 bajty; klucz HMAC pseudonimów w śladach. W `Development` bez niego: losowy na czas procesu |
 | `Assistant:TraceSaveTimeout` | nie | `00:00:02` (do 30 s); jak długo koniec tury czeka na zapis śladu |
+| `ForwardedHeaders:KnownProxies` | nie | lista adresów IP proxy, którym API wierzy w `X-Forwarded-For` (poza loopback). Adres klienta służy limitom logowania - [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#limity) |
+| `Observability:MaxSecurityEventsPerMinute` | nie | `600`; więcej zdarzeń bezpieczeństwa w minucie jest tylko liczonych w logu |
+| `RateLimits:AuthPermitLimit` / `AuthWindow` | nie | `10` / `00:01:00`; próby logowania i rejestracji na adres IP, potem `429` (blokada konta Identity działa niezależnie) |
+| `RateLimits:PurchasePermitLimit` / `PurchaseWindow` | nie | `60` / `00:01:00`; zakupy (z odbiorem kuponu) na kasjera, potem `429` |
+| `Observability:TraceRetention` / `SecurityEventRetention` | nie | `30.00:00:00` (1 h - 365 dni); po tym czasie worker usuwa ślady tur i zdarzenia bezpieczeństwa |
+| `Observability:PurgeInterval` / `MonitorInterval` | nie | `01:00:00` / `00:01:00`; jak często działa retencja i ocena reguł |
+| `Observability:WorkerEnabled` | nie | `true`; testy wyłączają i wywołują retencję i reguły same |
+| `Observability:RepeatedErrorsPerUser` / `ReviewQueueLimit` | nie | `3` / `50`; od ilu błędów pseudonim dostaje powód `repeated_errors`; długość kolejki |
+| `Observability:Rules:<reguła>:Enabled`, `Threshold`, `Window`, `MinSample`, `Cooldown`, `Severity` | nie | reguły i domyślne wartości: [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#reguły-anomalii); nieznana reguła lub zły zakres zatrzymuje start |
 | `Telemetry:OtlpEndpoint` | nie | adres OTLP/HTTP (np. `http://localhost:6006/v1/traces` dla Phoenix); pusty = bez eksportu OpenTelemetry. Nagłówki eksportera tylko z `OTEL_EXPORTER_OTLP_HEADERS` |
 | `ASPNETCORE_ENVIRONMENT` | nie | `Development` włącza OpenAPI i `/health/db` |
 

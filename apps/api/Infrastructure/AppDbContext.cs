@@ -18,6 +18,8 @@ namespace FuelClub.Api.Infrastructure
         public DbSet<Coupon> Coupons => Set<Coupon>();
         public DbSet<Modules.Assistant.Tracing.AssistantTurn> AssistantTurns =>
             Set<Modules.Assistant.Tracing.AssistantTurn>();
+        public DbSet<Modules.Observability.SecurityEvent> SecurityEvents =>
+            Set<Modules.Observability.SecurityEvent>();
         public DbSet<Idempotency.IdempotencyRecord> IdempotencyRecords =>
             Set<Idempotency.IdempotencyRecord>();
 

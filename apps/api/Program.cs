@@ -5,6 +5,7 @@ using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Assistant;
 using FuelClub.Api.Modules.Loyalty;
+using FuelClub.Api.Modules.Observability;
 using FuelClub.Api.Modules.Rewards;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,13 +23,15 @@ builder.Services.ConfigureHttpJsonOptions(options =>
         .Strict
 );
 builder.Services.AddIdempotency(builder.Configuration);
-builder.Services.AddApiRateLimiting();
+builder.Services.AddClientAddress(builder.Configuration);
+builder.Services.AddApiRateLimiting(builder.Configuration);
 builder.Services.AddOpenApi(options => options.AddIdempotencyHeader());
 builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
 builder.Services.AddRewards(builder.Configuration);
 builder.Services.AddAssistant(builder.Configuration);
 builder.Services.AddTelemetry(builder.Configuration);
+builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddHostedService<DemoAccountsSeeder>();
 
 var app = builder.Build();
@@ -44,6 +47,8 @@ if (args is [DemoPasswordReset.Command])
     return;
 }
 
+app.UseForwardedHeaders();
+app.UseSecurityEvents();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -64,6 +69,7 @@ app.MapAdminEndpoints();
 app.MapLoyaltyEndpoints();
 app.MapRewardsEndpoints();
 app.MapAssistantEndpoints();
+app.MapObservabilityEndpoints();
 
 foreach (var additional in app.Services.GetServices<IAdditionalEndpoints>())
     additional.Map(app);

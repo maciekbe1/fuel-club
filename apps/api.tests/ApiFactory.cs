@@ -93,6 +93,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                             ["Rewards:OfferLockTimeout"] = "00:00:01",
                             ["Rewards:CouponLockTimeout"] = "00:00:01",
                             ["Rewards:PreviewPermitLimit"] = "10",
+                            // All tests log in from one address; RateLimitTests lower these per host.
+                            ["RateLimits:AuthPermitLimit"] = "100000",
+                            // Tests run retention and alerts themselves.
+                            ["Observability:WorkerEnabled"] = "false",
+                            ["RateLimits:PurchasePermitLimit"] = "100000",
                         }
                     )
             );

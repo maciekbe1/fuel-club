@@ -151,6 +151,34 @@ Review (`/code-review high`, 7 uwag, wszystkie przyjęte):
 - brak klucza pseudonimu poza `Development` tylko ostrzegał;
 - logi bez powiązania z żądaniem (dodany link).
 
+## P7b - zdarzenia, anomalie, kolejka, retencja (done, 2026-11-22)
+
+ADR 0009, moduł `Observability`, ekran `/admin/obserwowalnosc`.
+- `security_events`: 403, 401 logowania, 409 klucza i ponownego odbioru, 429. Wzorzec trasy i pseudonim, bez IP i id z URL. Zapis po odpowiedzi, najwyżej 600/min.
+- Kod błędu przechwytuje `ProblemCodeCapture` (dekorator `IProblemDetailsService`) - odpowiedzi bez zmian (pełny zestaw API przeszedł przed testami P7b).
+- 8 reguł anomalii z konfiguracji; alert w logu z wyciszeniem, Slack nie skonfigurowany.
+- Admin: metryki (p95 `percentile_cont`, narzędzia, tokeny), kolejka podejrzanych tur, oznaczanie przejrzanych.
+- Retencja 30 dni (worker).
+- Limity: logowanie/rejestracja na adres klienta (`X-Forwarded-For` od loopback/`KnownProxies`), zakupy na kasjera.
+
+Testy (2026-11-22): `dotnet test` passed 476/476; E2E 122/122 w dwóch przebiegach, w pierwszym przebiegu po poprawkach 1 porażka, której nie udało się powtórzyć (niezidentyfikowana, prawdopodobnie flaky); docs build passed.
+
+Próby negatywne, każda wywraca swój test: bez `ProblemCodeCapture`; ocena udziału bez minimalnej próbki; bez `UseForwardedHeaders`; bez wykluczenia przerwanych tur z kolejki.
+
+Przeglądarka (Chrome, własna instancja): ekran admina - metryki, reguły, kolejka.
+
+Review (`/code-review high`, 8 uwag, wszystkie przyjęte):
+- limit logowań wspólny dla całej aplikacji (IP Nexta) → forwarded headers;
+- nieograniczone INSERT-y przy zalewie odmów → limit na minutę;
+- `429` przy ponowieniu zakupu kasował klucz → klucz zostaje;
+- przerwane tury w kolejce jako awaria narzędzia → wykluczone;
+- brak komunikatu `429` przy logowaniu/rejestracji;
+- logowanie rozpoznawane po surowej ścieżce → po trasie;
+- `ProblemCodeCapture` blokowałby przyszłe `AddProblemDetails` → dekorator writerów;
+- sumy tokenów `int` → `long`.
+
+Wpadka procesu: `git checkout -- apps/api/Migrations` cofnął snapshot; migracja odtworzona (nowe id `20261122164023`), wpis historii poprawiony w bazach test/e2e/browser.
+
 ## Następny krok
 
-P7b - metryki, reguły anomalii, kolejka przeglądu, dostęp admina i retencja śladów, wg specs/PLAN.md i SPEC.md §3.
+P7c - opcjonalny judge (bez klucza: odnotować jako niezrealizowany), potem P8.

@@ -22,6 +22,7 @@ public sealed class AssistantTurnConfiguration : IEntityTypeConfiguration<Assist
         builder.Property(turn => turn.Model).HasMaxLength(100);
         builder.Property(turn => turn.PromptVersion).HasMaxLength(100);
         builder.Property(turn => turn.ErrorCode).HasMaxLength(100);
+        builder.Property(turn => turn.ReviewedBy).HasMaxLength(450);
         builder.Property(turn => turn.Outcome).HasConversion<string>().HasMaxLength(20);
         builder.OwnsMany(
             turn => turn.Tools,

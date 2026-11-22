@@ -35,6 +35,10 @@ public sealed class AssistantTurn
     /// <summary>Only what the provider reports; null means unknown, not zero.</summary>
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
+
+    /// <summary>Set when an admin marked the turn as reviewed in the review queue.</summary>
+    public DateTimeOffset? ReviewedAt { get; set; }
+    public string? ReviewedBy { get; set; }
 }
 
 /// <summary>A tool name from the closed list (or "unknown"), its status and duration.</summary>

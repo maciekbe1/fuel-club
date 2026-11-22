@@ -46,6 +46,9 @@ export default defineConfig({
         ASPNETCORE_ENVIRONMENT: "Development",
         ConnectionStrings__DefaultConnection: database,
         DemoAccounts__Enabled: "false",
+        // Every test logs in from 127.0.0.1 and one cashier serves all tests: the limits would stop the suite.
+        RateLimits__AuthPermitLimit: "100000",
+        RateLimits__PurchasePermitLimit: "100000",
         BootstrapCashier__Email: CASHIER.email,
         BootstrapCashier__Password: CASHIER.password,
         BootstrapCashier__StationCode: CASHIER.station,

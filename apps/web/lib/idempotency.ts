@@ -47,11 +47,16 @@ export function clearPendingOperations() {
 /**
  * Keep the key when the outcome is unknown or transient: a retry must reuse it, so the server
  * replays the stored result or finishes the operation once. A final answer (a stored domain error,
- * a validation error, key reuse) ends the operation, and the next attempt is a new one.
+ * a validation error, key reuse) ends the operation, and the next attempt is a new one. A 429 is
+ * transient: the limit runs before the replay, so a retry of a committed operation can get it.
  */
 export function keepsIdempotencyKey(error: unknown) {
   if (error instanceof ApiError)
-    return error.status >= 500 || error.code === "idempotency.in_progress";
+    return (
+      error.status >= 500 ||
+      error.status === 429 ||
+      error.code === "idempotency.in_progress"
+    );
   // NetworkError (no response, e.g. lost after the server committed) and anything unexpected.
   return true;
 }

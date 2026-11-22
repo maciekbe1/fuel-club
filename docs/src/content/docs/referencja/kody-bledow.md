@@ -92,6 +92,14 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `loyalty.customer_busy` | - | `503` + `Retry-After`: inna operacja na tym kliencie trwa dłużej niż `Loyalty:CustomerLockTimeout`; ponów z tym samym kluczem (niezapisywany) |
 | `loyalty.card_already_issued` | - | `409`: wydanie karty, gdy aktywna już istnieje (aktualną podaje `GET`) |
 
+## Observability
+
+| Kod | Pole | Kiedy |
+| --- | --- | --- |
+| `observability.validation_failed` | - | `400`: błędy parametrów w `errors` |
+| `observability.out_of_range` | `hours` | okno spoza 1-720 h |
+| `observability.turn_not_found` | - | `404`: oznaczanie nieistniejącej tury |
+
 ## Idempotency
 
 Dotyczą endpointów oznaczonych `RequireIdempotency()`. Zobacz [idempotencja](/wyjasnienia/idempotencja/).

@@ -66,7 +66,7 @@ Odpowiedź `GET /api/auth/me`:
 | --- | --- |
 | kradzież sesji przez XSS | cookie HttpOnly |
 | CSRF | token w nagłówku, także dla logowania - [CSRF](/wyjasnienia/csrf/) |
-| zgadywanie haseł | blokada konta po 5 próbach; ten sam błąd dla złego hasła i nieistniejącego konta |
+| zgadywanie haseł | blokada konta po 5 próbach; ten sam błąd dla złego hasła i nieistniejącego konta; limit prób logowania i rejestracji na adres IP (`RateLimits:AuthPermitLimit`, `429`); każde nieudane logowanie to zdarzenie `LoginFailed` ([Observability](/moduly/observability/)) |
 | słabe hasła | min. 10 znaków, mała i wielka litera, cyfra, znak specjalny |
 | samodzielne nadanie roli Admin | rola tylko z konfiguracji; odmowa awansu istniejącego konta |
 | niespójny stan konta | rejestracja i provisioning w transakcji |

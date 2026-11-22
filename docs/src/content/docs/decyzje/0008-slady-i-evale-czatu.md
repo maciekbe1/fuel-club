@@ -68,6 +68,6 @@ Trzeba wiedzieć, co asystent zrobił w każdej turze: które narzędzia, z jaki
 
 ## Konsekwencje
 
-- `assistant_turns` rośnie z każdą turą. Retencja, metryki i dostęp admina są w P7b; do tego czasu nie ma automatycznego usuwania.
+- `assistant_turns` rośnie z każdą turą; retencję, metryki i dostęp admina opisuje [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/).
 - Phoenix pokazuje brak tokenów jako `0` - to jego prezentacja. W bazie i w spanie wartość jest nieobecna.
 - Pseudonim nie jest anonimizacją: z kluczem i listą identyfikatorów da się go odwrócić. Klucz to sekret.

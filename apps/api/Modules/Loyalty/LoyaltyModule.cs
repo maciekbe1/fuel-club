@@ -45,6 +45,8 @@ public static class LoyaltyModule
 
         cashier
             .MapPost("/fuel-purchases", FuelPurchaseEndpoint.Handle)
+            .RequireRateLimiting(RateLimiting.PurchasePolicy)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .RequireIdempotency()
             .WithDescription(FuelPurchaseEndpoint.Description)
             .ProducesProblem(StatusCodes.Status400BadRequest)

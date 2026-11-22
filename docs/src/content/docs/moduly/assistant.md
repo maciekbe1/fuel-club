@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie]
-Zrealizowane: `POST /api/chat` (SSE), cztery narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Planowane: metryki, anomalie, kolejka admina i retencja śladów (P7b), ocena przez judge (P7c), adapter dostawcy (opcjonalnie).
+Zrealizowane: `POST /api/chat` (SSE), cztery narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Metryki, anomalie, kolejka admina i retencja: [Observability](/moduly/observability/) (P7b). Planowane: ocena przez judge (P7c), adapter dostawcy (opcjonalnie).
 :::
 
 ## Co robi
@@ -84,9 +84,7 @@ Potwierdzenie jest bezstanowym tokenem Data Protection (`proposalId`, `userId`, 
 
 Klient, który odszedł, zostawia turę `Cancelled`. Gdy tura skończyła się błędem, zanim klient odszedł, zostaje `Error`.
 
-:::caution[Planowane]
-Retencja (automatyczne usuwanie), metryki i dostęp admina do śladów - P7b.
-:::
+Retencja, metryki i kolejka przeglądu: [Observability](/moduly/observability/).
 
 ## Zabezpieczenia
 

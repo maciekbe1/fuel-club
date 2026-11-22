@@ -1,3 +1,4 @@
+using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Csrf;
 
 namespace FuelClub.Api.Modules.Accounts
@@ -10,10 +11,14 @@ namespace FuelClub.Api.Modules.Accounts
 
             group
                 .MapPost("/register", RegisterEndpoint.Handle)
+                .RequireRateLimiting(RateLimiting.AuthPolicy)
+                .ProducesProblem(StatusCodes.Status429TooManyRequests)
                 .Produces(StatusCodes.Status201Created)
                 .ProducesProblem(StatusCodes.Status400BadRequest);
             group
                 .MapPost("/login", LoginEndpoint.Handle)
+                .RequireRateLimiting(RateLimiting.AuthPolicy)
+                .ProducesProblem(StatusCodes.Status429TooManyRequests)
                 .Produces(StatusCodes.Status204NoContent)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status401Unauthorized);

@@ -344,6 +344,8 @@ Konto kasjera ma rolę `Cashier` i dokładnie jedno stanowisko w `CashierStation
 
 ## Zabezpieczenia
 
+- Limit zakupów (z odbiorem kuponu) na kasjera: `RateLimits:PurchasePermitLimit` w `PurchaseWindow` (60/min), potem `429`.
+
 - Reguły zakresu są w kodzie i w bazie (`CHECK`). Baza jest ostatnią linią obrony.
 - `numeric(10,2)` w PostgreSQL **zaokrągla** wartość z większą liczbą miejsc, zamiast ją odrzucić. Precyzję sprawdza więc tylko `FuelPurchaseRules` i nie wolno jej pominąć.
 - `xmin` wykrywa równoległą zmianę salda (`DbUpdateConcurrencyException`).

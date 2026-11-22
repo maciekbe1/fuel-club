@@ -143,6 +143,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["ProblemDetails"];
                     };
                 };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -191,6 +200,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -373,6 +391,15 @@ export interface paths {
                 };
                 /** @description Conflict */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1294,6 +1321,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/observability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Metrics over the last `hours` (1-720, default 24): chat turns, p95 times, tools, security events and the anomaly rules. Metadata only, users as pseudonyms. */
+        get: {
+            parameters: {
+                query?: {
+                    hours?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ObservabilitySummary"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/observability/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReviewQueue"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/observability/review/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1319,6 +1463,24 @@ export interface components {
         };
         AdminRewardsResponse: {
             items: components["schemas"]["AdminRewardResponse"][];
+        };
+        AnomalyResult: {
+            rule: string;
+            severity: string;
+            enabled: boolean;
+            /** Format: double */
+            value: number;
+            /** Format: double */
+            threshold: number;
+            /** Format: int32 */
+            sample: number;
+            /** Format: int32 */
+            minSample: number;
+            /** Format: int32 */
+            windowMinutes: number;
+            triggered: boolean;
+            /** Format: date-time */
+            lastAlertAt: null | string;
         };
         CashierStationResponse: {
             stationCode: string;
@@ -1360,6 +1522,28 @@ export interface components {
             promptVersion: string;
             demo: boolean;
         };
+        ChatMetrics: {
+            /** Format: int32 */
+            turns: number;
+            /** Format: int32 */
+            done: number;
+            /** Format: int32 */
+            errors: number;
+            /** Format: int32 */
+            cancelled: number;
+            /** Format: double */
+            p95FirstEventMs: null | number;
+            /** Format: double */
+            p95TotalMs: null | number;
+            errorCodes: components["schemas"]["CountItem"][];
+            tools: components["schemas"]["ToolCount"][];
+            /** Format: int64 */
+            inputTokens: null | number;
+            /** Format: int64 */
+            outputTokens: null | number;
+            /** Format: int32 */
+            turnsWithoutTokenData: number;
+        };
         ChatRequest: {
             message: null | string;
             history: null | components["schemas"]["ChatHistoryItem"][];
@@ -1378,6 +1562,11 @@ export interface components {
         };
         ConfirmationRequest: {
             token: null | string;
+        };
+        CountItem: {
+            key: string;
+            /** Format: int32 */
+            count: number;
         };
         CouponPreviewCalculation: {
             /** Format: double */
@@ -1486,6 +1675,15 @@ export interface components {
             displayName: string;
             roles: string[];
         };
+        ObservabilitySummary: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            chat: components["schemas"]["ChatMetrics"];
+            security: components["schemas"]["CountItem"][];
+            anomalies: components["schemas"]["AnomalyResult"][];
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -1498,6 +1696,32 @@ export interface components {
             email: string;
             password: string;
             displayName: string;
+        };
+        ReviewItem: {
+            /** Format: uuid */
+            id: string;
+            correlationId: string;
+            userPseudonym: string;
+            /** Format: date-time */
+            startedAt: string;
+            outcome: string;
+            errorCode: null | string;
+            provider: string;
+            model: string;
+            promptVersion: string;
+            /** Format: int32 */
+            totalMs: number;
+            tools: components["schemas"]["ReviewTool"][];
+            reasons: string[];
+        };
+        ReviewQueue: {
+            items: components["schemas"]["ReviewItem"][];
+        };
+        ReviewTool: {
+            name: string;
+            status: string;
+            /** Format: int32 */
+            durationMs: number;
         };
         RewardResponse: {
             /** Format: uuid */
@@ -1515,6 +1739,12 @@ export interface components {
         };
         RewardsResponse: {
             items: components["schemas"]["RewardResponse"][];
+        };
+        ToolCount: {
+            name: string;
+            status: string;
+            /** Format: int32 */
+            count: number;
         };
         TransactionCouponExchange: {
             /** Format: uuid */

@@ -9,6 +9,7 @@ import {
   Settings,
   TicketCheck,
   MessageCircle,
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
@@ -40,6 +41,14 @@ export function HomeScreen() {
           icon={Settings}
           title="Administracja ofert"
           description="Twórz, zmieniaj i wyłączaj oferty"
+        />
+      )}
+      {isAdmin && (
+        <Shortcut
+          href="/admin/obserwowalnosc"
+          icon={Activity}
+          title="Obserwowalność"
+          description="Metryki, anomalie, tury do przejrzenia"
         />
       )}
     </>
@@ -121,7 +130,8 @@ function Shortcut({
     | "/kupony"
     | "/czat"
     | "/kasa"
-    | "/admin/oferty";
+    | "/admin/oferty"
+    | "/admin/obserwowalnosc";
   icon: ComponentType<{ className?: string }>;
   title: string;
   description: string;

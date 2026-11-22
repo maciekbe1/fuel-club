@@ -59,6 +59,8 @@ export const authMessages: Record<string, string> = {
   "accounts.password_requires_lowercase": "Hasło musi zawierać małą literę",
   "accounts.password_requires_uppercase": "Hasło musi zawierać wielką literę",
   "accounts.invalid_registration": "Nie udało się utworzyć konta",
+  "rate_limit.exceeded":
+    "Za dużo prób z tego adresu. Odczekaj minutę i spróbuj ponownie.",
   "accounts.registration_failed": "Nie udało się utworzyć konta",
   default: "Niepoprawna wartość",
 };
