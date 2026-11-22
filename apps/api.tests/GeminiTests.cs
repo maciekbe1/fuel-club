@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -125,8 +126,17 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
     ) =>
         factory.WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("Assistant:Provider", "gemini");
-            builder.UseSetting("Assistant:Gemini:ApiKey", key);
+            // After the factory's own settings (which force demo), so these win.
+            builder.ConfigureAppConfiguration(
+                (_, config) =>
+                    config.AddInMemoryCollection(
+                        new Dictionary<string, string?>
+                        {
+                            ["Assistant:Provider"] = "gemini",
+                            ["Assistant:Gemini:ApiKey"] = key,
+                        }
+                    )
+            );
             builder.ConfigureTestServices(services =>
                 services
                     .AddHttpClient(GeminiChatModel.ClientName)
@@ -312,11 +322,20 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         var key = Environment.GetEnvironmentVariable(GeminiFactAttribute.KeyVariable)!;
         await using var host = factory.WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("Assistant:Provider", "gemini");
-            builder.UseSetting("Assistant:Gemini:ApiKey", key);
             var model = Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_MODEL");
-            if (!string.IsNullOrWhiteSpace(model))
-                builder.UseSetting("Assistant:Gemini:Model", model);
+            builder.ConfigureAppConfiguration(
+                (_, config) =>
+                    config.AddInMemoryCollection(
+                        new Dictionary<string, string?>
+                        {
+                            ["Assistant:Provider"] = "gemini",
+                            ["Assistant:Gemini:ApiKey"] = key,
+                            ["Assistant:Gemini:Model"] = string.IsNullOrWhiteSpace(model)
+                                ? "gemini-3.5-flash-lite"
+                                : model,
+                        }
+                    )
+            );
         });
         var (client, _, _) = await CustomerAsync(host, 1234);
 

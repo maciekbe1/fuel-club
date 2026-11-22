@@ -30,10 +30,21 @@ public static class AssistantModule
         services.AddSingleton<ConfirmationTokens>();
         services.AddSingleton<TracePseudonyms>();
         // The demo model is the default; Assistant:Provider=gemini switches to the Gemini adapter.
-        if (configuration[$"{AssistantOptions.Section}:Provider"] == Providers.Gemini)
-            services.AddHttpClient<IChatModel, GeminiChatModel>(GeminiChatModel.ClientName);
-        else
-            services.AddSingleton<IChatModel, DemoChatModel>();
+        // Chosen from the bound options when resolved, so every configuration source counts.
+        services.AddHttpClient(GeminiChatModel.ClientName);
+        services.AddSingleton<DemoChatModel>();
+        services.AddTransient<IChatModel>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<AssistantOptions>>();
+            return options.Value.Provider == Providers.Gemini
+                ? new GeminiChatModel(
+                    provider
+                        .GetRequiredService<IHttpClientFactory>()
+                        .CreateClient(GeminiChatModel.ClientName),
+                    options
+                )
+                : provider.GetRequiredService<DemoChatModel>();
+        });
         services.AddScoped<AssistantTools>();
         services.AddScoped<ChatService>();
         services.AddRateLimiter(options =>

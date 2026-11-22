@@ -82,6 +82,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                             ["ConnectionStrings:DefaultConnection"] = _connectionString,
                             // Tests create their own accounts; ignore demo data and bootstrap staff from user-secrets.
                             ["DemoAccounts:Enabled"] = "false",
+                            // A Gemini key in user-secrets must not reach tests: evals expect the demo model.
+                            ["Assistant:Provider"] = "demo",
+                            ["Assistant:Gemini:ApiKey"] = "",
                             ["BootstrapAdmin:Email"] = "",
                             ["BootstrapAdmin:Password"] = "",
                             ["BootstrapCashier:Email"] = "",
