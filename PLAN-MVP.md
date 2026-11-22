@@ -29,7 +29,7 @@ Asystent implementuje uzgodnione kroki, użytkownik decyduje o zakresie i sprawd
 ### Konto i role
 
 - Logowanie i wylogowanie, sesja w ciasteczku HttpOnly.
-- Role docelowe: User (klient), Cashier (kasjer), Admin (zarządzanie ofertami). Cashier jest planowany; obecnie zaimplementowano User i Admin.
+- Role: User (klient), Cashier (kasjer), Admin (zarządzanie ofertami) - wszystkie zaimplementowane.
 - Konta demonstracyjne: dwóch użytkowników do testów izolacji, kasjer oraz administrator - wyłącznie w Development.
 - Kasjer powstaje z konfiguracji startowej (analogicznie do administratora), z przypisaną stacją i kasą. Bez automatycznego awansu istniejącego zwykłego konta. Endpoint zarządzania personelem nie jest teraz potrzebny.
 - Hasła haszowane przez Identity. Dane startowe tylko w środowisku Development.
@@ -48,7 +48,7 @@ Asystent implementuje uzgodnione kroki, użytkownik decyduje o zakresie i sprawd
 - Wymiana kodu karty wymaga zalogowanego właściciela i natychmiast unieważnia poprzedni kod. Kodów kart nie logujemy.
 - Po zapisie zakupu kasjer widzi ID zakupu i przyznane punkty, bez salda klienta.
 - Operacje kasowe wymagają Cashier; sama rola Admin ich nie uprawnia. Prawdziwa integracja POS pozostaje poza MVP.
-- Reguła: 1 punkt za każdy pełny 1 zł tankowania, floor(kwota). Kwota 0 < x <= 5000 zł, maks. 2 miejsca po przecinku; litry > 0, maks. 3 miejsca. Wartości jako decimal, bez float.
+- Reguła: 1 punkt za każdy pełny 1 zł zapłacony, floor(PaidAmount); po rabacie z kuponu zapłata i punkty mogą wynosić 0. Kwota brutto 0 < x <= 5000 zł, maks. 2 miejsca po przecinku; litry > 0, maks. 3 miejsca. Wartości jako decimal, bez float.
 - Unikalna kombinacja stacja + kasa + data sprzedaży + numer paragonu zapobiega ponownemu naliczeniu również z innym kluczem idempotencji: 409 loyalty.receipt_already_registered, bez informacji o właścicielu. Ten sam klucz z tym samym żądaniem odtwarza pierwotny sukces.
 - Data sprzedaży nie może być późniejsza niż dziś w strefie stacji (demo Europe/Warsaw): 400 loyalty.sale_date_in_future. Starsze daty są dozwolone.
 - Zakup poniżej 1 zł (0 pkt) jest zapisywany bez wpisu w historii i bez zmiany salda. Idempotencja obowiązuje także dla niego.
@@ -103,13 +103,13 @@ Podział na moduły logiczne: Accounts, Loyalty, Rewards, Assistant, Observabili
 ## Dane i niezmienniki
 
 - Identity users/roles: konta i uprawnienia.
-- LoyaltyCard (planowana): właściciel, kod (128 bitów losowości, jawnie, UNIQUE), daty utworzenia i unieważnienia. Jeden aktywny kod na użytkownika; wymiana unieważnia poprzedni.
-- CashierStation (planowana): kasjer, stacja, kasa - przypisanie z konfiguracji, źródło StationCode i RegisterCode zakupu.
+- LoyaltyCard: właściciel, kod (128 bitów losowości, jawnie, UNIQUE), daty utworzenia i unieważnienia. Jeden aktywny kod na użytkownika; wymiana unieważnia poprzedni.
+- CashierStation: kasjer, stacja, kasa - przypisanie z konfiguracji, źródło StationCode i RegisterCode zakupu.
 - LoyaltyAccount: userId, balance, wersja współbieżności (xmin). Saldo nigdy ujemne.
 - PointsLedger: userId, delta, typ, identyfikator źródła, data. Dziennik niezmienny.
-- FuelPurchase: klient (z karty), wykonawca (kasjer z sesji), kwota, litry, przyznane punkty; paragon identyfikuje stacja + kasa + data sprzedaży + numer (unikalne razem).
-- RewardDefinition: oferta, koszt, aktywność.
-- UserCoupon: właściciel, oferta, snapshot, status, kod, daty aktywacji i odbioru.
+- FuelPurchase: klient (z karty), wykonawca (kasjer z sesji), kwota brutto, rabat, kwota zapłacona, litry, przyznane punkty; paragon identyfikuje stacja + kasa + data sprzedaży + numer (unikalne razem).
+- RewardOffer: oferta, koszt, stawka zł/l, limit litrów, aktywność, wersja.
+- Coupon: właściciel, oferta, snapshot, status, kod, daty aktywacji i odbioru, zakup odbioru (tylko zakup właściciela).
 - IdempotencyRecord: użytkownik wykonujący operację, klucz, fingerprint żądania, status HTTP i odpowiedź.
 - ChatTrace/ToolTrace: correlationId, pseudonimowy identyfikator użytkownika, narzędzie, wynik, czas i sygnały anomalii.
 
@@ -171,12 +171,15 @@ Logi strukturalne z correlationId, czasem narzędzia, wynikiem i trybem dostawcy
 
 ## Etapy implementacji
 
+Bieżąca realizacja pozostałego zakresu: `specs/SPEC.md`, `specs/PLAN.md` (kroki P0-P10), stan w `IMPLEMENTATION-STATE.md`.
+
+
 1. Szkielet repo, .NET API, Next.js, PostgreSQL, healthcheck, .env.example i README.
 2. Migracje Identity, konta demo, logowanie, sesja i role. Test izolacji dwóch użytkowników.
 3. Rola Cashier, karta lojalnościowa, saldo, ledger i tankowanie przez symulator kasy. Kolejność: 3.1 rola Cashier i stanowisko (zrobione) → 3.3 infrastruktura Idempotency-Key (zrobione) → 3.2 karta (zrobione) → 3.4 zakup przez kasę (zrobione) → 3.5 odczyt salda i historii (zrobione). Testy uprawnień, rozpoznania karty, ponowień i paragonu.
-4. Oferty i wymiana punktów z transakcją oraz idempotencją. Test równoległego wydawania.
-5. Aktywacja, skan kodu i realizacja przez kasjera. Test jednorazowego rabatu przy różnych kluczach.
-6. Interfejs: konto i karta, saldo/historia, katalog, moje kupony, panel kasjera i osobny panel administratora.
+4. Oferty i wymiana punktów z transakcją oraz idempotencją. Test równoległego wydawania. (zrobione)
+5. Aktywacja, skan kodu i realizacja przez kasjera. Test jednorazowego rabatu przy różnych kluczach. (API zrobione; UI w etapie 6)
+6. Interfejs: konto i karta, saldo/historia, katalog, moje kupony, panel kasjera i osobny panel administratora. (konto, karta, saldo, historia i zakup w kasie zrobione; reszta: `specs/PLAN.md` P1-P4)
 7. Lokalny agent, SSE, narzędzia i potwierdzenie aktywacji.
 8. Evals, logi, anomalie, scenariusz demonstracji i test E2E.
 9. Opcjonalny adapter Gemini, bez blokowania lokalnego uruchomienia.
