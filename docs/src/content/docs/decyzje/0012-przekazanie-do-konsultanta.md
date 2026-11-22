@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Proponowana (2026-11-22), P11. Nie zrealizowana - opis kontraktu do akceptacji przed implementacją.
+Decyzja przyjęta (2026-11-22), P11. Nie zrealizowana - kontrakt przed implementacją.
 
 ## Problem
 
@@ -23,15 +23,20 @@ Model nie może sam przekazać rozmowy ani dawać konsultantowi uprawnień, któ
 
 ### Rola i uprawnienia
 
-- Nowa rola `Support`. Konto demo `konsultant@demo.fuelclub.test`. Na innych środowiskach `BootstrapSupport:Email`/`Password` jak kasjer.
+- Nowa rola `Support`. Konto demo `konsultant@demo.fuelclub.test`. Na innych środowiskach, także Railway: `BootstrapSupport:Email`/`Password`.
+  - Sekrety tylko w zmiennych środowiskowych / user-secrets.
+  - Bootstrap tworzy tylko nowe konto. Istniejące konto z tym e-mailem **nie** dostaje roli: ostrzeżenie w logu, konto bez zmian.
 - `Support` nie ma uprawnień `User`, `Cashier` ani `Admin`: nie nalicza punktów, nie realizuje kuponów, nie zmienia ofert, nie widzi salda, kart ani kuponów klienta.
 - Konsultant widzi tylko zgłoszenia: nazwę wyświetlaną klienta (bez e-maila) i wiadomości.
 
 ### Stany zgłoszenia
 
-`Waiting` → `Assigned` → `Closed`. W oknie czatu: bot → oczekiwanie → konsultant → zakończona.
+`Waiting` → `Assigned` → `Closed`, oraz `Expired`. W oknie czatu: bot → oczekiwanie → konsultant → zakończona albo wygasła.
 
 - Klient ma najwyżej jedno otwarte zgłoszenie (`Waiting` lub `Assigned`) - częściowy indeks UNIQUE w bazie.
+- `Assigned` → `Waiting`: konsultant oddaje zgłoszenie do kolejki (tylko aktualny opiekun) albo przekracza limit bezczynności.
+- **Wygaśnięcie:** `Waiting` bez aktywności przez `WaitingExpiry` (domyślnie 7 dni) → `Expired`, nie „rozwiązane”. Klient widzi informację „Nikt nie zdążył odpowiedzieć - zgłoszenie wygasło” i może utworzyć nowe.
+- **Bezczynność przejętego:** `Assigned` bez wiadomości przez `AssignedIdleTimeout` (domyślnie 24 h) wraca do kolejki z wiadomością systemową; potem obowiązuje wygaśnięcie jak wyżej. Żadne zgłoszenie nie zostaje otwarte bezterminowo.
 - Zgłoszenie żyje na serwerze: po przeładowaniu i ponownym zalogowaniu okno czatu wraca do niego.
 - Zamyka konsultant przejmujący zgłoszenie albo klient. Po zamknięciu klient może zacząć nową rozmowę z botem.
 
@@ -43,7 +48,11 @@ Model nie może sam przekazać rozmowy ani dawać konsultantowi uprawnień, któ
 - Przed wysłaniem okno pokazuje zgodę:
   - „Rozmowa z konsultantem jest zapisywana i przechowywana 30 dni od zakończenia.”
   - pole „Dołącz dotychczasową rozmowę z asystentem” - domyślnie **wyłączone**.
-- Konsultant widzi wiadomości od przekazania. Dołączona rozmowa jest oznaczona jako przekazana przez klienta (serwer nie przechowuje rozmów z botem, więc nie może jej potwierdzić).
+- Konsultant widzi wiadomości od przekazania.
+- **Dołączona historia to niezaufany tekst klienta**, nie potwierdzony zapis działań systemu. Serwer nie przechowuje rozmów z botem, więc jej nie weryfikuje; klient może wpisać tam cokolwiek, także „asystent aktywował kupon”.
+  - Zapis: wiadomości autora `Customer` ze znacznikiem `ClientProvidedHistory`, nigdy jako `System` ani `Support`.
+  - Panel konsultanta pokazuje je osobno, pod nagłówkiem „Tekst przekazany przez klienta - niepotwierdzony”, jako zwykły tekst.
+  - Limity jak historia czatu (20 wpisów, 2000 znaków).
 
 ### Bot w trakcie zgłoszenia
 
@@ -51,6 +60,10 @@ Model nie może sam przekazać rozmowy ani dawać konsultantowi uprawnień, któ
 - Gdy klient ma otwarte zgłoszenie:
   - `POST /api/chat` → `409 assistant.handoff_active` przed strumieniem;
   - `POST /api/chat/confirmations` → `409 assistant.handoff_active` - stare przyciski aktywacji są wyłączone w UI, a backend odrzuca ich użycie.
+- **Wyścig przekazanie-aktywacja.** Sam odczyt stanu przed zapisem nie wystarcza: przekazanie mogłoby się zatwierdzić między sprawdzeniem a aktywacją.
+  - Utworzenie zgłoszenia i aktywacja z czatu blokują ten sam wiersz klienta (`loyalty_accounts ... FOR UPDATE`) w swojej transakcji.
+  - Aktywacja sprawdza brak otwartego zgłoszenia **pod tą blokadą** i w tej samej transakcji zmienia kupon.
+  - Skutek: albo aktywacja zatwierdza się przed zgłoszeniem, albo widzi zgłoszenie i kończy się `409`. Test API uruchamia oba żądania równolegle (bramka blokad jak w testach wyścigów).
 
 ### Endpointy
 
@@ -72,6 +85,7 @@ Konsultant (rola `Support`, CSRF dla zmian):
 | `POST` | `/api/support/cases/{id}/claim` | Atomowe przejęcie: warunkowy `UPDATE ... WHERE Status = 'Waiting'`. Przegrany → `409 support.case_taken`; ponowienie przez tego samego konsultanta → `200`. |
 | `GET` | `/api/support/cases/{id}/messages?after={seq}` | Tylko przejmujący. Inny konsultant → `403 support.not_assignee`. |
 | `POST` | `/api/support/cases/{id}/messages` | Tylko przejmujący, `Idempotency-Key`. |
+| `POST` | `/api/support/cases/{id}/release` | Oddanie do kolejki: warunkowy `UPDATE ... WHERE AssignedTo = ja AND Status = 'Assigned'` → `Waiting`. Od tej chwili poprzedni opiekun dostaje `403 support.not_assignee`. Wiadomości zostają, bot dalej wyłączony. |
 | `POST` | `/api/support/cases/{id}/close` | Tylko przejmujący. |
 
 ### Wiadomości i kursor
@@ -88,7 +102,7 @@ Konsultant (rola `Support`, CSRF dla zmian):
 ### Dane, logi, retencja
 
 - Treść wiadomości tylko w bazie. Nie trafia do logów, śladów ani zdarzeń bezpieczeństwa; logi i spany mają id zgłoszenia i stan.
-- Zgłoszenie i jego wiadomości są usuwane 30 dni po zamknięciu (worker retencji jak w [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/)).
+- Zgłoszenie i jego wiadomości są usuwane 30 dni po zamknięciu albo wygaśnięciu. Wygaszanie, powrót do kolejki i usuwanie robi worker jak w [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/).
 - Limity: tworzenie zgłoszeń i wiadomości na użytkownika (domyślnie 5 zgłoszeń/h, 30 wiadomości/min).
 
 ## Alternatywy
@@ -103,11 +117,5 @@ Konsultant (rola `Support`, CSRF dla zmian):
 - Pierwsza tabela z treścią rozmów: zakres danych i retencja jak wyżej, opis w dokumentacji modułu.
 - Czat ma nowy stan i nowy kod błędu; Gemini dostaje piątą deklarację narzędzia (bez nowych danych dla Google).
 - Testy:
-  - API: izolacja klientów, `Support` bez dostępu do operacji kasy i admina, wyścig dwóch przejęć (jeden wygrywa), kursor przy równoległych wiadomościach, idempotencja tworzenia i wiadomości, `409 handoff_active` dla czatu i potwierdzenia, retencja.
+  - API: izolacja klientów, `Support` bez dostępu do operacji kasy i admina, wyścig dwóch przejęć (jeden wygrywa), wyścig przekazania z aktywacją, oddanie do kolejki, wygaśnięcie i bezczynność, bootstrap nie awansuje istniejącego konta, historia oznaczona jako niezaufana, kursor przy równoległych wiadomościach, idempotencja tworzenia i wiadomości, `409 handoff_active` dla czatu i potwierdzenia, retencja.
   - E2E: klient przekazuje i czeka, konsultant przejmuje i odpowiada, klient widzi odpowiedź, zamknięcie, powrót po ponownym logowaniu.
-
-## Otwarte pytania
-
-1. Nieobsłużone `Waiting` - zamykać automatycznie (np. po 7 dniach)?
-2. Konsultant oddaje zgłoszenie do kolejki - potrzebne?
-3. Konto `Support` na Railway: `BootstrapSupport` wystarczy?
