@@ -269,6 +269,113 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         );
     }
 
+    private static string ParallelBody() =>
+        JsonSerializer.Serialize(
+            new
+            {
+                candidates = new[]
+                {
+                    new
+                    {
+                        content = new
+                        {
+                            role = "model",
+                            parts = new object[]
+                            {
+                                new
+                                {
+                                    functionCall = new { name = "get_my_balance", args = new { } },
+                                    thoughtSignature = "sig-P",
+                                },
+                                new
+                                {
+                                    functionCall = new
+                                    {
+                                        name = "list_my_coupons",
+                                        args = new { status = "Purchased" },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                usageMetadata = new { promptTokenCount = 100, candidatesTokenCount = 10 },
+            }
+        );
+
+    [Fact]
+    public async Task Parallel_calls_in_one_response_all_run_and_go_back_together()
+    {
+        var gemini = new FakeGemini(
+            (HttpStatusCode.OK, ParallelBody()),
+            (HttpStatusCode.OK, TextBody("Masz 55 pkt i brak kuponów."))
+        );
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 55);
+
+        var events = await ChatAsync(client, "Saldo i kupony?");
+
+        Assert.Equal(["meta", "tool", "tool", "delta", "done"], events.Select(e => e.Name));
+        Assert.Equal(
+            ["get_my_balance", "list_my_coupons"],
+            events.Where(e => e.Name == "tool").Select(e => e.Data.GetProperty("name").GetString())
+        );
+        var contents = JsonNode.Parse(gemini.Sent[1].Body)!["contents"]!.AsArray();
+        Assert.Equal(3, contents.Count);
+        var calls = contents[1]!["parts"]!.AsArray();
+        Assert.Equal(2, calls.Count);
+        Assert.Equal("sig-P", calls[0]!["thoughtSignature"]!.GetValue<string>());
+        Assert.Null(calls[1]!["thoughtSignature"]);
+        var responses = contents[2]!["parts"]!.AsArray();
+        Assert.Equal(
+            ["get_my_balance", "list_my_coupons"],
+            responses.Select(r => r!["functionResponse"]!["name"]!.GetValue<string>())
+        );
+    }
+
+    [Fact]
+    public async Task A_step_over_the_tool_limit_runs_none_of_its_calls()
+    {
+        var gemini = new FakeGemini((HttpStatusCode.OK, ParallelBody()));
+        await using var host = Host(gemini);
+        await using var limited = host.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration(
+                (_, config) =>
+                    config.AddInMemoryCollection(
+                        new Dictionary<string, string?> { ["Assistant:MaxToolCalls"] = "1" }
+                    )
+            )
+        );
+        var (client, _, _) = await CustomerAsync(limited, 5);
+
+        var events = await ChatAsync(client, "Saldo i kupony?");
+
+        Assert.Equal(["meta", "error"], events.Select(e => e.Name));
+        Assert.Equal("assistant.tool_limit", events[1].Data.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_failed_model_call_leaves_the_turn_tokens_unknown_not_partial()
+    {
+        var gemini = new FakeGemini(
+            (HttpStatusCode.OK, CallBody("get_my_balance", new { }, "sig-U")),
+            (HttpStatusCode.ServiceUnavailable, "{}")
+        );
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 1);
+
+        var events = await ChatAsync(client, "Ile mam punktów?");
+
+        Assert.Equal("error", events[^1].Name);
+        var correlation = events[0].Data.GetProperty("correlationId").GetString();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var turn = await scope
+            .ServiceProvider.GetRequiredService<AppDbContext>()
+            .AssistantTurns.SingleAsync(t => t.CorrelationId == correlation);
+        Assert.Null(turn.InputTokens);
+        Assert.Null(turn.OutputTokens);
+    }
+
     [Fact]
     public void Response_parts_map_to_steps_and_empty_answers_fail()
     {
@@ -281,7 +388,7 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
                 .Parse(CallBody("list_my_coupons", new { status = "Purchased" }, "s"))
                 .RootElement
         );
-        var tool = Assert.IsType<ModelStep.Tool>(call).Call;
+        var tool = Assert.Single(Assert.IsType<ModelStep.Tool>(call).Calls);
         Assert.Equal("Purchased", tool.Arguments.GetProperty("status").GetString());
         Assert.Equal("s", tool.ProviderPart!.Value.GetProperty("thoughtSignature").GetString());
 

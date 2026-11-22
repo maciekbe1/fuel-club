@@ -27,7 +27,12 @@ public abstract record ModelStep
 {
     public TokenUsage? Usage { get; init; }
 
-    public sealed record Tool(ToolCall Call) : ModelStep;
+    /// <summary>One or more calls the model asked for at once; they run in order.</summary>
+    public sealed record Tool(IReadOnlyList<ToolCall> Calls) : ModelStep
+    {
+        public Tool(ToolCall call)
+            : this([call]) { }
+    }
 
     public sealed record Reply(string Text) : ModelStep;
 }

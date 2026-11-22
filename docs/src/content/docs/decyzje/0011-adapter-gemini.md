@@ -25,11 +25,15 @@ Lokalne testy i CI nie mogą zależeć od chmury.
 - `GeminiChatModel` woła REST `models/{model}:generateContent` z deklaracjami narzędzi (function calling).
   - Klucz idzie w nagłówku `x-goog-api-key`, nigdy w URL.
   - Błąd HTTP to `assistant.provider_error`. Treść odpowiedzi błędu nie trafia do logu.
-- Jeden krok = jedno wywołanie narzędzia albo odpowiedź. Pętlę, limit narzędzi i czasy prowadzi `ChatService`.
+- Krok modelu to odpowiedź albo **jedno lub więcej** wywołań narzędzi (Gemini może zwrócić kilka `functionCall` naraz).
+  - `ChatService` wykonuje je po kolei.
+  - Krok, który przekroczyłby `MaxToolCalls`, nie wykonuje żadnego wywołania (`assistant.tool_limit`).
+  - Pętlę i czasy prowadzi `ChatService`.
 - **Podpisy wywołań:** Gemini 3 wymaga odesłania `thoughtSignature` z każdym `functionCall` bieżącej tury (inaczej `400`).
-  - `ToolCall.ProviderPart` przechowuje oryginalną część odpowiedzi modelu.
-  - `ChatModelContext.ToolCalls` oddaje ją w następnym kroku.
+  - `ToolCall.ProviderPart` przechowuje oryginalną część odpowiedzi modelu, a `ToolCall.Step` - numer kroku.
+  - `ChatModelContext.ToolCalls` oddaje je w następnym kroku: wywołania jednego kroku w jednej wiadomości modelu, w kolejności, a ich wyniki w jednej wiadomości użytkownika.
 - Tokeny: wejście `promptTokenCount`; wyjście `candidatesTokenCount` + `thoughtsTokenCount` (rozumowanie jest płatne). Trafiają do śladu tury.
+  - Nieudane albo przerwane wywołanie modelu mogło zostać naliczone, więc suma tury jest nieznana (`null`), nie częściowa. Podsumowanie liczy takie tury osobno.
 - Model `Assistant:Gemini:Model`, domyślnie `gemini-3.5-flash-lite` (kod z listy modeli Google, 2026-11). Przed zmianą sprawdź aktualną listę.
 
 ### Dane wysyłane do Google

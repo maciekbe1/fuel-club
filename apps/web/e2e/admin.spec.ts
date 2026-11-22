@@ -281,3 +281,50 @@ test("customer and cashier cannot open the admin screens", async ({
   expect((await till.request.get("/api/admin/rewards")).status()).toBe(403);
   await context.close();
 });
+
+test("restored create fails again: the retry sends the stored offer, not the empty form", async ({
+  browser,
+  baseURL,
+}) => {
+  const admin = await adminPage(browser, baseURL!);
+  const name = offerName("Ponowienie");
+  const keys: string[] = [];
+  admin.page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().endsWith("/api/admin/rewards"))
+      keys.push(r.headers()["idempotency-key"]);
+  });
+  const lose = async (route: import("@playwright/test").Route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await route.fetch();
+    await route.abort("failed");
+  };
+  await admin.page.route(ADMIN_REWARDS, lose);
+
+  await admin.page.goto("/admin/oferty/nowa");
+  await fillOffer(admin.page, { name, cost: "300", rate: "0,1", liters: "30" });
+  await admin.page.getByRole("button", { name: "Utwórz ofertę" }).click();
+  const banner = admin.page.getByRole("main").getByRole("alert");
+  await expect(banner).toContainText(
+    "nie wiadomo, czy oferta została utworzona",
+  );
+
+  // Reload: the form is empty, the create comes back from storage; its retry is lost too.
+  await admin.page.reload();
+  await expect(banner).toContainText(`Tworzenie oferty „${name}”`);
+  await banner.getByRole("button", { name: "Ponów utworzenie" }).click();
+  await expect(banner).toContainText(
+    "nie wiadomo, czy oferta została utworzona",
+  );
+
+  await admin.page.unroute(ADMIN_REWARDS);
+  await banner.getByRole("button", { name: "Ponów utworzenie" }).click();
+  await admin.page.waitForURL("/admin/oferty");
+
+  expect(keys).toHaveLength(3);
+  expect(new Set(keys).size).toBe(1);
+  await expect(
+    admin.page.getByTestId("admin-offer").filter({ hasText: name }),
+  ).toHaveCount(1);
+  await retire(admin.page, name);
+  await admin.context.close();
+});

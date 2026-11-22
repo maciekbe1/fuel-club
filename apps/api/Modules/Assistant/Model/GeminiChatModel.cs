@@ -79,48 +79,21 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         foreach (var item in context.History)
             contents.Add(Text(item.Role == "assistant" ? "model" : "user", item.Text));
         contents.Add(Text("user", context.Message));
-        for (var i = 0; i < context.ToolResults.Count; i++)
+        // Each model step goes back as one model turn (its call parts, unchanged and in order:
+        // Gemini 3 rejects calls without their signatures) and one user turn with all responses.
+        var count = Math.Min(context.ToolResults.Count, context.ToolCalls.Count);
+        for (var i = 0; i < count; )
         {
-            var result = context.ToolResults[i];
-            var call = i < context.ToolCalls.Count ? context.ToolCalls[i] : null;
-            // The model's own part goes back unchanged: Gemini 3 rejects a call without its signature.
-            var part = call?.ProviderPart is { } raw
-                ? JsonNode.Parse(raw.GetRawText())!
-                : new JsonObject
-                {
-                    ["functionCall"] = new JsonObject
-                    {
-                        ["name"] = result.Name,
-                        ["args"] = call is null
-                            ? new JsonObject()
-                            : JsonNode.Parse(call.Arguments.GetRawText()),
-                    },
-                };
-            contents.Add(new JsonObject { ["role"] = "model", ["parts"] = new JsonArray(part) });
-            contents.Add(
-                new JsonObject
-                {
-                    ["role"] = "user",
-                    ["parts"] = new JsonArray(
-                        new JsonObject
-                        {
-                            ["functionResponse"] = new JsonObject
-                            {
-                                ["name"] = result.Name,
-                                ["response"] = JsonSerializer.SerializeToNode(
-                                    new
-                                    {
-                                        status = result.Status,
-                                        data = result.Data,
-                                        reason = result.Reason,
-                                    },
-                                    Json
-                                ),
-                            },
-                        }
-                    ),
-                }
-            );
+            var step = context.ToolCalls[i].Step;
+            var calls = new JsonArray();
+            var responses = new JsonArray();
+            for (; i < count && context.ToolCalls[i].Step == step; i++)
+            {
+                calls.Add(CallPart(context.ToolCalls[i]));
+                responses.Add(ResponsePart(context.ToolResults[i]));
+            }
+            contents.Add(new JsonObject { ["role"] = "model", ["parts"] = calls });
+            contents.Add(new JsonObject { ["role"] = "user", ["parts"] = responses });
         }
 
         return new JsonObject
@@ -133,6 +106,36 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
             ["tools"] = new JsonArray(new JsonObject { ["functionDeclarations"] = Declarations() }),
         };
     }
+
+    private static JsonNode CallPart(ToolCall call) =>
+        call.ProviderPart is { } raw
+            ? JsonNode.Parse(raw.GetRawText())!
+            : new JsonObject
+            {
+                ["functionCall"] = new JsonObject
+                {
+                    ["name"] = call.Name,
+                    ["args"] = JsonNode.Parse(call.Arguments.GetRawText()),
+                },
+            };
+
+    private static JsonObject ResponsePart(ToolResult result) =>
+        new()
+        {
+            ["functionResponse"] = new JsonObject
+            {
+                ["name"] = result.Name,
+                ["response"] = JsonSerializer.SerializeToNode(
+                    new
+                    {
+                        status = result.Status,
+                        data = result.Data,
+                        reason = result.Reason,
+                    },
+                    Json
+                ),
+            },
+        };
 
     private static JsonObject Text(string role, string text) =>
         new() { ["role"] = role, ["parts"] = new JsonArray(new JsonObject { ["text"] = text }) };
@@ -208,23 +211,24 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         )
             throw new InvalidOperationException("Gemini returned no content.");
 
-        // One call per step: ChatService runs it and asks again with the result.
+        // All calls of the response, in order: ChatService runs them and asks again with the results.
+        var calls = new List<ToolCall>();
         foreach (var part in parts.EnumerateArray())
             if (part.TryGetProperty("functionCall", out var call))
-            {
-                var args = call.TryGetProperty("args", out var a)
-                    ? a.Clone()
-                    : JsonSerializer.SerializeToElement(new { });
-                return new ModelStep.Tool(
-                    new ToolCall(call.GetProperty("name").GetString() ?? "", args)
+                calls.Add(
+                    new ToolCall(
+                        call.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                        call.TryGetProperty("args", out var a)
+                        && a.ValueKind == JsonValueKind.Object
+                            ? a.Clone()
+                            : JsonSerializer.SerializeToElement(new { })
+                    )
                     {
                         ProviderPart = part.Clone(),
                     }
-                )
-                {
-                    Usage = usage,
-                };
-            }
+                );
+        if (calls.Count > 0)
+            return new ModelStep.Tool(calls) { Usage = usage };
 
         var text = string.Concat(
             parts

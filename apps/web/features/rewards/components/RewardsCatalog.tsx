@@ -2,12 +2,12 @@
 
 import { Ticket } from "lucide-react";
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
-import { keepsIdempotencyKey, readPending } from "@/lib/idempotency";
+import { keepsIdempotencyKey, usePendingVars } from "@/lib/idempotency";
 import { EXCHANGE_OPERATION, useExchange, useRewards } from "../hooks";
 import { formatPoints, formatTerms } from "@/lib/format";
 import type { ExchangeVars, Reward } from "../services";
@@ -53,20 +53,6 @@ function unknownMessage(error: Error) {
   return "Błąd serwera - nie wiadomo, czy wymiana się udała. Ponów: kupon nie zostanie kupiony dwa razy.";
 }
 
-const noSubscription = () => () => {};
-
-function usePendingExchange() {
-  const raw = useSyncExternalStore(
-    noSubscription,
-    () =>
-      JSON.stringify(
-        readPending<ExchangeVars>(EXCHANGE_OPERATION)?.vars ?? null,
-      ),
-    () => "null",
-  );
-  return JSON.parse(raw) as ExchangeVars | null;
-}
-
 type Outcome =
   | { kind: "success"; offerName: string }
   | { kind: "final"; message: string };
@@ -83,7 +69,7 @@ export function RewardsCatalog() {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   // An exchange left unfinished before this screen was (re)mounted, e.g. after a lost response.
   // Read after hydration (the server snapshot is null), cleared once it got a final answer.
-  const stored = usePendingExchange();
+  const stored = usePendingVars<ExchangeVars>(EXCHANGE_OPERATION);
   const [cleared, setCleared] = useState(false);
   const restored = cleared ? null : stored;
 

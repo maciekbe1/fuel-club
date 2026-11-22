@@ -47,6 +47,8 @@ export default defineConfig({
         ConnectionStrings__DefaultConnection: database,
         DemoAccounts__Enabled: "false",
         // Every test logs in from 127.0.0.1 and one cashier serves all tests: the limits would stop the suite.
+        // Deterministic chat: a Gemini key in user-secrets must not reach E2E.
+        Assistant__Provider: "demo",
         RateLimits__AuthPermitLimit: "100000",
         RateLimits__PurchasePermitLimit: "100000",
         Rewards__PreviewPermitLimit: "1000",

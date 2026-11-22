@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/problem";
-import { clearPendingOperations } from "@/lib/idempotency";
+import { retainPendingOperations } from "@/lib/idempotency";
 import { queryKeys } from "@/lib/query-keys";
 import { authService, type Me, type RegisterInput } from "./services";
 
@@ -17,11 +17,18 @@ export function useMe(initialData?: Me) {
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: authService.login,
-    onSuccess: () => {
-      queryClient.clear();
-      clearPendingOperations();
+    mutationFn: async (input: Parameters<typeof authService.login>[0]) => {
+      await authService.login(input);
+      // Unfinished operations of this account survive signing in again (expired session);
+      // another account's are dropped. Not reading the account is not a failed login: the
+      // entries stay bound to their owners anyway.
+      try {
+        retainPendingOperations((await authService.me()).id);
+      } catch {
+        // Kept; readPending still returns them only to their owner.
+      }
     },
+    onSuccess: () => queryClient.clear(),
   });
 }
 
@@ -31,9 +38,11 @@ export function useLogin() {
  */
 export function useLogout() {
   const queryClient = useQueryClient();
+  // Unfinished operations stay bound to this account (another account never reads them, and the
+  // next sign-in of another account drops them): logging out must not lose a key whose outcome
+  // is unknown.
   const wipe = () => {
     queryClient.clear();
-    clearPendingOperations();
     window.location.replace("/login");
   };
   return useMutation({
@@ -64,9 +73,13 @@ export function useRegister() {
         });
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.clear();
-      clearPendingOperations();
+      try {
+        retainPendingOperations((await authService.me()).id);
+      } catch {
+        // A new account has nothing pending; another account's entries cannot be read by it.
+      }
     },
   });
 }

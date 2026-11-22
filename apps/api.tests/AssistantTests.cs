@@ -711,6 +711,25 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
             weekend.Id,
             named.Of("confirmation").Single().GetProperty("couponId").GetGuid()
         );
+
+        // The answer to its own question continues the activation.
+        var answer = await ChatAsync(
+            customer.Client,
+            "Weekend",
+            history: new object[]
+            {
+                new { role = "user", text = "aktywuj kupon Super" },
+                new { role = "assistant", text = unknown.Text },
+            }
+        );
+        Assert.Equal(
+            weekend.Id,
+            answer.Of("confirmation").Single().GetProperty("couponId").GetGuid()
+        );
+
+        // Without that question the same word is not an activation.
+        var plain = await ChatAsync(customer.Client, "Weekend");
+        Assert.Empty(plain.Of("confirmation"));
     }
 
     [Fact]

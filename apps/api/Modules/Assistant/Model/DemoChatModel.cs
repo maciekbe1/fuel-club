@@ -15,6 +15,9 @@ public sealed partial class DemoChatModel : IChatModel
 {
     private static readonly CultureInfo Polish = CultureInfo.GetCultureInfo("pl-PL");
 
+    /// <summary>The question that asks which coupon to activate; the next message answers it.</summary>
+    private const string WhichCoupon = "Który kupon aktywować?";
+
     public string Provider => "demo";
     public string Model => "demo-rules";
     public string PromptVersion => "demo-rules-v1";
@@ -33,7 +36,8 @@ public sealed partial class DemoChatModel : IChatModel
             );
 
         var done = context.ToolResults;
-        var activation = Activation().IsMatch(text);
+        // An answer to "which coupon?" continues the activation even without the keyword.
+        var activation = Activation().IsMatch(text) || AnswersWhichCoupon(context.History);
 
         if (activation)
             return Task.FromResult(NextActivationStep(context, text, intro));
@@ -79,17 +83,35 @@ public sealed partial class DemoChatModel : IChatModel
         var named = list.FirstOrDefault(c =>
             text.Contains(Normalize(c.OfferName), StringComparison.Ordinal)
         );
+        // A short answer ("Weekend") names part of one offer: used only when exactly one matches.
+        var answer = text.Trim().TrimEnd('.', '!', '?');
+        if (named is null && answer.Length >= 3)
+        {
+            var partial = list.Where(c =>
+                    Normalize(c.OfferName).Contains(answer, StringComparison.Ordinal)
+                )
+                .Take(2)
+                .ToList();
+            if (partial.Count == 1)
+                named = partial[0];
+        }
         if (named is not null)
             return Propose(named.Id.ToString());
         if (list.Count == 1)
             return Propose(list[0].Id.ToString());
         return new ModelStep.Reply(
             intro
-                + "Który kupon aktywować? Do aktywacji masz: "
+                + WhichCoupon
+                + " Do aktywacji masz: "
                 + string.Join("; ", list.Select(c => c.OfferName))
                 + ". Napisz nazwę oferty."
         );
     }
+
+    private static bool AnswersWhichCoupon(IReadOnlyList<Chat.ChatHistoryItem> history) =>
+        history.Count > 0
+        && history[^1] is { Role: "assistant", Text: { } last }
+        && last.Contains(WhichCoupon, StringComparison.Ordinal);
 
     private static ModelStep Propose(string couponId) =>
         new ModelStep.Tool(

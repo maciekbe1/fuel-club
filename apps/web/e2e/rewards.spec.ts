@@ -1,5 +1,13 @@
 import type { Page } from "@playwright/test";
-import { cashier, expect, issueCard, offerName, test } from "./fixtures";
+import {
+  cashier,
+  expect,
+  issueCard,
+  loginAs,
+  offerName,
+  PASSWORD,
+  test,
+} from "./fixtures";
 
 const EXCHANGE = "**/api/rewards/*/exchange";
 
@@ -280,4 +288,54 @@ test("leaving the screen with an unknown outcome keeps the lock and the key", as
   expect(keys[1]).toBe(keys[0]);
   expect(await couponCount(page)).toBe(1);
   await expect(balance(page)).toContainText("100 pkt");
+});
+
+test("lost response, then the session ends: signing in again keeps the key, one debit", async ({
+  page,
+  customer,
+  staff,
+  baseURL,
+}) => {
+  const name = offerName("Sesja");
+  await staff.createOffer({
+    name,
+    pointsCost: 500,
+    discountPerLiter: 0.2,
+    maxLiters: 50,
+  });
+  await earn(page, baseURL!, 600);
+
+  const keys: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/exchange"))
+      keys.push(request.headers()["idempotency-key"]);
+  });
+  await page.route(EXCHANGE, async (route) => {
+    await route.fetch();
+    await route.abort("failed");
+  });
+  await page.goto("/oferty");
+  const item = offer(page, name);
+  await item.getByRole("button", { name: "Wymień punkty" }).click();
+  await item.getByRole("button", { name: "Potwierdź wymianę" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "nie wiadomo, czy wymiana się udała",
+  );
+  await page.unroute(EXCHANGE);
+
+  // The session ends (expired cookie) and the same person signs in again in this tab.
+  await page.context().clearCookies();
+  await loginAs(page, customer.email, PASSWORD);
+  await page.goto("/oferty");
+  const restored = page.getByRole("main").getByRole("alert");
+  await expect(restored).toContainText(name);
+  await restored.getByRole("button", { name: "Ponów wymianę" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Kupiono kupon" }),
+  ).toBeVisible();
+
+  expect(keys).toHaveLength(2);
+  expect(keys[1]).toBe(keys[0]);
+  await expect(balance(page)).toContainText("100 pkt");
+  expect(await couponCount(page)).toBe(1);
 });

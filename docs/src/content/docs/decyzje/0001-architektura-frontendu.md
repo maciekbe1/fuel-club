@@ -58,7 +58,9 @@ Token jest powiązany z tożsamością. Po logowaniu i wylogowaniu klient woła 
 - mutacje bez danych (`mutate()`) też dostają klucz,
 - `409 key_reused` jest pokazywany jako błąd domenowy, nie sieciowy,
 - mutacje nie mają auto-retry (`retry: false`). Ponowienie jest świadome i z tym samym kluczem,
-- opcja `persist` trzyma klucz nierozstrzygniętej operacji w `sessionStorage` karty, aż przyjdzie ostateczna odpowiedź: wyjście z ekranu ani przeładowanie nie pozwala powtórzyć operacji z nowym kluczem (używa jej wymiana punktów). Logowanie, rejestracja i wylogowanie czyszczą te wpisy.
+- opcja `persist` trzyma klucz nierozstrzygniętej operacji w `sessionStorage` karty, aż przyjdzie ostateczna odpowiedź: wyjście z ekranu ani przeładowanie nie pozwala powtórzyć operacji z nowym kluczem (używa jej wymiana punktów). Wpis jest przypisany do konta (`owner` = id z `/api/auth/me`): inne konto w tej karcie go nie odczyta.
+  - Wylogowanie i wygaśnięcie sesji go nie usuwają - ponowne zalogowanie tego samego konta wraca do ponowienia z tym samym kluczem.
+  - Zalogowanie innego konta usuwa wpisy pozostałych kont.
 
 ### 7. SSE
 

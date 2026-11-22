@@ -100,13 +100,23 @@ public sealed class ChatService(
             {
                 // The model sees results without the confirmation token: only the client gets it.
                 var seen = results.Select(r => r with { Confirmation = null }).ToList();
-                var step = await model.NextAsync(
-                    new ChatModelContext(request.Message!.Trim(), history, seen)
-                    {
-                        ToolCalls = calls,
-                    },
-                    turn.Token
-                );
+                ModelStep step;
+                try
+                {
+                    step = await model.NextAsync(
+                        new ChatModelContext(request.Message!.Trim(), history, seen)
+                        {
+                            ToolCalls = calls,
+                        },
+                        turn.Token
+                    );
+                }
+                catch
+                {
+                    // A call that failed or was cut off may still be billed: the total is unknown.
+                    recorder.Usage(null);
+                    throw;
+                }
                 recorder.Usage(step.Usage);
                 if (step is ModelStep.Reply reply)
                 {
@@ -116,8 +126,9 @@ public sealed class ChatService(
                     return;
                 }
 
-                var call = ((ModelStep.Tool)step).Call;
-                if (results.Count >= settings.MaxToolCalls)
+                var asked = ((ModelStep.Tool)step).Calls;
+                // The whole step or nothing: a partial run would hide calls the model expects answers to.
+                if (asked.Count == 0 || results.Count + asked.Count > settings.MaxToolCalls)
                 {
                     logger.LogWarning(
                         "Chat {CorrelationId} exceeded the tool limit ({Limit})",
@@ -131,12 +142,22 @@ public sealed class ChatService(
                     return;
                 }
 
-                var result = await RunToolAsync(call, context, correlationId, recorder, turn.Token);
-                results.Add(result);
-                calls.Add(call);
-                await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
-                if (result.Confirmation is { } confirmation)
-                    await Send("confirmation", confirmation, turn.Token);
+                var stepIndex = calls.Count == 0 ? 0 : calls[^1].Step + 1;
+                foreach (var call in asked)
+                {
+                    var result = await RunToolAsync(
+                        call,
+                        context,
+                        correlationId,
+                        recorder,
+                        turn.Token
+                    );
+                    results.Add(result);
+                    calls.Add(call with { Step = stepIndex });
+                    await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
+                    if (result.Confirmation is { } confirmation)
+                        await Send("confirmation", confirmation, turn.Token);
+                }
             }
         }
         catch (OperationCanceledException) when (aborted.IsCancellationRequested)

@@ -15,6 +15,9 @@ public sealed record ToolCall(string Name, JsonElement Arguments)
 {
     /// <summary>The provider's own form of this call (e.g. a Gemini part with its thought signature).</summary>
     public JsonElement? ProviderPart { get; init; }
+
+    /// <summary>Which model step asked for it (0, 1, ...); calls of one step go back together.</summary>
+    public int Step { get; init; }
 }
 
 /// <summary>Who is asking: always the session user, never a model argument.</summary>
