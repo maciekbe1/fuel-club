@@ -21,32 +21,40 @@ public static class ActivateEndpoint
         + "was redeemed since: read the current state with GET.";
 
     public static async Task<Results<Ok<CouponResponse>, ProblemHttpResult>> Handle(
-        Guid id, HttpContext http, UserManager<ApplicationUser> users, AppDbContext db, CancellationToken cancellationToken)
+        Guid id,
+        HttpContext http,
+        UserManager<ApplicationUser> users,
+        AppDbContext db,
+        CancellationToken cancellationToken
+    )
     {
         var userId = users.GetUserId(http.User)!;
 
         // clock_timestamp(), not now(): now() is the start of the idempotency transaction.
         // The code is a parameter, so logged SQL never contains it.
         var code = CouponCode.Generate();
-        var activated = await db.Coupons
-            .FromSql($"""
+        var activated = await db
+            .Coupons.FromSql(
+                $"""
                 UPDATE "Coupons"
                 SET "Status" = 'Active', "Code" = {code}, "ActivatedAt" = clock_timestamp()
                 WHERE "Id" = {id} AND "UserId" = {userId} AND "Status" = 'Purchased'
                 RETURNING *
-                """)
+                """
+            )
             .AsNoTracking()
             .ToListAsync(cancellationToken);
         if (activated.SingleOrDefault() is { } coupon)
             return TypedResults.Ok(MyCouponsEndpoints.ToResponse(coupon));
 
-        var current = await MyCouponsEndpoints.Own(db, userId).SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
+        var current = await MyCouponsEndpoints
+            .Own(db, userId)
+            .SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
         return current?.Status switch
         {
             null => RewardsProblems.CouponNotFound(),
             CouponStatus.Active => TypedResults.Ok(MyCouponsEndpoints.ToResponse(current)),
-            CouponStatus.Redeemed => ApiProblems.Problem(
-                StatusCodes.Status409Conflict, "Coupon was already redeemed", RewardsErrorCodes.CouponRedeemed),
+            CouponStatus.Redeemed => RewardsProblems.CouponRedeemed(),
             _ => throw new InvalidOperationException("A purchased coupon was not activated."),
         };
     }

@@ -2,7 +2,8 @@ using System.Text.RegularExpressions;
 
 namespace FuelClub.Api.Modules.Loyalty.Domain;
 
-public sealed record LoyaltyValidationError(string Field, string Code) : FuelClub.Api.Infrastructure.IFieldError;
+public sealed record LoyaltyValidationError(string Field, string Code)
+    : FuelClub.Api.Infrastructure.IFieldError;
 
 /// <summary>
 /// Business rules for a fuel purchase. The database repeats range, date and format checks
@@ -39,20 +40,15 @@ public static partial class FuelPurchaseRules
             },
         };
 
-/// <param name="stationToday">Current date in the station's time zone; later sale dates are rejected.</param>
-    public static IReadOnlyList<LoyaltyValidationError> Validate(FuelPurchaseInput input, DateOnly stationToday)
+    /// <param name="stationToday">Current date in the station's time zone; later sale dates are rejected.</param>
+    public static IReadOnlyList<LoyaltyValidationError> Validate(
+        FuelPurchaseInput input,
+        DateOnly stationToday
+    )
     {
-        var errors = new List<LoyaltyValidationError>();
-
-        if (input.Amount <= 0m || input.Amount > MaxAmount)
-            errors.Add(new("amount", LoyaltyErrorCodes.AmountOutOfRange));
-        else if (!HasAtMostDecimals(input.Amount, AmountScale))
-            errors.Add(new("amount", LoyaltyErrorCodes.AmountPrecision));
-
-        if (input.Liters <= 0m || input.Liters > MaxLiters)
-            errors.Add(new("liters", LoyaltyErrorCodes.LitersOutOfRange));
-        else if (!HasAtMostDecimals(input.Liters, LitersScale))
-            errors.Add(new("liters", LoyaltyErrorCodes.LitersPrecision));
+        var errors = new List<LoyaltyValidationError>(
+            ValidateQuantities(input.Amount, input.Liters)
+        );
 
         if (input.Receipt.SaleDate == default)
             errors.Add(new("saleDate", LoyaltyErrorCodes.RequiredField));
@@ -74,6 +70,27 @@ public static partial class FuelPurchaseRules
             ReceiptNumberMaxLength,
             ReceiptNumberRegex()
         );
+
+        return errors;
+    }
+
+    /// <summary>Gross amount and liters; shared with the cashier's coupon preview, so both agree.</summary>
+    public static IReadOnlyList<LoyaltyValidationError> ValidateQuantities(
+        decimal amount,
+        decimal liters
+    )
+    {
+        var errors = new List<LoyaltyValidationError>();
+
+        if (amount <= 0m || amount > MaxAmount)
+            errors.Add(new("amount", LoyaltyErrorCodes.AmountOutOfRange));
+        else if (!HasAtMostDecimals(amount, AmountScale))
+            errors.Add(new("amount", LoyaltyErrorCodes.AmountPrecision));
+
+        if (liters <= 0m || liters > MaxLiters)
+            errors.Add(new("liters", LoyaltyErrorCodes.LitersOutOfRange));
+        else if (!HasAtMostDecimals(liters, LitersScale))
+            errors.Add(new("liters", LoyaltyErrorCodes.LitersPrecision));
 
         return errors;
     }

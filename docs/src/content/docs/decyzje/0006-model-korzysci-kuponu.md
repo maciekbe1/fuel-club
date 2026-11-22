@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta. Zrealizowane: encje, ograniczenia w bazie, migracja, reguły obliczeń z testami. Planowane: endpointy wymiany, aktywacji, podglądu i odbioru razem z zakupem.
+Decyzja przyjęta. Zrealizowane: encje, ograniczenia w bazie, migracja, reguły obliczeń z testami, wymiana, aktywacja, podgląd z limitem prób. Planowane: odbiór razem z zakupem.
 
 ## Problem
 

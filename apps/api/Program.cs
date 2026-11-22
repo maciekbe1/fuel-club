@@ -1,19 +1,27 @@
-using FuelClub.Api.Modules.Rewards;
 using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Csrf;
 using FuelClub.Api.Infrastructure.DemoData;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Loyalty;
+using FuelClub.Api.Modules.Rewards;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddCsrf();
+
 // Numbers must be JSON numbers ("10" is rejected); OpenAPI then types them as numbers only.
 builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict);
+    options.SerializerOptions.NumberHandling = System
+        .Text
+        .Json
+        .Serialization
+        .JsonNumberHandling
+        .Strict
+);
 builder.Services.AddIdempotency(builder.Configuration);
+builder.Services.AddApiRateLimiting();
 builder.Services.AddOpenApi(options => options.AddIdempotencyHeader());
 builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
@@ -25,13 +33,20 @@ var app = builder.Build();
 // One-off maintenance command; hosted services (seeding, provisioning) do not start in this mode.
 if (args is [DemoPasswordReset.Command])
 {
-    Environment.ExitCode = await DemoPasswordReset.RunAsync(app.Services, app.Environment, app.Configuration);
+    Environment.ExitCode = await DemoPasswordReset.RunAsync(
+        app.Services,
+        app.Environment,
+        app.Configuration
+    );
     return;
 }
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After authorization: policies partition by the authenticated user, and rejected callers never count.
+app.UseRateLimiter();
 app.UseIdempotencyBodyBuffering();
 
 if (app.Environment.IsDevelopment())

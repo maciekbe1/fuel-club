@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie]
-Zrealizowane: model danych, ograniczenia w bazie, reguły (kod kuponu, obliczenie rabatu, walidacja oferty), API ofert (katalog, zarządzanie przez Admin z wersją), wymiana punktów na kupon, odczyt własnych kuponów, aktywacja kuponu. Planowane: podgląd z limitem prób i odbiór razem z zakupem, interfejs (katalog, panel administratora, kupon w kasie).
+Zrealizowane: model danych, ograniczenia w bazie, reguły (kod kuponu, obliczenie rabatu, walidacja oferty), API ofert (katalog, zarządzanie przez Admin z wersją), wymiana punktów na kupon, odczyt własnych kuponów, aktywacja kuponu, podgląd kuponu dla kasjera z limitem prób. Planowane: odbiór razem z zakupem, interfejs (katalog, panel administratora, kupon w kasie).
 :::
 
 ## Co robi
@@ -26,6 +26,8 @@ Klient wymienia punkty na kupon z rabatem na paliwo, aktywuje go w telefonie i p
 | Wymiana punktów | `Exchange/ExchangeEndpoint.cs` |
 | Moje kupony (odczyt) | `Coupons/MyCouponsEndpoints.cs` |
 | Aktywacja kuponu | `Coupons/ActivateEndpoint.cs` |
+| Podgląd kuponu (kasjer) | `Cashier/CouponPreviewEndpoint.cs` |
+| Limit prób (429) | `apps/api/Infrastructure/RateLimiting.cs`, polityka w `RewardsModule.cs` |
 | `Cache-Control: no-store` | `apps/api/Infrastructure/NoStore.cs` |
 | Pobranie punktów (Loyalty) | `Modules/Loyalty/Points/PointsSpending.cs` |
 | Mapowanie, błędy modułu | `RewardsModule.cs`, `RewardsProblems.cs` |
@@ -166,15 +168,30 @@ Wszystko w jednej transakcji: nieudana próba nie zostawia ani obciążenia, ani
 Ekran „Moje kupony”: po aktywacji frontend odświeża kupon przez `GET`, jak przy karcie.
 :::
 
+## Podgląd kuponu (kasjer)
+
+`POST /api/cashier/coupons/preview` (rola `Cashier`, Admin nie dziedziczy, CSRF, bez `Idempotency-Key`), treść `{ cardCode, couponCode, amount?, liters? }`. Kody tylko w treści, nigdy w URL.
+
+1. Walidacja (`400 rewards.validation_failed`): oba kody wymagane i w formacie (wpisane ręcznie są normalizowane jak przy kasie; kod karty w polu kuponu i odwrotnie → `invalid_format`); `amount` i `liters` razem albo wcale (brak jednego → `rewards.required_field`), zakresy i precyzja jak przy zakupie (`FuelPurchaseRules.ValidateQuantities`, kody `loyalty.*`).
+2. Aktywna karta → właściciel; brak albo unieważniona → `404 loyalty.card_not_found`.
+3. Kupon o tym kodzie **należący do właściciela karty**; cudzy i nieistniejący → identyczne `404 rewards.coupon_not_found` - kod nie zdradza, czyj jest kupon.
+4. Odebrany → `409 rewards.coupon_redeemed`. Kupon `Purchased` nie ma kodu, więc nie da się go znaleźć.
+5. `200 { offerName, discountPerLiter, maxLiters, calculation }`; `calculation` = `null` bez kwoty i litrów, inaczej `{ discount, paidAmount, pointsAwarded }` z `CouponDiscount` i `PointsPolicy` - tych samych co przy zakupie. Bez danych klienta i `id` kuponu.
+
+Podgląd niczego nie zmienia ani nie rezerwuje (bez blokad); zakup sprawdza kupon i liczy rabat od nowa.
+
+**Limit prób**: stałe okno na kasjera (partycja po id konta), `Rewards:PreviewPermitLimit` (domyślnie 30) prób na `Rewards:PreviewWindow` (domyślnie 1 min). Liczą się wszystkie próby, także nieudane; `401`/`403` z autoryzacji nie (middleware limitu działa po niej). Przekroczenie → `429 rate_limit.exceeded` z `Retry-After`. Kodu kuponu (128 bitów) nie da się zgadnąć - limit utrudnia głównie sprawdzanie kodów kart. Licznik jest w pamięci procesu (jedna instancja API).
+
 ## Zabezpieczenia
 
 - Rabat liczy serwer z kopii parametrów w kuponie; klient nie wysyła kwoty rabatu.
 - Kody kuponów nie trafiają do logów; w żądaniach tylko w treści (POST), nie w URL. Kod jest też w treści zapisanej odpowiedzi aktywacji w `IdempotencyRecords`; MVP nie usuwa tych wierszy (retencję trzeba ustalić przed produkcją, `PLAN-MVP.md`), więc dostęp do bazy i kopii zapasowych daje dostęp do kodów.
 - Odpowiedzi grupy `/api/me/coupons` po sprawdzeniu dostępu i CSRF (także błędy domenowe i odtworzone odpowiedzi) mają `Cache-Control: no-store`; `401`/`403` go nie mają, ale nie zawierają kodu: przeglądarka i pośrednicy nie zapisują odpowiedzi z kodem. Filtr jest na grupie, czyli na zewnątrz filtra idempotencji - odtworzenie omija endpoint i jego własne filtry. Nagłówek nie dotyczy pamięci TanStack Query w karcie przeglądarki.
 - Aktywacja tylko własnego kuponu: `UserId` jest w warunku `UPDATE`.
+- Podgląd: kupon musi należeć do właściciela zeskanowanej karty; limit prób na kasjera; kody nie trafiają do logów (test do poziomu Trace).
 
 :::caution[Planowane]
-Sprawdzanie przy odbiorze (kupon = właściciel karty), warunkowa zmiana statusu, idempotencja odbioru razem z zakupem i limit prób podglądu powstaną z endpointami.
+Odbiór razem z zakupem (`couponCode` w `POST /api/cashier/fuel-purchases`): ponowne sprawdzenie kuponu pod blokadą klienta, warunkowe `Active → Redeemed` z `RedeemedAt = clock_timestamp()` (aktywacja zakończona w trakcie czekania zakupu na blokadę ma wcześniejszy `ActivatedAt` niż `now()` zakupu), idempotencja zakupu.
 :::
 
 ## Testy
@@ -187,9 +204,10 @@ Sprawdzanie przy odbiorze (kupon = właściciel karty), warunkowa zmiana statusu
 | `RewardsModelConstraintsTests.cs` | wszystkie poprawne stany kuponu; `CHECK` zakresów oferty i snapshotu; pusta nazwa; **baza zaokrągla 0,205 → 0,21** (dlatego walidacja w aplikacji); 7 niespójnych stanów kuponu; aktywacja przed zakupem; zły format kodu; duplikat kodu; jeden kupon na zakup; oferty z kuponami nie da się usunąć; `Version < 1` odrzucone; równoległe zapisy przez EF wykryte, każdy podnosi wersję |
 | `RewardExchangeTests.cs` | wymiana: `201`, kupon = migawka oferty, bez kodu, `Location`, saldo, odczyt kuponu i listy, wpis `CouponExchange` (`-koszt`, `balanceAfter`, `couponExchange`); całe saldo do wydania; brak punktów (499 i brak konta) → `409` bez zmian; kolejność: brak → `404`, wyłączona (z podniesioną wersją) → `offer_inactive`, zmieniona → `offer_changed`, bez obciążenia; `version` wymagane i `>= 1`; ten sam klucz → ten sam kupon, jedno obciążenie, także równolegle; **6 równoległych wymian przy saldzie na 2 → dokładnie 2 kupony, saldo 0, `balanceAfter` 500, 0**; **edycja admina czeka na trwającą wymianę (bramka), kupon ma warunki, które klient widział**, potem stara wersja → `offer_changed`; klient zajęty → `503` z `Retry-After`, bez zmian, ten sam klucz działa później; oferta zablokowana dłużej niż limit → `503 rewards.offer_busy`, bez zmian, ten sam klucz działa później; zakres `OfferLockTimeout`; cudzy kupon → `404`, lista tylko własnych; `401`, `403` kasjer, CSRF, brak klucza → `400` |
 | `CouponActivationTests.cs` | aktywacja: `code` `null` przed, potem poprawny format, zapisane wartości = odpowiedź, kod w obu `GET`, saldo i historia bez zmian; `activatedAt` późniejsze niż początek transakcji (rekord idempotencji); ponowna aktywacja nowym kluczem → ten sam kod; ponowienie tym samym kluczem → odtworzenie z tym samym kodem; 6 równoległych aktywacji → jeden kod; równolegle jednym kluczem → jeden kod; odebrany → `409`, status i kod bez zmian; odtworzenie po odbiorze zwraca zapisaną odpowiedź, `GET` pokazuje `Redeemed`; kupon wyłączonej oferty da się aktywować; cudzy i nieistniejący → `404`, kupon nietknięty; `no-store` na aktywacji, odtworzeniu, `404` i obu `GET` (kontrola: `/api/me/wallet` bez nagłówka); kod nie trafia do logów (Trace, także SQL); `401`, `403` kasjer, CSRF, brak klucza |
+| `CouponPreviewTests.cs` | podgląd: same warunki bez kwoty; obliczenie = tabela rabatów (limit litrów, połówka w górę, rabat do brutto i 0 pkt); kody wpisane ręcznie normalizowane; tylko jedno z `amount`/`liters` → `required_field`, zakresy i precyzja jak przy zakupie; wymagane kody, zamienione kody → `invalid_format`; nieznana i unieważniona karta → `404`; **cudzy kupon → odpowiedź identyczna jak dla nieistniejącego**; odebrany → `409`, cudzy odebrany → `404`; po podglądzie kupon, saldo, zakupy i historia bez zmian; **limit na kasjera liczy też nieudane próby, potem `429` z `Retry-After`, inny kasjer działa**; kody nie trafiają do logów; `403` dla User i Admin, `401`, CSRF; zakres `PreviewPermitLimit` i `PreviewWindow` |
 | `RewardOfferTests.cs` | katalog: tylko aktywne, kolejność koszt → nazwa → `id` (także dla identycznego kosztu i nazwy), pola; dostęp: katalog tylko `User` (`401` anonim, `403` kasjer i sam Admin), część admina tylko `Admin`; tworzenie: `201` + `Location`, `version 1`, odczyt pojedynczy i na liście; idempotencja `POST` (jedna oferta), brak klucza → `400`; walidacja pól (w tym 0,205 zł/l i brak `isActive`) bez zapisu wiersza; brak liczb → `required_field` w `POST` i `PUT`; liczby jako tekst → `400`; zmiana przez EF podnosi wersję, więc starszy formularz dostaje `409`; `PUT` zastępuje formularz i podnosi wersję, odpowiedź = zapisany wiersz; **nieaktualny formularz → `409` bez nadpisania**; **8 równoległych `PUT` z tą samą wersją → dokładnie jeden `200`, 7 × `409`, wersja 2**; `version` wymagane i `>= 1`, walidacja przed konfliktem; nieznane `id` → `404`; wyłączenie ukrywa w katalogu, włączenie przywraca; edycja oferty nie zmienia wydanego kuponu; CSRF |
 | `LoyaltyModelConstraintsTests.cs` | rabat równy brutto (zapłata 0, 0 pkt) przyjęty; rabat poza `0 - brutto` i `PaidAmount ≠ GrossAmount - Discount` odrzucone; znak `Delta` zgodny z typem |
 
-Próby negatywne: zaokrąglenie bankierskie (`ToEven`) i brak ograniczenia do brutto wywracają testy obliczeń; `UPDATE` bez warunku na wersję wywraca testy nieaktualnego formularza i równoległej edycji; brak podnoszenia wersji w `SaveChanges` wywraca oba testy zapisu przez EF; wymiana bez warunku `Balance >= koszt`, bez `FOR SHARE` albo ze sprawdzeniem wersji przed wyłączeniem wywraca odpowiednie testy wymiany. Aktywacja bez warunku na status wywraca testy odebranego kuponu, ponownej aktywacji i równoległych aktywacji; `now()` zamiast `clock_timestamp()` wywraca test czasu; kod wklejony w SQL wywraca test logów; brak `no-store` albo filtr tylko na endpoincie (wewnątrz idempotencji) wywraca testy nagłówka.
+Próby negatywne: zaokrąglenie bankierskie (`ToEven`) i brak ograniczenia do brutto wywracają testy obliczeń; `UPDATE` bez warunku na wersję wywraca testy nieaktualnego formularza i równoległej edycji; brak podnoszenia wersji w `SaveChanges` wywraca oba testy zapisu przez EF; wymiana bez warunku `Balance >= koszt`, bez `FOR SHARE` albo ze sprawdzeniem wersji przed wyłączeniem wywraca odpowiednie testy wymiany. Aktywacja bez warunku na status wywraca testy odebranego kuponu, ponownej aktywacji i równoległych aktywacji; `now()` zamiast `clock_timestamp()` wywraca test czasu; kod wklejony w SQL wywraca test logów; brak `no-store` albo filtr tylko na endpoincie (wewnątrz idempotencji) wywraca testy nagłówka. Podgląd bez warunku na właściciela kuponu wywraca testy cudzego kuponu; bez sprawdzenia statusu - test odebranego; bez `RequireRateLimiting` - test limitu.
 
 Testy nagłówka używają hosta z domyślnym interwałem sprawdzania sesji (`ApiFactory.WithoutPerRequestSessionRenewal`). Główny host testowy sprawdza sesję przy każdym żądaniu, więc odnawia ciasteczko, a handler ciasteczek dodaje wtedy `no-store` do każdej odpowiedzi i ukryłby brak nagłówka.

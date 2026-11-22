@@ -3,6 +3,7 @@ namespace FuelClub.Api.Modules.Rewards;
 public static class RewardsErrorCodes
 {
     public const string RequiredField = "rewards.required_field";
+    public const string InvalidFormat = "rewards.invalid_format";
     public const string TooLong = "rewards.too_long";
     public const string PointsCostOutOfRange = "rewards.points_cost_out_of_range";
     public const string DiscountPerLiterOutOfRange = "rewards.discount_per_liter_out_of_range";

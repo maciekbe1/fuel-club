@@ -141,11 +141,10 @@ Ponowienie odebranego kuponu tym samym kluczem zwraca pierwotny sukces. Nowy klu
 - POST /api/me/loyalty-card - wydanie karty (Idempotency-Key)
 - POST /api/me/loyalty-card/rotate - wymiana kodu (Idempotency-Key)
 - GET /api/cashier/station - stanowisko zalogowanego kasjera
-- POST /api/cashier/fuel-purchases - kod karty i dane zakupu; konto klienta ustala backend z karty, stację i kasę z konta kasjera
+- POST /api/cashier/fuel-purchases - kod karty i dane zakupu, opcjonalnie kod kuponu (odbiór w tej samej transakcji, ADR 0006); konto klienta ustala backend z karty, stację i kasę z konta kasjera
 - GET /api/admin/rewards, GET /api/admin/rewards/{id}
 - POST /api/admin/rewards (Idempotency-Key), PUT /api/admin/rewards/{id} - cały formularz z `version`, także włączanie i wyłączanie; nieaktualna wersja → 409
 - POST /api/cashier/coupons/preview - podgląd korzyści po skanie, bez zużycia kuponu
-- POST /api/cashier/redemptions - potwierdzenie realizacji w symulatorze kasy
 - POST /api/chat - SSE: meta, tool, delta, confirmation, done, error
 - GET /api/admin/observability - ograniczony podgląd metryk i anomalii
 

@@ -902,6 +902,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cashier/coupons/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Shows a coupon's discount for the scanned card. Without amount and liters returns the terms only. Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429). */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CouponPreviewRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CouponPreviewResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/rewards": {
         parameters: {
             query?: never;
@@ -1109,6 +1185,30 @@ export interface components {
         CashierStationResponse: {
             stationCode: string;
             registerCode: string;
+        };
+        CouponPreviewCalculation: {
+            /** Format: double */
+            discount: number;
+            /** Format: double */
+            paidAmount: number;
+            /** Format: int32 */
+            pointsAwarded: number;
+        };
+        CouponPreviewRequest: {
+            cardCode: null | string;
+            couponCode: null | string;
+            /** Format: double */
+            amount: null | number;
+            /** Format: double */
+            liters: null | number;
+        };
+        CouponPreviewResponse: {
+            offerName: string;
+            /** Format: double */
+            discountPerLiter: number;
+            /** Format: double */
+            maxLiters: number;
+            calculation: null | components["schemas"]["CouponPreviewCalculation"];
         };
         CouponResponse: {
             /** Format: uuid */

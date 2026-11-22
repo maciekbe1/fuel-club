@@ -75,7 +75,8 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.offer_changed` | - | `409`: oferta zmieniła się od wyświetlenia (inna `version`); nic nie pobrano, pokaż nowe warunki |
 | `rewards.insufficient_points` | - | `409`: saldo mniejsze niż koszt (także brak konta); nic nie pobrano |
 | `rewards.coupon_not_found` | - | `404`: brak kuponu albo cudzy kupon |
-| `rewards.coupon_redeemed` | - | `409`: kupon już odebrany, aktywacja niemożliwa |
+| `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd) |
+| `rewards.invalid_format` | `couponCode` | kod nie jest kodem kuponu (`K` + 26 znaków; np. kod karty) |
 | `loyalty.card_not_found` | - | `404`: kod karty nieznany albo unieważniony - celowo bez rozróżnienia |
 | `loyalty.receipt_already_registered` | - | `409`: paragon (stacja, kasa, data, numer) już zapisany; bez informacji o właścicielu |
 | `loyalty.customer_busy` | - | `503` + `Retry-After`: inna operacja na tym kliencie trwa dłużej niż `Loyalty:CustomerLockTimeout`; ponów z tym samym kluczem (niezapisywany) |
@@ -99,3 +100,4 @@ Dotyczą endpointów oznaczonych `RequireIdempotency()`. Zobacz [idempotencja](/
 | Kod | Status | Kiedy |
 | --- | --- | --- |
 | `csrf.invalid` | `403` | brak lub nieważny token CSRF przy metodzie modyfikującej |
+| `rate_limit.exceeded` | `429` + `Retry-After` | przekroczony limit prób (podgląd kuponu: `Rewards:PreviewPermitLimit` na `Rewards:PreviewWindow`, na kasjera) |
