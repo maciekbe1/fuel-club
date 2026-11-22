@@ -20,7 +20,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v1";
+    public string PromptVersion => "demo-rules-v2";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -28,7 +28,14 @@ public sealed partial class DemoChatModel : IChatModel
         var text = Normalize(context.Message);
         var intro = context.History.Count == 0 ? "Asystent w trybie demo (reguły, bez AI). " : "";
 
-        // A question about awarded points, before the refusal rules ("naliczono" is not a request).
+        if (Forbidden().IsMatch(text))
+            return Reply(
+                intro
+                    + "Nie mogę naliczać ani wymieniać punktów, realizować kuponów ani zmieniać ofert. "
+                    + "Punkty nalicza kasa przy tankowaniu, a wymianę zrobisz w zakładce „Oferty”."
+            );
+
+        // A question about awarded points; a request in the same message was refused above.
         if (ExplainPoints().IsMatch(text))
             return
                 context.ToolResults.LastOrDefault(r =>
@@ -37,13 +44,6 @@ public sealed partial class DemoChatModel : IChatModel
                     is { } explained
                 ? Reply(intro + Describe(explained))
                 : Call(AssistantTools.ExplainPurchasePoints);
-
-        if (Forbidden().IsMatch(text))
-            return Reply(
-                intro
-                    + "Nie mogę naliczać ani wymieniać punktów, realizować kuponów ani zmieniać ofert. "
-                    + "Punkty nalicza kasa przy tankowaniu, a wymianę zrobisz w zakładce „Oferty”."
-            );
 
         var done = context.ToolResults;
         // An answer to "which coupon?" continues the activation even without the keyword.
@@ -169,7 +169,7 @@ public sealed partial class DemoChatModel : IChatModel
     private static decimal? Number(Match match) =>
         match.Success
         && decimal.TryParse(
-            match.Groups[1].Value.Replace(',', '.'),
+            match.Groups[1].Value.Replace(" ", "").Replace(',', '.'),
             NumberStyles.AllowDecimalPoint,
             CultureInfo.InvariantCulture,
             out var value
@@ -219,10 +219,13 @@ public sealed partial class DemoChatModel : IChatModel
                 )
                 + ".",
             (AssistantTools.CompareCoupons, CouponComparison c) => DescribeComparison(c),
+            (AssistantTools.CompareCoupons, null) =>
+                "Nie mogę policzyć tego tankowania. Podaj litry (więcej niż 0) i ewentualnie "
+                    + "kwotę do 5 000 zł, np. „40 l za 250 zł”.",
             (AssistantTools.ExplainPurchasePoints, PurchasePointsData p) =>
                 $"Ostatni zakup: brutto {Money(p.GrossAmount)}, rabat {Money(p.Discount)}, "
                     + $"zapłacono {Money(p.PaidAmount)} → {p.PointsAwarded.ToString("N0", Polish)} pkt. "
-                    + $"Zasada: {p.Rule}",
+                    + p.Rule,
             (AssistantTools.ExplainPurchasePoints, null) =>
                 "Nie widzę jeszcze żadnego Twojego zakupu, więc nie ma czego wyjaśnić.",
             (AssistantTools.ListMyCoupons, List<CouponSummary> { Count: 0 }) =>
@@ -312,7 +315,7 @@ public sealed partial class DemoChatModel : IChatModel
     }
 
     [GeneratedRegex(
-        @"nalicz|dopisz|dodaj\s+(mi\s+)?\d*\s*punkt|daj\s+(mi\s+)?\d*\s*punkt|odbierz|zrealizuj|wymien|kup\s+kupon|admin|zmien\s+ofert|usun"
+        @"nalicz(\s|$|cie)|dopisz|dodaj\s+(mi\s+)?\d*\s*punkt|daj\s+(mi\s+)?\d*\s*punkt|odbierz|zrealizuj|wymien|kup\s+kupon|admin|zmien\s+ofert|usun"
     )]
     private static partial Regex Forbidden();
 
@@ -330,7 +333,7 @@ public sealed partial class DemoChatModel : IChatModel
     private static partial Regex Coupons();
 
     [GeneratedRegex(
-        @"(dlaczego|czemu|skad|wyjasnij|ile\s+(punktow\s+)?dostalem|naliczon)[^?]*(punkt|pkt)|(punkt|pkt)[^?]*(dostalem|naliczon)"
+        @"(dostal|naliczon|naliczyl|przyznan)[^?]*(punkt|pkt)|(punkt|pkt)[^?]*(dostal|naliczon|naliczyl|przyznan|za\s+(ostatnie\s+)?tankowanie)"
     )]
     private static partial Regex ExplainPoints();
 
@@ -340,7 +343,10 @@ public sealed partial class DemoChatModel : IChatModel
     [GeneratedRegex(@"(\d+(?:[.,]\d+)?)\s*(?:l\b|litr)")]
     private static partial Regex LitersAmount();
 
-    [GeneratedRegex(@"(\d+(?:[.,]\d+)?)\s*(?:zl|pln)")]
+    // The purchase amount, not a price per litre ("po 6,20 zł/l"); "1 000 zł" is one number.
+    [GeneratedRegex(
+        @"(?<![\d.,])(?<!po\s)(\d{1,3}(?:\s\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(?:zl|pln)(?!\s*/\s*l)(?!\s+za\s+litr)"
+    )]
     private static partial Regex MoneyAmount();
 
     [GeneratedRegex(@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")]

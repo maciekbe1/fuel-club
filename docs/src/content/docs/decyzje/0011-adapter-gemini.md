@@ -13,7 +13,7 @@ Decyzja przyjęta (2026-11-22), P10. Testy z podstawionym API Gemini przechodzą
 
 Czat działa na deterministycznym adapterze demo. Prawdziwy model ma działać za tym samym kontraktem ([ADR 0007](/decyzje/0007-czat-i-potwierdzenia/)):
 
-- te same 4 narzędzia tylko do odczytu;
+- te same narzędzia tylko do odczytu (lista w [ADR 0007](/decyzje/0007-czat-i-potwierdzenia/));
 - aktywacja wyłącznie przyciskiem;
 - te same limity i ślady.
 

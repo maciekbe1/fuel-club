@@ -119,8 +119,8 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
     public const string ExplainPurchasePoints = "explain_purchase_points";
 
     public const string PointsRule =
-        "1 pkt za każdą pełną złotówkę zapłaconą po rabacie (zapłacono = brutto - rabat), "
-        + "zaokrąglenie w dół.";
+        "Obecna zasada naliczania: 1 pkt za każdą pełną złotówkę zapłaconą po rabacie "
+        + "(zapłacono = brutto - rabat), zaokrąglenie w dół.";
 
     public const string ComparisonCriterion =
         "najwyższy rabat w zł dla podanego tankowania; przy równym rabacie - kolejność nazw";
@@ -327,6 +327,9 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             return null;
         foreach (var property in arguments.EnumerateObject())
         {
+            // An explicit null is an absent optional value (providers send it).
+            if (allowed.Contains(property.Name) && property.Value.ValueKind == JsonValueKind.Null)
+                continue;
             if (
                 !allowed.Contains(property.Name)
                 || property.Value.ValueKind != JsonValueKind.Number

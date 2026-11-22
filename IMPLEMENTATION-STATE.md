@@ -296,6 +296,17 @@ Testy:
 
 Niestabilny test „stop cancels the turn” (5/16 także na starym kodzie): stop przed wyjściem żądania - sygnał już przerwany, bez zdarzenia. Test czeka na żądanie i sprawdza `signal.aborted` - 30/30.
 
+Review (`/code-review high`, 8 uwag: 7 przyjętych, 1 odrzucona):
+- przyjęte:
+  - cena za litr brana za kwotę zakupu;
+  - wyjaśnienie punktów przed odmową;
+  - odrzucone porównanie bez komunikatu i „1 000 zł”;
+  - zasada jako obecna;
+  - `demo-rules-v2`;
+  - `null` w opcjonalnym argumencie;
+  - dokumentacja;
+- odrzucona: „ostatni zakup” wg czasu rejestracji zamiast daty sprzedaży. Właściciel ustalił datę sprzedaży; przypadek paragonu z datą wsteczną zgłoszony do decyzji.
+
 ## Następny krok
 
 Otwarte:

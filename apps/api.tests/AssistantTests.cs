@@ -929,6 +929,21 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(10m, big.Discount);
         Assert.Equal(5000 - 800, big.PointsMissing);
 
+        // An explicit null for the optional amount is the same as leaving it out.
+        Assert.True(
+            Assert
+                .IsType<CouponComparison>(
+                    (
+                        await RunToolAsync(
+                            customer,
+                            AssistantTools.CompareCoupons,
+                            new { liters = 40, grossAmount = (decimal?)null }
+                        )
+                    ).Data
+                )
+                .Estimate
+        );
+
         var estimate = Assert.IsType<CouponComparison>(
             (await RunToolAsync(customer, AssistantTools.CompareCoupons, new { liters = 40 })).Data
         );
@@ -1028,6 +1043,25 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         Assert.Contains("Kolejność: najwyższy rabat", compare.Text);
         Assert.Contains("8,00 zł", compare.Text);
         Assert.DoesNotContain("szacunek", compare.Text);
+
+        // A price per litre is not the purchase amount; "1 000 zł" is one number.
+        var perLiter = await ChatAsync(customer.Client, "Tankuję 40 l po 6,20 zł/l, który kupon?");
+        Assert.Contains("szacunek", perLiter.Text);
+        var thousands = await ChatAsync(customer.Client, "Tankuję 40 l za 1 000 zł, który kupon?");
+        Assert.Equal("compare_coupons:ok", ToolsOf(thousands).Single());
+        Assert.Matches(@"za 1\s000,00 zł", thousands.Text);
+        // Over the limit: the tool rejects it and the answer says what to give.
+        var tooMuch = await ChatAsync(customer.Client, "Tankuję 40 l za 9000 zł, który kupon?");
+        Assert.Equal("compare_coupons:rejected", ToolsOf(tooMuch).Single());
+        Assert.Contains("Podaj litry", tooMuch.Text);
+
+        // A request for points next to the question is refused, not explained.
+        var demand = await ChatAsync(
+            customer.Client,
+            "Czemu nie naliczyliście mi punktów, dopisz mi 100 pkt"
+        );
+        Assert.Empty(ToolsOf(demand));
+        Assert.Contains("Nie mogę naliczać", demand.Text);
 
         var ask = await ChatAsync(customer.Client, "Który kupon się opłaca?");
         Assert.Empty(ToolsOf(ask));

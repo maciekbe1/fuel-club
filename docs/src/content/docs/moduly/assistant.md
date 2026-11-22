@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie]
-Zrealizowane: `POST /api/chat` (SSE), cztery narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Metryki, anomalie, kolejka admina i retencja: [Observability](/moduly/observability/) (P7b). Adapter Gemini: [ADR 0011](/decyzje/0011-adapter-gemini/) (`Model/GeminiChatModel.cs`, testy `GeminiTests`). Planowane: ocena przez judge (P7c).
+Zrealizowane: `POST /api/chat` (SSE), sześć narzędzi, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Metryki, anomalie, kolejka admina i retencja: [Observability](/moduly/observability/) (P7b). Adapter Gemini: [ADR 0011](/decyzje/0011-adapter-gemini/) (`Model/GeminiChatModel.cs`, testy `GeminiTests`). Planowane: ocena przez judge (P7c).
 :::
 
 ## Co robi
@@ -50,7 +50,7 @@ Adapter demo (`DemoChatModel`) rozpoznaje słowa kluczowe bez polskich znaków i
 - „oferty/nagrody” → `list_available_rewards`;
 - „kupon” → `list_my_coupons`;
 - „który kupon / opłaca / wybrać / porównaj” + litry (np. „40 l”, opcjonalnie „250 zł”) → `compare_coupons`; bez litrów - pytanie o litry;
-- „dlaczego / skąd / ile dostałem … punktów”, „naliczono” → `explain_purchase_points` (przed regułą odmowy: pytanie o naliczenie to nie prośba);
+- „dostałem / naliczono / przyznano … punktów”, „punkty za tankowanie” → `explain_purchase_points` (po regule odmowy: „nalicz”, „dopisz” w tej samej wiadomości dają odmowę); kwota zakupu to liczba przy „zł”, nie cena za litr („po 6,20 zł/l”);
 - „aktywuj/aktywacja” → lista kuponów `Purchased` (albo GUID z wiadomości) → `propose_coupon_activation` dla jedynego kuponu albo kuponu nazwanej oferty; przy kilku bez nazwy - pytanie, który. „Aktywne kupony” to pytanie o listę, nie prośba;
 - prośby o naliczenie, wymianę, odbiór i administrację → odmowa bez narzędzi.
 
@@ -102,7 +102,7 @@ Retencja, metryki i kolejka przeglądu: [Observability](/moduly/observability/).
 
 | Plik | Sprawdza |
 | --- | --- |
-| `apps/web/e2e/chat.spec.ts` | saldo: odpowiedź, etykieta narzędzia, oznaczenie demo, Enter; **propozycja nic nie zmienia, przycisk aktywuje, kod nie pojawia się w czacie**; „Nie teraz” → kupon bez zmian; **utracona odpowiedź potwierdzenia → ponowienie z tym samym kluczem**; cudzy kupon → „odrzucono”, brak karty i nazwy; **strumień w 3-bajtowych kawałkach z przerwą przed odpowiedzią: narzędzie widoczne przed tekstem** (brak buforowania przez Next), polskie znaki całe; ucięty strumień → błąd, nie sukces; zdarzenie `error` po częściowym tekście → błąd; „Zatrzymaj” → `cancelled`, żądanie przerwane |
+| `apps/web/e2e/chat.spec.ts` | saldo: odpowiedź, etykieta narzędzia, oznaczenie demo, Enter; **propozycja nic nie zmienia, przycisk aktywuje, kod nie pojawia się w czacie**; „Nie teraz” → kupon bez zmian; **utracona odpowiedź potwierdzenia → ponowienie z tym samym kluczem**; cudzy kupon → „odrzucono”, brak karty i nazwy; **strumień w 3-bajtowych kawałkach z przerwą przed odpowiedzią: narzędzie widoczne przed tekstem** (brak buforowania przez Next), polskie znaki całe; ucięty strumień → błąd, nie sukces; zdarzenie `error` po częściowym tekście → błąd; „Zatrzymaj” → `cancelled`, żądanie przerwane; porównanie kuponów i rachunek punktów z narzędzi serwera |
 | `apps/api.tests/Evals/AssistantEvals.cs` | 15 wersjonowanych przypadków (`assistant-evals-v1`): saldo, oferty, porównanie kuponów, wyjaśnienie punktów bez zakupów, brak punktów, własny kupon (propozycja, lista bez kodów), cudzy kupon, naliczenie, dwa prompt injection, błędne argumenty (nieznane narzędzie, `userId`, zły status, dodatkowy argument przy cudzym kuponie), tekst „potwierdzam” ≠ zgoda, awaria dostawcy, limit narzędzi; każdy: narzędzia, jeden koniec tury, brak zmian salda/historii/kuponów, wiersz śladu zgodny ze strumieniem i bez treści; pokrycie wszystkich kategorii SPEC §3 |
 | `apps/api.tests/TurnRecorderTests.cs` | narzędzie z przekroczonym czasem / wyjątkiem zostaje w śladzie (`timeout`/`error`, span z błędem); brak danych o tokenach w jednym wywołaniu → `null`; span tury jako korzeń z linkiem do żądania, przywrócenie `Activity.Current`; klucz pseudonimu wymagany poza `Development`, min. 32 bajty |
 | `apps/api.tests/AssistantTracingTests.cs` | spany tylko z atrybutów z listy, bez treści wiadomości, kodu kuponu, e-maila i id użytkownika, narzędzia jako dzieci tury, brak tokenów = brak atrybutu; **eksport do lokalnego kolektora OTLP bez tych danych**, niedostępny kolektor nie blokuje czatu; pseudonim = HMAC z kluczem, stały dla użytkownika, różny dla innych; wiersz z metadanymi i czasami; tokeny sumowane; odejście klienta → `Cancelled` |
