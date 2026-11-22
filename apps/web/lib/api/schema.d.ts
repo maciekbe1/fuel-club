@@ -939,7 +939,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Shows a coupon's discount for the scanned card. Without amount and liters returns the terms only. Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429). */
+        /** @description Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind. Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429). */
         post: {
             parameters: {
                 query?: never;
@@ -991,6 +991,94 @@ export interface paths {
                 };
                 /** @description Too Many Requests */
                 429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cashier/reward-handovers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Hands over an active product reward of the scanned card's owner. Records the cashier, station, register and time; registers no purchase and awards no points. A fuel discount coupon returns 409 rewards.coupon_wrong_kind. Retry with the same Idempotency-Key replays the result. */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description UUID chosen by the client; reuse it only to retry the same request. */
+                    "Idempotency-Key": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RewardHandoverRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RewardHandoverResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1449,10 +1537,11 @@ export interface components {
             description: string;
             /** Format: int32 */
             pointsCost: number;
+            kind: string;
             /** Format: double */
-            discountPerLiter: number;
+            discountPerLiter: null | number;
             /** Format: double */
-            maxLiters: number;
+            maxLiters: null | number;
             isActive: boolean;
             /** Format: int32 */
             version: number;
@@ -1492,10 +1581,11 @@ export interface components {
             /** Format: uuid */
             couponId: string;
             offerName: string;
+            kind: string;
             /** Format: double */
-            discountPerLiter: number;
+            discountPerLiter: null | number;
             /** Format: double */
-            maxLiters: number;
+            maxLiters: null | number;
             /** Format: date-time */
             expiresAt: string;
             token: string;
@@ -1586,10 +1676,11 @@ export interface components {
         };
         CouponPreviewResponse: {
             offerName: string;
+            kind: string;
             /** Format: double */
-            discountPerLiter: number;
+            discountPerLiter: null | number;
             /** Format: double */
-            maxLiters: number;
+            maxLiters: null | number;
             calculation: null | components["schemas"]["CouponPreviewCalculation"];
         };
         CouponResponse: {
@@ -1600,10 +1691,11 @@ export interface components {
             offerName: string;
             /** Format: int32 */
             pointsCost: number;
+            kind: string;
             /** Format: double */
-            discountPerLiter: number;
+            discountPerLiter: null | number;
             /** Format: double */
-            maxLiters: number;
+            maxLiters: null | number;
             status: string;
             code: null | string;
             /** Format: date-time */
@@ -1621,6 +1713,7 @@ export interface components {
             description: null | string;
             /** Format: int32 */
             pointsCost: null | number;
+            kind: null | string;
             /** Format: double */
             discountPerLiter: null | number;
             /** Format: double */
@@ -1723,6 +1816,17 @@ export interface components {
             /** Format: int32 */
             durationMs: number;
         };
+        RewardHandoverRequest: {
+            cardCode: null | string;
+            couponCode: null | string;
+        };
+        RewardHandoverResponse: {
+            /** Format: uuid */
+            couponId: string;
+            offerName: string;
+            /** Format: date-time */
+            handedOverAt: string;
+        };
         RewardResponse: {
             /** Format: uuid */
             id: string;
@@ -1730,10 +1834,11 @@ export interface components {
             description: string;
             /** Format: int32 */
             pointsCost: number;
+            kind: string;
             /** Format: double */
-            discountPerLiter: number;
+            discountPerLiter: null | number;
             /** Format: double */
-            maxLiters: number;
+            maxLiters: null | number;
             /** Format: int32 */
             version: number;
         };
@@ -1790,6 +1895,7 @@ export interface components {
             description: null | string;
             /** Format: int32 */
             pointsCost: null | number;
+            kind: null | string;
             /** Format: double */
             discountPerLiter: null | number;
             /** Format: double */

@@ -11,9 +11,20 @@ internal static class RewardsSql
 {
     public static string Num(decimal value) => value.ToString(CultureInfo.InvariantCulture);
 
-    /// <summary>Benefit range shared by the offer and the coupon snapshot.</summary>
+    /// <summary>
+    /// Benefit range shared by the offer and the coupon snapshot. A fuel discount has both terms, a
+    /// product has neither (ranges below pass on NULL).
+    /// </summary>
     public static void BenefitChecks(TableBuilder table, string name)
     {
+        table.HasCheckConstraint($"CK_{name}_Kind", "\"Kind\" IN ('FuelDiscount', 'Product')");
+        table.HasCheckConstraint(
+            $"CK_{name}_KindTerms",
+            """
+            ("Kind" = 'FuelDiscount' AND "DiscountPerLiter" IS NOT NULL AND "MaxLiters" IS NOT NULL)
+            OR ("Kind" = 'Product' AND "DiscountPerLiter" IS NULL AND "MaxLiters" IS NULL)
+            """
+        );
         table.HasCheckConstraint(
             $"CK_{name}_DiscountPerLiter_Range",
             $"\"DiscountPerLiter\" > 0 AND \"DiscountPerLiter\" <= {Num(RewardOfferRules.MaxDiscountPerLiter)}"
@@ -58,6 +69,9 @@ internal sealed class RewardOfferConfiguration : IEntityTypeConfiguration<Reward
         builder
             .Property(offer => offer.MaxLiters)
             .HasPrecision(RewardOfferRules.MaxLitersPrecision, RewardOfferRules.MaxLitersScale);
+        builder.Property(offer => offer.Kind).HasConversion<string>().HasMaxLength(16);
+        // Target of the coupon's (OfferId, Kind) key: a coupon's kind is its offer's kind.
+        builder.HasAlternateKey(offer => new { offer.Id, offer.Kind });
         builder.Property(offer => offer.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(offer => offer.UpdatedAt).HasDefaultValueSql("now()");
         // EF updates compare the original version and AppDbContext raises it (see BumpRewardOfferVersions).
@@ -86,14 +100,17 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
                     "CK_Coupons_Code_Format",
                     $"\"Code\" IS NULL OR \"Code\" ~ '{CouponCode.Pattern}'"
                 );
-                // Each status has exactly the fields it implies: no code before activation, no purchase
-                // link before redemption, and nothing is ever "un-done".
+                // Each status has exactly the fields it implies: no code before activation, no
+                // redemption link before redemption, and nothing is ever "un-done". A redeemed fuel
+                // discount points at a purchase and never a handover; a redeemed product the reverse.
                 table.HasCheckConstraint(
                     "CK_Coupons_State",
                     """
-                    ("Status" = 'Purchased' AND "Code" IS NULL AND "ActivatedAt" IS NULL AND "RedeemedAt" IS NULL AND "RedeemedPurchaseId" IS NULL)
-                    OR ("Status" = 'Active' AND "Code" IS NOT NULL AND "ActivatedAt" IS NOT NULL AND "RedeemedAt" IS NULL AND "RedeemedPurchaseId" IS NULL)
-                    OR ("Status" = 'Redeemed' AND "Code" IS NOT NULL AND "ActivatedAt" IS NOT NULL AND "RedeemedAt" IS NOT NULL AND "RedeemedPurchaseId" IS NOT NULL)
+                    ("Status" = 'Purchased' AND "Code" IS NULL AND "ActivatedAt" IS NULL AND "RedeemedAt" IS NULL AND "RedeemedPurchaseId" IS NULL AND "RedeemedHandoverId" IS NULL)
+                    OR ("Status" = 'Active' AND "Code" IS NOT NULL AND "ActivatedAt" IS NOT NULL AND "RedeemedAt" IS NULL AND "RedeemedPurchaseId" IS NULL AND "RedeemedHandoverId" IS NULL)
+                    OR ("Status" = 'Redeemed' AND "Code" IS NOT NULL AND "ActivatedAt" IS NOT NULL AND "RedeemedAt" IS NOT NULL
+                        AND (("Kind" = 'FuelDiscount' AND "RedeemedPurchaseId" IS NOT NULL AND "RedeemedHandoverId" IS NULL)
+                          OR ("Kind" = 'Product' AND "RedeemedPurchaseId" IS NULL AND "RedeemedHandoverId" IS NOT NULL)))
                     """
                 );
                 table.HasCheckConstraint(
@@ -116,6 +133,7 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
             .Property(coupon => coupon.MaxLiters)
             .HasPrecision(RewardOfferRules.MaxLitersPrecision, RewardOfferRules.MaxLitersScale);
         builder.Property(coupon => coupon.Status).HasConversion<string>().HasMaxLength(16);
+        builder.Property(coupon => coupon.Kind).HasConversion<string>().HasMaxLength(16);
         builder.Property(coupon => coupon.Code).HasMaxLength(CouponCode.Length).IsFixedLength();
         builder.Property(coupon => coupon.PurchasedAt).HasDefaultValueSql("now()");
 
@@ -134,7 +152,31 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
         builder
             .HasOne<RewardOffer>()
             .WithMany()
-            .HasForeignKey(coupon => coupon.OfferId)
+            .HasForeignKey(coupon => new { coupon.OfferId, coupon.Kind })
+            .HasPrincipalKey(offer => new { offer.Id, offer.Kind })
+            .HasConstraintName("FK_Coupons_RewardOffers_OfferKind")
+            .OnDelete(DeleteBehavior.Restrict);
+        builder
+            .HasIndex(coupon => coupon.RedeemedHandoverId)
+            .IsUnique()
+            .HasDatabaseName("UX_Coupons_RedeemedHandover");
+        // Composite: the handover a coupon points at is this coupon's, for this coupon's owner.
+        builder
+            .HasOne<RewardHandover>()
+            .WithMany()
+            .HasForeignKey(coupon => new
+            {
+                coupon.RedeemedHandoverId,
+                coupon.Id,
+                coupon.UserId,
+            })
+            .HasPrincipalKey(handover => new
+            {
+                handover.Id,
+                handover.CouponId,
+                handover.UserId,
+            })
+            .HasConstraintName("FK_Coupons_RewardHandovers_Handover")
             .OnDelete(DeleteBehavior.Restrict);
         // Composite: a coupon can only be redeemed on a purchase of its own owner.
         builder
@@ -143,6 +185,58 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
             .HasForeignKey(coupon => new { coupon.RedeemedPurchaseId, coupon.UserId })
             .HasPrincipalKey(purchase => new { purchase.Id, purchase.UserId })
             .HasConstraintName(RedeemedPurchaseOwnerConstraint)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class RewardHandoverConfiguration : IEntityTypeConfiguration<RewardHandover>
+{
+    public void Configure(EntityTypeBuilder<RewardHandover> builder)
+    {
+        builder.ToTable(
+            "RewardHandovers",
+            table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_RewardHandovers_StationCode_Format",
+                    $"\"StationCode\" ~ '{FuelPurchaseRules.CodePattern}'"
+                );
+                table.HasCheckConstraint(
+                    "CK_RewardHandovers_RegisterCode_Format",
+                    $"\"RegisterCode\" ~ '{FuelPurchaseRules.CodePattern}'"
+                );
+            }
+        );
+        builder.HasKey(handover => handover.Id);
+        builder.Property(handover => handover.Id).ValueGeneratedNever();
+        builder
+            .Property(handover => handover.StationCode)
+            .HasMaxLength(FuelPurchaseRules.CodeMaxLength);
+        builder
+            .Property(handover => handover.RegisterCode)
+            .HasMaxLength(FuelPurchaseRules.CodeMaxLength);
+        builder.Property(handover => handover.HandedOverAt).HasDefaultValueSql("clock_timestamp()");
+        builder
+            .HasIndex(handover => handover.CouponId)
+            .IsUnique()
+            .HasDatabaseName("UX_RewardHandovers_Coupon");
+        // Target of the coupon's key, which ties coupon, handover and owner together. No key back
+        // to the coupon: the two would form a cycle that no row could be deleted from.
+        builder.HasAlternateKey(handover => new
+        {
+            handover.Id,
+            handover.CouponId,
+            handover.UserId,
+        });
+        builder
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(handover => handover.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(handover => handover.CashierUserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

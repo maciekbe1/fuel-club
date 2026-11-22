@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-22). Nie zrealizowana - kontrakt przed implementacją.
+Decyzja przyjęta i zrealizowana (2026-11-22), P13. Opis działania: [Rewards](/moduly/rewards/#nagrody-produktowe).
 
 ## Problem
 
@@ -39,18 +39,18 @@ Drugi, równoległy system (osobne nagrody, wymiany, kody) powieliłby wymianę,
 - `POST /api/cashier/reward-handovers` (rola `Cashier`, CSRF, `Idempotency-Key`). Treść: `{ cardCode, couponCode }` w body, nigdy w URL ani logach.
 - Jedna transakcja:
   1. karta → właściciel; kupon tego właściciela. Nieznany i cudzy kod dają **ten sam `404`**; rodzaj kuponu sprawdzany dopiero po właścicielu, więc błąd rodzaju nie ujawnia cudzego kuponu;
-  2. warunkowy `UPDATE coupons SET Status = Redeemed ... WHERE Id = @id AND Status = 'Active' AND Kind = 'Product'`;
-  3. wiersz `reward_handovers` (kupon `UNIQUE`, kasjer, stacja, kasa, czas) - ślad wydania mimo braku tankowania.
+  2. wiersz `RewardHandovers` (kupon `UNIQUE`, kasjer, stacja, kasa, czas) - ślad wydania mimo braku tankowania;
+  3. warunkowy `UPDATE "Coupons" SET "Status" = 'Redeemed', "RedeemedHandoverId" = ... WHERE ... "Status" = 'Active' AND "Kind" = 'Product'`; 0 wierszy wycofuje transakcję.
 - Bez zakupu paliwa i bez punktów.
 - Sama karta nie jest dodatkowym uwierzytelnieniem: zachowuje spójny proces z rabatem i pozwala backendowi sprawdzić właściciela.
 - Błędy:
   - cudzy albo nieistniejący kod → `404`, ten sam co przy rabacie;
-  - kupon nieaktywny lub odebrany → `409`, jak przy rabacie;
+  - kupon odebrany → `409 rewards.coupon_redeemed`; nieaktywowany nie ma kodu, więc → `404`, jak przy rabacie;
   - kupon rabatowy w tym endpoincie albo nagroda w zakupie paliwa → `409 rewards.coupon_wrong_kind`.
 - Ponowienie z tym samym kluczem odtwarza wynik. Inny klucz po odbiorze → `409` (warunkowy UPDATE pilnuje jednorazowości).
 - Ograniczenia bazy rozróżniają oba odbiory:
   - `FuelDiscount` + `Redeemed` ⇒ `RedeemedPurchaseId` ustawiony, bez wydania;
-  - `Product` + `Redeemed` ⇒ wiersz `reward_handovers`, `RedeemedPurchaseId` pusty;
+  - `Product` + `Redeemed` ⇒ wiersz `RewardHandovers`, `RedeemedPurchaseId` pusty;
   - zakup paliwa nie może wskazać kuponu produktowego (złożony FK lub CHECK z rodzajem).
 - Podgląd w kasie (karta + kupon) pokazuje rodzaj: przy nagrodzie przycisk „Wydaj nagrodę” zamiast rejestracji tankowania.
 
@@ -80,7 +80,7 @@ Nazewnictwo: „Nagroda” (bez „bonu”), rabat dalej „kupon”.
 ## Konsekwencje
 
 - ADR 0006 zostaje dla rabatów; jego alternatywa „darmowy produkt” jest zrealizowana tutaj osobną ścieżką odbioru.
-- Migracja: nowa kolumna z wartością domyślną, nullowalne stawka i limit, nowe CHECK-i, tabela `reward_handovers`.
+- Migracja: nowa kolumna z wartością domyślną, nullowalne stawka i limit, nowe CHECK-i, tabela `RewardHandovers`.
 - `npm run api:types` - nowe pola i endpoint.
 - Testy:
   - API: CHECK-i rodzaju, edycja nie zmienia rodzaju, wymiana i aktywacja nagrody, wydanie jednorazowe przy różnych kluczach i równolegle, cudza karta, zły rodzaj w obu kierunkach, brak punktów i zakupu przy wydaniu, kasjer bez roli → `403`;

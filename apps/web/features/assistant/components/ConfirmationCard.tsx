@@ -6,7 +6,7 @@ import { useState } from "react";
 import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, NetworkError } from "@/lib/api/problem";
-import { formatTerms } from "@/lib/format";
+import { benefitTerms, isProduct } from "@/lib/format";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { useConfirmActivation } from "../hooks";
 import type { Turn } from "../hooks";
@@ -64,12 +64,13 @@ export function ConfirmationCard({
         <TicketCheck className="mt-0.5 size-5 shrink-0 text-primary" />
         <div className="flex flex-col gap-0.5">
           <p className="font-medium">
-            Aktywować kupon „{confirmation.offerName}”?
+            {isProduct(confirmation)
+              ? `Aktywować odbiór nagrody „${confirmation.offerName}”?`
+              : `Aktywować kupon „${confirmation.offerName}”?`}
           </p>
           <p className="text-sm text-muted-foreground">
-            {formatTerms(confirmation.discountPerLiter, confirmation.maxLiters)}
-            . Propozycja ważna do{" "}
-            {time.format(new Date(confirmation.expiresAt))}.
+            {benefitTerms(confirmation) ?? "Nagroda do odbioru w kasie"}.
+            Propozycja ważna do {time.format(new Date(confirmation.expiresAt))}.
           </p>
         </div>
       </div>

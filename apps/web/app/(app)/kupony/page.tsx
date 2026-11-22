@@ -11,9 +11,9 @@ export default function CouponsPage() {
         >
           ← Saldo
         </Link>
-        <h1 className="text-2xl font-semibold">Moje kupony</h1>
+        <h1 className="text-2xl font-semibold">Moje kupony i nagrody</h1>
         <p className="text-sm text-muted-foreground">
-          Aktywuj kupon i pokaż jego kod przy kasie razem z kartą.
+          Aktywuj kupon lub odbiór nagrody i pokaż kod przy kasie razem z kartą.
         </p>
       </div>
       <CouponsList />

@@ -506,11 +506,16 @@ namespace FuelClub.Api.Migrations
                         .HasColumnType("character(27)")
                         .IsFixedLength();
 
-                    b.Property<decimal>("DiscountPerLiter")
+                    b.Property<decimal?>("DiscountPerLiter")
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)");
 
-                    b.Property<decimal>("MaxLiters")
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<decimal?>("MaxLiters")
                         .HasPrecision(7, 3)
                         .HasColumnType("numeric(7,3)");
 
@@ -533,6 +538,9 @@ namespace FuelClub.Api.Migrations
                     b.Property<DateTimeOffset?>("RedeemedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("RedeemedHandoverId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("RedeemedPurchaseId")
                         .HasColumnType("uuid");
 
@@ -551,15 +559,21 @@ namespace FuelClub.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_Coupons_Code");
 
-                    b.HasIndex("OfferId");
+                    b.HasIndex("RedeemedHandoverId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Coupons_RedeemedHandover");
 
                     b.HasIndex("RedeemedPurchaseId")
                         .IsUnique()
                         .HasDatabaseName("UX_Coupons_RedeemedPurchase");
 
+                    b.HasIndex("OfferId", "Kind");
+
                     b.HasIndex("RedeemedPurchaseId", "UserId");
 
                     b.HasIndex("UserId", "Status");
+
+                    b.HasIndex("RedeemedHandoverId", "Id", "UserId");
 
                     b.ToTable("Coupons", null, t =>
                         {
@@ -567,15 +581,68 @@ namespace FuelClub.Api.Migrations
 
                             t.HasCheckConstraint("CK_Coupons_DiscountPerLiter_Range", "\"DiscountPerLiter\" > 0 AND \"DiscountPerLiter\" <= 10");
 
+                            t.HasCheckConstraint("CK_Coupons_Kind", "\"Kind\" IN ('FuelDiscount', 'Product')");
+
+                            t.HasCheckConstraint("CK_Coupons_KindTerms", "(\"Kind\" = 'FuelDiscount' AND \"DiscountPerLiter\" IS NOT NULL AND \"MaxLiters\" IS NOT NULL)\nOR (\"Kind\" = 'Product' AND \"DiscountPerLiter\" IS NULL AND \"MaxLiters\" IS NULL)");
+
                             t.HasCheckConstraint("CK_Coupons_MaxLiters_Range", "\"MaxLiters\" > 0 AND \"MaxLiters\" <= 1000");
 
                             t.HasCheckConstraint("CK_Coupons_PointsCost_Range", "\"PointsCost\" >= 1 AND \"PointsCost\" <= 1000000");
 
-                            t.HasCheckConstraint("CK_Coupons_State", "(\"Status\" = 'Purchased' AND \"Code\" IS NULL AND \"ActivatedAt\" IS NULL AND \"RedeemedAt\" IS NULL AND \"RedeemedPurchaseId\" IS NULL)\nOR (\"Status\" = 'Active' AND \"Code\" IS NOT NULL AND \"ActivatedAt\" IS NOT NULL AND \"RedeemedAt\" IS NULL AND \"RedeemedPurchaseId\" IS NULL)\nOR (\"Status\" = 'Redeemed' AND \"Code\" IS NOT NULL AND \"ActivatedAt\" IS NOT NULL AND \"RedeemedAt\" IS NOT NULL AND \"RedeemedPurchaseId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_Coupons_State", "(\"Status\" = 'Purchased' AND \"Code\" IS NULL AND \"ActivatedAt\" IS NULL AND \"RedeemedAt\" IS NULL AND \"RedeemedPurchaseId\" IS NULL AND \"RedeemedHandoverId\" IS NULL)\nOR (\"Status\" = 'Active' AND \"Code\" IS NOT NULL AND \"ActivatedAt\" IS NOT NULL AND \"RedeemedAt\" IS NULL AND \"RedeemedPurchaseId\" IS NULL AND \"RedeemedHandoverId\" IS NULL)\nOR (\"Status\" = 'Redeemed' AND \"Code\" IS NOT NULL AND \"ActivatedAt\" IS NOT NULL AND \"RedeemedAt\" IS NOT NULL\n    AND ((\"Kind\" = 'FuelDiscount' AND \"RedeemedPurchaseId\" IS NOT NULL AND \"RedeemedHandoverId\" IS NULL)\n      OR (\"Kind\" = 'Product' AND \"RedeemedPurchaseId\" IS NULL AND \"RedeemedHandoverId\" IS NOT NULL)))");
 
                             t.HasCheckConstraint("CK_Coupons_Status", "\"Status\" IN ('Purchased', 'Active', 'Redeemed')");
 
                             t.HasCheckConstraint("CK_Coupons_Timeline", "(\"ActivatedAt\" IS NULL OR \"ActivatedAt\" >= \"PurchasedAt\") AND (\"RedeemedAt\" IS NULL OR \"RedeemedAt\" >= \"ActivatedAt\")");
+                        });
+                });
+
+            modelBuilder.Entity("FuelClub.Api.Modules.Rewards.Domain.RewardHandover", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CashierUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CouponId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("HandedOverAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("clock_timestamp()");
+
+                    b.Property<string>("RegisterCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("StationCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CashierUserId");
+
+                    b.HasIndex("CouponId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RewardHandovers_Coupon");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RewardHandovers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RewardHandovers_RegisterCode_Format", "\"RegisterCode\" ~ '^[A-Z0-9-]+$'");
+
+                            t.HasCheckConstraint("CK_RewardHandovers_StationCode_Format", "\"StationCode\" ~ '^[A-Z0-9-]+$'");
                         });
                 });
 
@@ -594,14 +661,19 @@ namespace FuelClub.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<decimal>("DiscountPerLiter")
+                    b.Property<decimal?>("DiscountPerLiter")
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<decimal>("MaxLiters")
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<decimal?>("MaxLiters")
                         .HasPrecision(7, 3)
                         .HasColumnType("numeric(7,3)");
 
@@ -629,6 +701,10 @@ namespace FuelClub.Api.Migrations
                     b.ToTable("RewardOffers", null, t =>
                         {
                             t.HasCheckConstraint("CK_RewardOffers_DiscountPerLiter_Range", "\"DiscountPerLiter\" > 0 AND \"DiscountPerLiter\" <= 10");
+
+                            t.HasCheckConstraint("CK_RewardOffers_Kind", "\"Kind\" IN ('FuelDiscount', 'Product')");
+
+                            t.HasCheckConstraint("CK_RewardOffers_KindTerms", "(\"Kind\" = 'FuelDiscount' AND \"DiscountPerLiter\" IS NOT NULL AND \"MaxLiters\" IS NOT NULL)\nOR (\"Kind\" = 'Product' AND \"DiscountPerLiter\" IS NULL AND \"MaxLiters\" IS NULL)");
 
                             t.HasCheckConstraint("CK_RewardOffers_MaxLiters_Range", "\"MaxLiters\" > 0 AND \"MaxLiters\" <= 1000");
 
@@ -887,9 +963,40 @@ namespace FuelClub.Api.Migrations
 
             modelBuilder.Entity("FuelClub.Api.Modules.Rewards.Domain.Coupon", b =>
                 {
+                    b.HasOne("FuelClub.Api.Modules.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("FuelClub.Api.Modules.Rewards.Domain.RewardOffer", null)
                         .WithMany()
-                        .HasForeignKey("OfferId")
+                        .HasForeignKey("OfferId", "Kind")
+                        .HasPrincipalKey("Id", "Kind")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Coupons_RewardOffers_OfferKind");
+
+                    b.HasOne("FuelClub.Api.Modules.Loyalty.Domain.FuelPurchase", null)
+                        .WithMany()
+                        .HasForeignKey("RedeemedPurchaseId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Coupons_FuelPurchases_RedeemedPurchaseOwner");
+
+                    b.HasOne("FuelClub.Api.Modules.Rewards.Domain.RewardHandover", null)
+                        .WithMany()
+                        .HasForeignKey("RedeemedHandoverId", "Id", "UserId")
+                        .HasPrincipalKey("Id", "CouponId", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Coupons_RewardHandovers_Handover");
+                });
+
+            modelBuilder.Entity("FuelClub.Api.Modules.Rewards.Domain.RewardHandover", b =>
+                {
+                    b.HasOne("FuelClub.Api.Modules.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CashierUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -898,13 +1005,6 @@ namespace FuelClub.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("FuelClub.Api.Modules.Loyalty.Domain.FuelPurchase", null)
-                        .WithMany()
-                        .HasForeignKey("RedeemedPurchaseId", "UserId")
-                        .HasPrincipalKey("Id", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("FK_Coupons_FuelPurchases_RedeemedPurchaseOwner");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

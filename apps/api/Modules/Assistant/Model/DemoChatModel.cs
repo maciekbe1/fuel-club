@@ -209,7 +209,11 @@ public sealed partial class DemoChatModel : IChatModel
                     "; ",
                     offers.Select(o =>
                         $"{o.Name} - {o.PointsCost.ToString("N0", Polish)} pkt, "
-                        + $"{o.DiscountPerLiter.ToString("0.00", Polish)} zł/l do {o.MaxLiters.ToString("0.###", Polish)} l"
+                        + (
+                            o is { DiscountPerLiter: { } rate, MaxLiters: { } liters }
+                                ? $"{rate.ToString("0.00", Polish)} zł/l do {liters.ToString("0.###", Polish)} l"
+                                : "nagroda"
+                        )
                         + (
                             o.PointsMissing > 0
                                 ? $" (brakuje {o.PointsMissing.ToString("N0", Polish)} pkt)"

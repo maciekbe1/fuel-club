@@ -1,7 +1,9 @@
 using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Accounts.Infrastructure;
 using FuelClub.Api.Modules.Loyalty.Infrastructure;
+using FuelClub.Api.Modules.Rewards.Domain;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelClub.Api.Infrastructure.DemoData;
 
@@ -27,6 +29,14 @@ public sealed class DemoAccountsSeeder(
         ("bartek@demo.fuelclub.test", "Bartek", RoleNames.User),
         ("kasjer@demo.fuelclub.test", "Kasjer demo", RoleNames.Cashier),
         ("admin@demo.fuelclub.test", "Administrator demo", RoleNames.Admin),
+    ];
+
+    /// <summary>Product rewards (ADR 0013): no stock, no expiry. Created once by name, never changed.</summary>
+    public static readonly (string Name, string Description, int PointsCost)[] Rewards =
+    [
+        ("Kawa", "Dowolna kawa z ekspresu na stacji.", 150),
+        ("Hot dog", "Hot dog z dowolnym dodatkiem.", 250),
+        ("Myjnia", "Program podstawowy myjni automatycznej.", 600),
     ];
 
     public const string CashierStationCode = "DEMO-01";
@@ -69,8 +79,28 @@ public sealed class DemoAccountsSeeder(
                 );
         }
 
+        foreach (var (name, description, cost) in Rewards)
+            if (!await db.RewardOffers.AnyAsync(offer => offer.Name == name, cancellationToken))
+                db.RewardOffers.Add(
+                    new RewardOffer
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Name = name,
+                        Description = description,
+                        PointsCost = cost,
+                        Kind = RewardKind.Product,
+                        IsActive = true,
+                        Version = 1,
+                    }
+                );
+        await db.SaveChangesAsync(cancellationToken);
+
         await transaction.CommitAsync(cancellationToken);
-        logger.LogInformation("Demo accounts ensured ({Count}).", Accounts.Length);
+        logger.LogInformation(
+            "Demo accounts ({Count}) and rewards ({Rewards}) ensured.",
+            Accounts.Length,
+            Rewards.Length
+        );
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

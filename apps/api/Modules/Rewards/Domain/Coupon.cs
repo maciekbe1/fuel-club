@@ -9,7 +9,7 @@ public enum CouponStatus
     /// <summary>Activated by the owner; has a redemption code.</summary>
     Active,
 
-    /// <summary>Used on exactly one fuel purchase.</summary>
+    /// <summary>Used on exactly one fuel purchase, or handed over at the till (a product).</summary>
     Redeemed,
 }
 
@@ -25,8 +25,9 @@ public sealed class Coupon
 
     public string OfferName { get; set; } = null!;
     public int PointsCost { get; set; }
-    public decimal DiscountPerLiter { get; set; }
-    public decimal MaxLiters { get; set; }
+    public RewardKind Kind { get; set; }
+    public decimal? DiscountPerLiter { get; set; }
+    public decimal? MaxLiters { get; set; }
 
     public CouponStatus Status { get; set; }
 
@@ -39,4 +40,22 @@ public sealed class Coupon
 
     /// <summary>The fuel purchase the discount was applied to; unique, so one coupon per purchase.</summary>
     public Guid? RedeemedPurchaseId { get; set; }
+
+    /// <summary>The till handover of a product; unique, so one handover per coupon.</summary>
+    public Guid? RedeemedHandoverId { get; set; }
+}
+
+/// <summary>
+/// A product handed over at the till: who, where and when, though nothing was fuelled. Coupon codes
+/// are not stored here.
+/// </summary>
+public sealed class RewardHandover
+{
+    public Guid Id { get; set; }
+    public Guid CouponId { get; set; }
+    public string UserId { get; set; } = null!;
+    public string CashierUserId { get; set; } = null!;
+    public string StationCode { get; set; } = null!;
+    public string RegisterCode { get; set; } = null!;
+    public DateTimeOffset HandedOverAt { get; set; }
 }

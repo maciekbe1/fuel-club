@@ -12,7 +12,7 @@ import {
   applyFieldErrors,
   readErrorMessage,
 } from "@/lib/api/problem";
-import { formatTerms } from "@/lib/format";
+import { benefitTerms } from "@/lib/format";
 import {
   useAdminReward,
   useFetchCurrentReward,
@@ -33,6 +33,7 @@ const FIELDS = [
   "name",
   "description",
   "pointsCost",
+  "kind",
   "discountPerLiter",
   "maxLiters",
   "isActive",
@@ -231,7 +232,7 @@ function EditLoaded({ initial }: { initial: AdminReward }) {
         className="flex flex-col gap-5 disabled:opacity-70"
       >
         <legend className="sr-only">Edycja oferty</legend>
-        <RewardFields form={form} />
+        <RewardFields form={form} kindLocked />
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="lg" className="h-12">
             {update.isPending ? "Zapisywanie…" : "Zapisz zmiany"}
@@ -276,7 +277,7 @@ function ConflictPanel({
             <dt className="font-medium">Aktualna wersja {current.version}:</dt>
             <dd data-testid="offer-current">
               {current.name} · {current.pointsCost} pkt ·{" "}
-              {formatTerms(current.discountPerLiter, current.maxLiters)} ·{" "}
+              {benefitTerms(current) ?? "nagroda"} ·{" "}
               {current.isActive ? "aktywna" : "wyłączona"}
             </dd>
           </dl>

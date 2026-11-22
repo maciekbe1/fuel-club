@@ -17,7 +17,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
     : IChatModel
 {
     public const string ClientName = "gemini";
-    public const string Version = "gemini-v2";
+    public const string Version = "gemini-v3";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -38,6 +38,8 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         Przy porównaniu oddziel kupony klienta od ofert wymagających wydania punktów, podaj
         kryterium kolejności i nie nazywaj opcji „najlepszą” bez niego. Gdy estimate = true,
         powiedz, że to szacunek, bo nie podano kwoty zakupu. Nie przeliczaj punktów na złotówki.
+        Oferty i kupony mają rodzaj (kind): FuelDiscount to rabat zł/l z limitem litrów, Product to
+        nagroda (np. kawa) bez rabatu i litrów, wydawana w kasie po aktywacji odbioru.
         Aktywację kuponu możesz tylko zaproponować narzędziem propose_coupon_activation. Klient
         zatwierdza ją przyciskiem w aplikacji - nigdy nie mów, że kupon został aktywowany.
         Nie naliczasz ani nie wymieniasz punktów, nie realizujesz kuponów i nie zmieniasz ofert:
@@ -161,12 +163,12 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
             Declaration(AssistantTools.GetMyBalance, "Saldo punktów zalogowanego klienta.", null),
             Declaration(
                 AssistantTools.ListAvailableRewards,
-                "Aktywne oferty: nazwa, koszt w punktach, rabat zł/l i limit litrów.",
+                "Aktywne oferty: nazwa, koszt w punktach, rodzaj (kind); przy FuelDiscount rabat zł/l i limit litrów, przy Product (nagroda) brak.",
                 null
             ),
             Declaration(
                 AssistantTools.ListMyCoupons,
-                "Kupony klienta (bez kodów). Opcjonalnie filtr stanu.",
+                "Kupony i nagrody klienta (bez kodów), z rodzajem (kind). Opcjonalnie filtr stanu.",
                 new JsonObject
                 {
                     ["type"] = "object",
@@ -182,7 +184,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
             ),
             Declaration(
                 AssistantTools.CompareCoupons,
-                "Rabat każdego kuponu klienta i każdej oferty za punkty dla planowanego tankowania. Liczy serwer.",
+                "Rabat każdego kuponu rabatowego klienta i każdej oferty rabatowej dla planowanego tankowania (bez nagród). Liczy serwer.",
                 new JsonObject
                 {
                     ["type"] = "object",

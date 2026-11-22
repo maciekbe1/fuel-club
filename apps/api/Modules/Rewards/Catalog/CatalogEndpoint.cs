@@ -9,8 +9,9 @@ public sealed record RewardResponse(
     string Name,
     string Description,
     int PointsCost,
-    decimal DiscountPerLiter,
-    decimal MaxLiters,
+    string Kind,
+    decimal? DiscountPerLiter,
+    decimal? MaxLiters,
     int Version
 );
 
@@ -45,6 +46,7 @@ public static class CatalogEndpoint
                 offer.Name,
                 offer.Description,
                 offer.PointsCost,
+                offer.Kind.ToString(),
                 offer.DiscountPerLiter,
                 offer.MaxLiters,
                 offer.Version

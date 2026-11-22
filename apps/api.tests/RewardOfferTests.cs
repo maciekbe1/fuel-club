@@ -37,8 +37,8 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         string Name,
         string Description,
         int PointsCost,
-        decimal DiscountPerLiter,
-        decimal MaxLiters,
+        decimal? DiscountPerLiter,
+        decimal? MaxLiters,
         bool IsActive,
         int Version,
         DateTimeOffset CreatedAt,
@@ -50,8 +50,8 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         string Name,
         string Description,
         int PointsCost,
-        decimal DiscountPerLiter,
-        decimal MaxLiters
+        decimal? DiscountPerLiter,
+        decimal? MaxLiters
     );
 
     private sealed record ListBody<T>(List<T> Items);

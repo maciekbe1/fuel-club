@@ -9,6 +9,8 @@ import {
   type CouponPreview,
   type FuelPurchaseBody,
   type FuelPurchaseResult,
+  type RewardHandoverBody,
+  type RewardHandoverResult,
 } from "./services";
 
 export function useCashierStation() {
@@ -22,6 +24,13 @@ export function useCashierStation() {
 export function useRegisterPurchase() {
   return useIdempotentMutation<FuelPurchaseResult, FuelPurchaseBody>({
     mutationFn: (body, key) => cashierService.purchase(body, key),
+  });
+}
+
+/** Same card and code → same Idempotency-Key until a final answer: a lost response is retried safely. */
+export function useHandOverReward() {
+  return useIdempotentMutation<RewardHandoverResult, RewardHandoverBody>({
+    mutationFn: (body, key) => cashierService.handOverReward(body, key),
   });
 }
 

@@ -99,5 +99,7 @@ export const purchaseMessages: Record<string, string> = {
   "rewards.coupon_not_found":
     "Nie znaleziono aktywnego kuponu tego klienta o tym kodzie.",
   "rewards.coupon_redeemed": "Ten kupon został już wykorzystany.",
+  "rewards.coupon_wrong_kind":
+    "To kod nagrody, nie rabatu - wydaj ją przyciskiem „Wydaj nagrodę”, a tankowanie zapisz bez kodu.",
   default: "Niepoprawna wartość.",
 };

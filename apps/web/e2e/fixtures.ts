@@ -106,8 +106,10 @@ export type OfferTerms = {
   name: string;
   description?: string;
   pointsCost: number;
-  discountPerLiter: number;
-  maxLiters: number;
+  /** "Product" for a reward handed over at the till; no per-liter terms then. */
+  kind?: "FuelDiscount" | "Product";
+  discountPerLiter?: number;
+  maxLiters?: number;
   isActive?: boolean;
 };
 

@@ -92,6 +92,20 @@ public static class RewardsModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
+        app.MapGroup("/api/cashier/reward-handovers")
+            .WithTags("Cashier")
+            .RequireAuthorization(policy => policy.RequireRole(RoleNames.Cashier))
+            .RequireCsrf()
+            .MapPost("", RewardHandoverEndpoint.Handle)
+            .RequireRateLimiting(RateLimiting.PurchasePolicy)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .RequireIdempotency()
+            .WithDescription(RewardHandoverEndpoint.Description)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
         // Admin manages offers; Cashier has no access.
         var admin = app.MapGroup(AdminRewardEndpoints.Path)
             .WithTags("AdminRewards")

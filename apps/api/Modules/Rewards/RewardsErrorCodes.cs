@@ -21,4 +21,7 @@ public static class RewardsErrorCodes
     public const string CouponNotFound = "rewards.coupon_not_found";
     public const string CouponRedeemed = "rewards.coupon_redeemed";
     public const string CouponBusy = "rewards.coupon_busy";
+    public const string NotForProduct = "rewards.not_for_product";
+    public const string KindImmutable = "rewards.kind_immutable";
+    public const string CouponWrongKind = "rewards.coupon_wrong_kind";
 }

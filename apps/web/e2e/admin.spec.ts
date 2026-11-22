@@ -328,3 +328,41 @@ test("restored create fails again: the retry sends the stored offer, not the emp
   await retire(admin.page, name);
   await admin.context.close();
 });
+
+test("admin creates a product reward: no per-liter fields, kind fixed on edit", async ({
+  browser,
+  baseURL,
+}) => {
+  const admin = await adminPage(browser, baseURL!);
+  const name = offerName("Nagroda");
+  await admin.page.goto("/admin/oferty/nowa");
+  await admin.page.getByLabel("Nazwa").fill(name);
+  await admin.page.getByLabel("Koszt (pkt)").fill("150");
+  await admin.page.getByLabel("Nagroda (produkt)").check();
+  await expect(admin.page.getByLabel("Rabat (zł/l)")).toHaveCount(0);
+  await expect(admin.page.getByLabel("Limit litrów")).toHaveCount(0);
+  await admin.page.getByRole("button", { name: "Utwórz ofertę" }).click();
+  await admin.page.waitForURL("/admin/oferty");
+
+  const row = admin.page.getByTestId("admin-offer").filter({ hasText: name });
+  await expect(row).toContainText("nagroda");
+  await row.getByRole("link").first().click();
+  await expect(
+    admin.page.locator("p").filter({ hasText: "Rodzaj:" }),
+  ).toContainText("Nagroda (produkt)");
+  // The create screen stays hidden in the DOM (Next keeps visited screens): only visible ones count.
+  await expect(
+    admin.page.getByLabel("Nagroda (produkt)").filter({ visible: true }),
+  ).toHaveCount(0);
+  await admin.page
+    .getByLabel("Koszt (pkt)")
+    .filter({ visible: true })
+    .fill("175");
+  await admin.page.getByRole("button", { name: "Zapisz zmiany" }).click();
+  await expect(admin.page.getByRole("status")).toContainText(
+    "Zapisano (wersja 2)",
+  );
+  await admin.page.getByRole("link", { name: "Wróć do listy" }).click();
+  await retire(admin.page, name);
+  await admin.context.close();
+});

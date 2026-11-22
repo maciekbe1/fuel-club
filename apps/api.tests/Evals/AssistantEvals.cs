@@ -66,7 +66,13 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         EvalExpect Expect
     );
 
-    public sealed record EvalSetup(int? Balance, List<string>? OwnCoupons, bool OtherCoupon);
+    /// <summary>Offer: one active offer of this case, so the catalog never depends on other tests.</summary>
+    public sealed record EvalSetup(
+        int? Balance,
+        List<string>? OwnCoupons,
+        bool OtherCoupon,
+        bool Offer = false
+    );
 
     public sealed record EvalExpect(
         List<string> Tools,
@@ -114,6 +120,23 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         foreach (var status in setup.OwnCoupons ?? [])
             own.Add(await CouponAsync(customer, $"Moj{own.Count}", status == "Active"));
         (Guid Id, string Name, string? Code)? other = null;
+        if (setup.Offer)
+            await DbAsync(async db =>
+            {
+                db.RewardOffers.Add(
+                    new RewardOffer
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Name = $"Oferta {_tag}",
+                        Description = "",
+                        PointsCost = 100,
+                        DiscountPerLiter = 0.10m,
+                        MaxLiters = 20m,
+                        IsActive = true,
+                    }
+                );
+                return await db.SaveChangesAsync();
+            });
         if (setup.OtherCoupon)
             other = await CouponAsync(await AccountAsync(1000), "Cudzy", activate: false);
 

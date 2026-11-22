@@ -9,13 +9,14 @@ import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
 import { keepsPendingOperation, usePendingVars } from "@/lib/idempotency";
 import { EXCHANGE_OPERATION, useExchange, useRewards } from "../hooks";
-import { formatPoints, formatTerms } from "@/lib/format";
+import { benefitTerms, formatPoints, isProduct } from "@/lib/format";
 import type { ExchangeVars, Reward } from "../services";
 
 const toVars = (offer: Reward): ExchangeVars => ({
   id: offer.id,
   version: offer.version,
   name: offer.name,
+  product: isProduct(offer),
 });
 
 const FINAL_MESSAGES: Record<string, string> = {
@@ -54,7 +55,7 @@ function unknownMessage(error: Error) {
 }
 
 type Outcome =
-  | { kind: "success"; offerName: string }
+  | { kind: "success"; offerName: string; product: boolean }
   | { kind: "final"; message: string };
 
 /**
@@ -88,7 +89,11 @@ export function RewardsCatalog() {
       await exchange.mutateAsync(vars);
       setSelected(null);
       setCleared(true);
-      setOutcome({ kind: "success", offerName: vars.name });
+      setOutcome({
+        kind: "success",
+        offerName: vars.name,
+        product: vars.product === true,
+      });
     } catch (error) {
       if (keepsPendingOperation(error)) return;
       setSelected(null);
@@ -158,11 +163,24 @@ export function RewardsCatalog() {
           role="status"
           className="rounded-2xl border border-emerald-500/40 bg-emerald-50 p-4 text-sm text-emerald-950 dark:bg-emerald-950 dark:text-emerald-50"
         >
-          Kupiono kupon „{outcome.offerName}”. Aktywuj go w{" "}
-          <Link href="/kupony" className="font-medium underline">
-            Moich kuponach
-          </Link>{" "}
-          przed tankowaniem.
+          {outcome.product ? (
+            <>
+              Wymieniono punkty na nagrodę „{outcome.offerName}”. Aktywuj odbiór
+              w{" "}
+              <Link href="/kupony" className="font-medium underline">
+                Moich kuponach i nagrodach
+              </Link>{" "}
+              i pokaż kod w kasie.
+            </>
+          ) : (
+            <>
+              Kupiono kupon „{outcome.offerName}”. Aktywuj go w{" "}
+              <Link href="/kupony" className="font-medium underline">
+                Moich kuponach
+              </Link>{" "}
+              przed tankowaniem.
+            </>
+          )}
         </p>
       )}
       {outcome?.kind === "final" && (
@@ -206,25 +224,43 @@ export function RewardsCatalog() {
           </p>
         </section>
       ) : (
-        <ul aria-label="Oferty" className="flex flex-col gap-3">
-          {offers.map((offer) => (
-            <OfferItem
-              key={offer.id}
-              offer={offer}
-              confirming={selected?.id === offer.id}
-              confirmed={selected?.id === offer.id ? selected : null}
-              locked={locked}
-              pending={exchange.isPending && selected?.id === offer.id}
-              onSelect={() => {
-                setOutcome(null);
-                exchange.reset();
-                setSelected(offer);
-              }}
-              onCancel={() => setSelected(null)}
-              onConfirm={() => confirm(toVars(selected!))}
-            />
-          ))}
-        </ul>
+        <div className="flex flex-col gap-6">
+          {[
+            {
+              label: "Rabaty na paliwo",
+              items: offers.filter((offer) => !isProduct(offer)),
+            },
+            {
+              label: "Nagrody",
+              items: offers.filter((offer) => isProduct(offer)),
+            },
+          ]
+            .filter((group) => group.items.length > 0)
+            .map((group) => (
+              <section key={group.label} className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold">{group.label}</h2>
+                <ul aria-label={group.label} className="flex flex-col gap-3">
+                  {group.items.map((offer) => (
+                    <OfferItem
+                      key={offer.id}
+                      offer={offer}
+                      confirming={selected?.id === offer.id}
+                      confirmed={selected?.id === offer.id ? selected : null}
+                      locked={locked}
+                      pending={exchange.isPending && selected?.id === offer.id}
+                      onSelect={() => {
+                        setOutcome(null);
+                        exchange.reset();
+                        setSelected(offer);
+                      }}
+                      onCancel={() => setSelected(null)}
+                      onConfirm={() => confirm(toVars(selected!))}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+        </div>
       )}
     </div>
   );
@@ -270,7 +306,9 @@ function OfferItem({
             <p className="text-sm text-muted-foreground">{offer.description}</p>
           )}
           <p className="text-sm">
-            Rabat {formatTerms(offer.discountPerLiter, offer.maxLiters)}
+            {benefitTerms(offer)
+              ? `Rabat ${benefitTerms(offer)}`
+              : "Nagroda do odbioru w kasie"}
           </p>
         </div>
         <span className="shrink-0 font-semibold" data-testid="offer-cost">
@@ -294,10 +332,10 @@ function OfferItem({
           className="flex flex-col gap-3 rounded-xl bg-muted p-3"
         >
           <p className="text-sm">
-            Wymienisz <strong>{formatPoints(confirmed!.pointsCost)}</strong> na
-            kupon „{confirmed!.name}”: rabat{" "}
-            {formatTerms(confirmed!.discountPerLiter, confirmed!.maxLiters)}{" "}
-            przy jednym tankowaniu.
+            Wymienisz <strong>{formatPoints(confirmed!.pointsCost)}</strong> na{" "}
+            {benefitTerms(confirmed!)
+              ? `kupon „${confirmed!.name}”: rabat ${benefitTerms(confirmed!)} przy jednym tankowaniu.`
+              : `nagrodę „${confirmed!.name}”, do odbioru w kasie.`}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button onClick={onConfirm} disabled={locked} autoFocus>

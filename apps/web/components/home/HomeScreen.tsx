@@ -102,7 +102,7 @@ export function HomeScreen() {
         <Shortcut
           href="/kupony"
           icon={TicketCheck}
-          title="Moje kupony"
+          title="Moje kupony i nagrody"
           description="Aktywuj i pokaż przy kasie"
         />
         <Shortcut

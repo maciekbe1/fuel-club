@@ -1,13 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { useWatch } from "react-hook-form";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, NetworkError } from "@/lib/api/problem";
-import { formatTerms } from "@/lib/format";
+import { benefitTerms, isProduct } from "@/lib/format";
+import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { cn } from "@/lib/utils";
-import { useCouponCalculation, useCouponTerms } from "../hooks";
+import {
+  useCouponCalculation,
+  useCouponTerms,
+  useForgetCouponPreviews,
+  useHandOverReward,
+} from "../hooks";
 import {
   looksLikeCardCode,
   looksLikeCouponCode,
@@ -30,6 +37,8 @@ function previewError(error: unknown) {
     return "Nie znaleziono aktywnego kuponu tego klienta o tym kodzie. Kupon musi być aktywowany w telefonie klienta.";
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
     return "Ten kupon został już wykorzystany.";
+  if (error instanceof ApiError && error.code === "rewards.coupon_wrong_kind")
+    return "To kod nagrody - rabatu nie da się przeliczyć. Wydaj nagrodę przyciskiem.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
     return "Nie znaleziono aktywnej karty o tym kodzie.";
   if (error instanceof ApiError && error.status === 401)
@@ -82,6 +91,8 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
 
   const hasCoupon = couponText.trim() !== "";
   const couponField = form.register("couponCode");
+  // The last handed-over reward; cleared when the cashier types or scans another code.
+  const [handedOver, setHandedOver] = useState<string | null>(null);
 
   return (
     <section
@@ -89,7 +100,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
       className="flex flex-col gap-3 rounded-2xl border p-4"
     >
       <h2 id="coupon-heading" className="font-medium">
-        Kupon klienta (opcjonalnie)
+        Kupon lub nagroda klienta (opcjonalnie)
       </h2>
       <FormField id="couponCode" label="Kod kuponu" error={errors.couponCode}>
         <Input
@@ -102,6 +113,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           {...couponField}
           onChange={(event) => {
             forget();
+            setHandedOver(null);
             return couponField.onChange(event);
           }}
         />
@@ -113,6 +125,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
         subject="kuponu"
         onScan={(code) => {
           forget();
+          setHandedOver(null);
           form.setValue("couponCode", code, {
             shouldValidate: true,
             shouldDirty: true,
@@ -138,14 +151,35 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
         </p>
       )}
 
-      {terms.isSuccess && couponCode && cardCode && (
+      {terms.isSuccess && couponCode && cardCode && isProduct(terms.data) && (
+        <RewardHandover
+          offerName={terms.data.offerName}
+          cardCode={cardCode}
+          couponCode={couponCode}
+          locked={locked}
+          onDone={() => {
+            setHandedOver(terms.data.offerName);
+            form.setValue("couponCode", "", { shouldDirty: true });
+          }}
+        />
+      )}
+      {handedOver && (
+        <p
+          role="status"
+          className="rounded-xl border border-emerald-600/30 bg-emerald-50 p-3 text-sm font-medium text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+        >
+          Wydano nagrodę „{handedOver}”. Bez tankowania i bez punktów.
+        </p>
+      )}
+
+      {terms.isSuccess && couponCode && cardCode && !isProduct(terms.data) && (
         <div
           data-testid="coupon-terms"
           className="flex flex-col gap-3 rounded-xl bg-muted p-3 text-sm"
         >
           <p>
             <span className="font-semibold">{terms.data.offerName}</span>:{" "}
-            {formatTerms(terms.data.discountPerLiter, terms.data.maxLiters)}
+            {benefitTerms(terms.data)}
           </p>
 
           {sameCodes && computed?.result && (
@@ -210,5 +244,104 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** Answers where the server certainly handed nothing over; any other failure is an unknown outcome. */
+function busyMessage(error: unknown) {
+  if (error instanceof ApiError && error.status === 429)
+    return "Limit prób na tej kasie został wyczerpany. Nagroda nie została wydana - spróbuj za chwilę.";
+  if (error instanceof ApiError && error.code === "loyalty.customer_busy")
+    return "Trwa inna operacja tego klienta. Nagroda nie została wydana - spróbuj za chwilę.";
+  return null;
+}
+
+function handoverError(error: unknown) {
+  if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
+    return "Ta nagroda została już wydana.";
+  if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
+    return "Nie znaleziono aktywnej nagrody tego klienta o tym kodzie.";
+  if (error instanceof ApiError && error.code === "loyalty.card_not_found")
+    return "Nie znaleziono aktywnej karty o tym kodzie.";
+  if (error instanceof ApiError && error.status === 401)
+    return "Sesja wygasła. Zaloguj się ponownie.";
+  return "Nie udało się wydać nagrody.";
+}
+
+/**
+ * A product reward (ADR 0013): handed over instead of a purchase - no amount, no points. After an
+ * unknown outcome only "Ponów wydanie" with the same key is offered, so it is never handed over twice.
+ */
+function RewardHandover({
+  offerName,
+  cardCode,
+  couponCode,
+  locked,
+  onDone,
+}: {
+  offerName: string;
+  cardCode: string;
+  couponCode: string;
+  locked: boolean;
+  onDone: () => void;
+}) {
+  const handOver = useHandOverReward();
+  const forgetPreviews = useForgetCouponPreviews();
+  const busy = handOver.isError ? busyMessage(handOver.error) : null;
+  const unknown =
+    handOver.isError && !busy && keepsIdempotencyKey(handOver.error)
+      ? handOver.error
+      : null;
+
+  const send = async () => {
+    try {
+      await handOver.mutateAsync({ cardCode, couponCode });
+      forgetPreviews();
+      onDone();
+    } catch {
+      // Shown below from the mutation state.
+    }
+  };
+
+  return (
+    <div
+      data-testid="reward-handover"
+      className="flex flex-col gap-3 rounded-xl bg-muted p-3 text-sm"
+    >
+      <p>
+        <span className="font-semibold">{offerName}</span>: nagroda do wydania.
+        Nie zapisuj tankowania z tym kodem.
+      </p>
+      {busy && (
+        <p role="alert" className="text-destructive">
+          {busy}
+        </p>
+      )}
+      {handOver.isError && !unknown && !busy && (
+        <p role="alert" className="text-destructive">
+          {handoverError(handOver.error)}
+        </p>
+      )}
+      {unknown && (
+        <p role="alert" className="font-medium">
+          {unknown instanceof NetworkError
+            ? "Nie dotarła odpowiedź serwera - nie wiadomo, czy nagroda została wydana."
+            : "Nie wiadomo, czy nagroda została wydana."}{" "}
+          Ponów: nagroda nie zostanie wydana dwa razy.
+        </p>
+      )}
+      <Button
+        type="button"
+        className="self-start"
+        disabled={locked || handOver.isPending}
+        onClick={send}
+      >
+        {handOver.isPending
+          ? "Wydawanie…"
+          : unknown
+            ? "Ponów wydanie"
+            : "Wydaj nagrodę"}
+      </Button>
+    </div>
   );
 }

@@ -21,6 +21,7 @@ Jeden `AppDbContext` (EF Core + Npgsql), dziedziczy po `IdentityDbContext<Applic
 | `*_LoyaltyCards` | `LoyaltyCards` - karty, jedna aktywna na użytkownika |
 | `*_IdempotencyRecords` | `IdempotencyRecords` - klucze idempotencji i zapisane odpowiedzi |
 | `*_CouponRedeemedPurchaseOwner` | złożony FK `Coupons (RedeemedPurchaseId, UserId)` → `FuelPurchases (Id, UserId)` zamiast FK po samym `Id`, `UNIQUE (Id, UserId)` w `FuelPurchases`; najpierw sprawdza dane - kupon odebrany na cudzy zakup zatrzymuje migrację, bez przepisywania |
+| `*_ProductRewards` | `RewardOffers.Kind`, `Coupons.Kind` (istniejące: `FuelDiscount`), nullowalne stawka i limit, `CHECK` rodzaju, FK `(OfferId, Kind)`; tabela `RewardHandovers`, `Coupons.RedeemedHandoverId` z FK złożonym; nowy `CK_Coupons_State` ([ADR 0013](/decyzje/0013-nagrody-produktowe/)); `Down` zatrzymuje się, gdy istnieją nagrody (stary schemat ich nie pomieści) |
 | `*_AssistantTurns` | `assistant_turns` - metadane tur czatu ([ADR 0008](/decyzje/0008-slady-i-evale-czatu/)) |
 | `*_Observability` | `security_events`; `assistant_turns.ReviewedAt`, `ReviewedBy` ([ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/)) |
 | `*_DataProtectionKeys` | `DataProtectionKeys` - klucze Data Protection ([ADR 0010](/decyzje/0010-obrazy-i-hosting/)) |
@@ -42,8 +43,9 @@ Jeden `AppDbContext` (EF Core + Npgsql), dziedziczy po `IdentityDbContext<Applic
 | --- | --- |
 | `LoyaltyAccounts` | saldo użytkownika, `CHECK (Balance >= 0)`, `xmin` jako token współbieżności |
 | `FuelPurchases` | tankowania; `UNIQUE (StationCode, RegisterCode, SaleDate, ReceiptNumber)`; `GrossAmount`, `Discount`, `PaidAmount` |
-| `RewardOffers` | oferty (rabat na litr); bez usuwania, tylko wyłączanie - [Rewards](/moduly/rewards/) |
-| `Coupons` | kupony klientów ze snapshotem oferty; `CHECK` stanu, `UNIQUE (Code)`, `UNIQUE (RedeemedPurchaseId)`; odbiór tylko na zakup właściciela (złożony FK) - [Rewards](/moduly/rewards/#dane) |
+| `RewardOffers` | oferty (rabat na litr albo nagroda produktowa); bez usuwania, tylko wyłączanie - [Rewards](/moduly/rewards/) |
+| `Coupons` | kupony klientów ze snapshotem oferty; `CHECK` stanu, `UNIQUE (Code)`, `UNIQUE (RedeemedPurchaseId)`; odbiór tylko na zakup albo wydanie właściciela (złożone FK) - [Rewards](/moduly/rewards/#dane) |
+| `RewardHandovers` | wydania nagród w kasie: kasjer, stacja, kasa, czas; `UNIQUE (CouponId)` - [Rewards](/moduly/rewards/#rewardhandovers) |
 | `PointsLedgerEntries` | historia zmian salda, tylko dopisywana; `UNIQUE (Type, SourceId)`; kolejność po `Sequence` |
 | `LoyaltyCards` | karty; `UNIQUE (Code)`, `UNIQUE (UserId) WHERE RevokedAt IS NULL` |
 | `assistant_turns` | metadane tury czatu, bez treści: `CorrelationId` (`UNIQUE`), `UserPseudonym` (HMAC), dostawca, model, wersja promptu, `Demo`, `StartedAt`, `FirstEventMs`, `TotalMs` (`CHECK >= 0`), `Outcome` (`Done`/`Error`/`Cancelled`), `ErrorCode`, `ToolCalls` (`CHECK >= 0`), `Tools` (`jsonb`: nazwa, stan, czas), `InputTokens`/`OutputTokens` (`null` = nieznane). Indeksy `StartedAt` i `(UserPseudonym, StartedAt)`. `ReviewedAt`, `ReviewedBy` (kolejka przeglądu). Bez FK do użytkownika; retencja `Observability:TraceRetention` - [Assistant](/moduly/assistant/#dane) |

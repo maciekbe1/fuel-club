@@ -10,8 +10,9 @@ public sealed record AdminRewardResponse(
     string Name,
     string Description,
     int PointsCost,
-    decimal DiscountPerLiter,
-    decimal MaxLiters,
+    string Kind,
+    decimal? DiscountPerLiter,
+    decimal? MaxLiters,
     bool IsActive,
     int Version,
     DateTimeOffset CreatedAt,
@@ -23,21 +24,27 @@ public sealed record AdminRewardsResponse(IReadOnlyList<AdminRewardResponse> Ite
 /// <summary>
 /// The whole form. Numbers and <c>IsActive</c> are nullable only to report a missing field as
 /// required (not as "out of range", and a missing isActive must not deactivate an offer).
+/// <c>Kind</c>: FuelDiscount (default) or Product; a product sends no per-liter terms.
 /// </summary>
 public sealed record CreateRewardRequest(
     string? Name,
     string? Description,
     int? PointsCost,
+    string? Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
     bool? IsActive
 );
 
-/// <summary>The whole form plus the version it was loaded with (PUT, also for activate/deactivate).</summary>
+/// <summary>
+/// The whole form plus the version it was loaded with (PUT, also for activate/deactivate).
+/// <c>Kind</c> may be sent but must match the offer: it never changes (400 rewards.kind_immutable).
+/// </summary>
 public sealed record UpdateRewardRequest(
     string? Name,
     string? Description,
     int? PointsCost,
+    string? Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
     bool? IsActive,
@@ -94,14 +101,18 @@ public static class AdminRewardEndpoints
         CancellationToken cancellationToken
     )
     {
+        var kind = ParseKind(request.Kind ?? nameof(RewardKind.FuelDiscount));
         var (input, errors) = ValidateForm(
             request.Name,
             request.Description,
             request.PointsCost,
+            kind ?? RewardKind.FuelDiscount,
             request.DiscountPerLiter,
             request.MaxLiters,
             request.IsActive
         );
+        if (kind is null)
+            errors.Add(new("kind", RewardsErrorCodes.InvalidFormat));
         if (errors.Count > 0)
             return RewardsProblems.Validation("Offer is not valid", errors);
 
@@ -111,6 +122,7 @@ public static class AdminRewardEndpoints
             Name = input.Name!,
             Description = input.Description!,
             PointsCost = input.PointsCost,
+            Kind = input.Kind,
             DiscountPerLiter = input.DiscountPerLiter,
             MaxLiters = input.MaxLiters,
             IsActive = request.IsActive!.Value,
@@ -134,14 +146,30 @@ public static class AdminRewardEndpoints
         CancellationToken cancellationToken
     )
     {
+        // The kind is fixed at creation and offers are never deleted, so reading it first is race-free.
+        var stored = await db
+            .RewardOffers.Where(offer => offer.Id == id)
+            .Select(offer => (RewardKind?)offer.Kind)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (stored is not { } offerKind)
+            return RewardsProblems.OfferNotFound();
         var (input, errors) = ValidateForm(
             request.Name,
             request.Description,
             request.PointsCost,
+            offerKind,
             request.DiscountPerLiter,
             request.MaxLiters,
             request.IsActive
         );
+        if (request.Kind is not null)
+        {
+            var kind = ParseKind(request.Kind);
+            if (kind is null)
+                errors.Add(new("kind", RewardsErrorCodes.InvalidFormat));
+            else if (kind != offerKind)
+                errors.Add(new("kind", RewardsErrorCodes.KindImmutable));
+        }
         if (request.Version is null)
             errors.Add(new("version", RewardsErrorCodes.RequiredField));
         else if (request.Version < 1)
@@ -158,7 +186,7 @@ public static class AdminRewardEndpoints
                     "DiscountPerLiter" = {input.DiscountPerLiter}, "MaxLiters" = {input.MaxLiters},
                     "IsActive" = {request.IsActive!.Value}, "Version" = "Version" + 1, "UpdatedAt" = now()
                 WHERE "Id" = {id} AND "Version" = {request.Version!.Value}
-                RETURNING "Id", "Name", "Description", "PointsCost", "DiscountPerLiter", "MaxLiters",
+                RETURNING "Id", "Name", "Description", "PointsCost", "Kind", "DiscountPerLiter", "MaxLiters",
                           "IsActive", "Version", "CreatedAt", "UpdatedAt"
                 """
             )
@@ -184,6 +212,7 @@ public static class AdminRewardEndpoints
         offer.Name,
         offer.Description,
         offer.PointsCost,
+        offer.Kind.ToString(),
         offer.DiscountPerLiter,
         offer.MaxLiters,
         offer.IsActive,
@@ -196,27 +225,26 @@ public static class AdminRewardEndpoints
         string? name,
         string? description,
         int? pointsCost,
+        RewardKind kind,
         decimal? discountPerLiter,
         decimal? maxLiters,
         bool? isActive
     )
     {
+        // Missing per-liter terms are reported by the rules (required for a fuel discount only).
         var input = RewardOfferRules.Normalize(
             new RewardOfferInput(
                 name,
                 description,
                 pointsCost ?? 0,
-                discountPerLiter ?? 0m,
-                maxLiters ?? 0m
+                kind,
+                discountPerLiter,
+                maxLiters
             )
         );
         var missing = new List<string>();
         if (pointsCost is null)
             missing.Add("pointsCost");
-        if (discountPerLiter is null)
-            missing.Add("discountPerLiter");
-        if (maxLiters is null)
-            missing.Add("maxLiters");
         if (isActive is null)
             missing.Add("isActive");
 
@@ -233,4 +261,12 @@ public static class AdminRewardEndpoints
         );
         return (input, errors);
     }
+
+    private static RewardKind? ParseKind(string value) =>
+        value switch
+        {
+            nameof(RewardKind.FuelDiscount) => RewardKind.FuelDiscount,
+            nameof(RewardKind.Product) => RewardKind.Product,
+            _ => null,
+        };
 }

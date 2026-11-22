@@ -221,7 +221,7 @@ test("loading error of the catalog can be retried", async ({
   });
   healthy = true;
   await alert.getByRole("button", { name: "Spróbuj ponownie" }).click();
-  await expect(page.getByRole("list", { name: "Oferty" })).toBeVisible();
+  await expect(page.getByTestId("offer").first()).toBeVisible();
 });
 
 test("leaving the screen with an unknown outcome keeps the lock and the key", async ({

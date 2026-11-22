@@ -5,7 +5,13 @@ export type Reward = components["schemas"]["RewardResponse"];
 export type ExchangeResult = components["schemas"]["ExchangeResponse"];
 
 /** The offer and the version whose terms the customer confirmed; the name is only for messages. */
-export type ExchangeVars = { id: string; version: number; name: string };
+/** `product` only changes the message; older stored operations may not have it. */
+export type ExchangeVars = {
+  id: string;
+  version: number;
+  name: string;
+  product?: boolean;
+};
 
 export const rewardsService = {
   list: () => unwrap(api.GET("/api/rewards")),

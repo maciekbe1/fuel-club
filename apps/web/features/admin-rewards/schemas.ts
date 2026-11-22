@@ -16,25 +16,46 @@ const decimal = (label: string, places: number, max: number) =>
     }, `Wartość musi być większa od 0 i nie większa niż ${max}`);
 
 /** Same limits as RewardOfferRules on the server; the server stays the authority. */
-export const rewardSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Podaj nazwę")
-    .max(100, "Nazwa może mieć najwyżej 100 znaków"),
-  description: z.string().trim().max(500, "Opis może mieć najwyżej 500 znaków"),
-  pointsCost: z
-    .string()
-    .trim()
-    .regex(/^\d{1,7}$/, "Podaj koszt jako liczbę całkowitą")
-    .refine(
-      (value) => Number(value) >= 1 && Number(value) <= 1_000_000,
-      "Koszt musi być od 1 do 1 000 000 pkt",
-    ),
-  discountPerLiter: decimal("rabat na litr", 2, 10),
-  maxLiters: decimal("limit litrów", 3, 1000),
-  isActive: z.boolean(),
-});
+export const rewardSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Podaj nazwę")
+      .max(100, "Nazwa może mieć najwyżej 100 znaków"),
+    description: z
+      .string()
+      .trim()
+      .max(500, "Opis może mieć najwyżej 500 znaków"),
+    pointsCost: z
+      .string()
+      .trim()
+      .regex(/^\d{1,7}$/, "Podaj koszt jako liczbę całkowitą")
+      .refine(
+        (value) => Number(value) >= 1 && Number(value) <= 1_000_000,
+        "Koszt musi być od 1 do 1 000 000 pkt",
+      ),
+    kind: z.enum(["FuelDiscount", "Product"]),
+    // Checked below only for a fuel discount: a product has no per-liter terms.
+    discountPerLiter: z.string(),
+    maxLiters: z.string(),
+    isActive: z.boolean(),
+  })
+  .superRefine((values, ctx) => {
+    if (values.kind !== "FuelDiscount") return;
+    for (const [field, schema] of [
+      ["discountPerLiter", decimal("rabat na litr", 2, 10)],
+      ["maxLiters", decimal("limit litrów", 3, 1000)],
+    ] as const) {
+      const result = schema.safeParse(values[field]);
+      if (!result.success)
+        ctx.addIssue({
+          code: "custom",
+          path: [field],
+          message: result.error.issues[0]?.message ?? "Niepoprawna wartość",
+        });
+    }
+  });
 
 export type RewardValues = z.infer<typeof rewardSchema>;
 
@@ -45,8 +66,10 @@ export function toRewardBody(values: RewardValues): CreateRewardBody {
     name: values.name.trim(),
     description: values.description.trim(),
     pointsCost: Number(values.pointsCost),
-    discountPerLiter: num(values.discountPerLiter),
-    maxLiters: num(values.maxLiters),
+    kind: values.kind,
+    discountPerLiter:
+      values.kind === "Product" ? null : num(values.discountPerLiter),
+    maxLiters: values.kind === "Product" ? null : num(values.maxLiters),
     isActive: values.isActive,
   };
 }
@@ -61,8 +84,12 @@ export function toRewardValues(offer: AdminReward): RewardValues {
     name: offer.name,
     description: offer.description,
     pointsCost: String(offer.pointsCost),
-    discountPerLiter: text.format(offer.discountPerLiter),
-    maxLiters: text.format(offer.maxLiters),
+    kind: offer.kind === "Product" ? "Product" : "FuelDiscount",
+    discountPerLiter:
+      offer.discountPerLiter === null
+        ? ""
+        : text.format(offer.discountPerLiter),
+    maxLiters: offer.maxLiters === null ? "" : text.format(offer.maxLiters),
     isActive: offer.isActive,
   };
 }
@@ -71,6 +98,7 @@ export const emptyReward: RewardValues = {
   name: "",
   description: "",
   pointsCost: "",
+  kind: "FuelDiscount",
   discountPerLiter: "",
   maxLiters: "",
   isActive: true,
@@ -94,5 +122,7 @@ export const rewardMessages: Record<string, string> = {
     "Limit musi być większy od 0 i nie większy niż 1000 l.",
   "rewards.max_liters_precision":
     "Limit może mieć najwyżej 3 miejsca po przecinku.",
+  "rewards.not_for_product": "Nagroda nie ma rabatu ani limitu litrów.",
+  "rewards.kind_immutable": "Rodzaju oferty nie można zmienić.",
   default: "Niepoprawna wartość.",
 };

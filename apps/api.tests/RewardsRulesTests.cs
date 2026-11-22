@@ -121,7 +121,14 @@ public sealed class RewardOfferRulesTests
     ) =>
         RewardOfferRules.Validate(
             RewardOfferRules.Normalize(
-                new RewardOfferInput(name, description, cost, rate, maxLiters)
+                new RewardOfferInput(
+                    name,
+                    description,
+                    cost,
+                    RewardKind.FuelDiscount,
+                    rate,
+                    maxLiters
+                )
             )
         );
 

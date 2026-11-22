@@ -34,6 +34,17 @@ internal static class RewardsProblems
             RewardsErrorCodes.CouponRedeemed
         );
 
+    /// <summary>
+    /// A product at the fuel purchase or a fuel discount at the handover. Checked only after the
+    /// owner, so it never reveals someone else's coupon.
+    /// </summary>
+    public static ProblemHttpResult CouponWrongKind() =>
+        ApiProblems.Problem(
+            StatusCodes.Status409Conflict,
+            "This coupon is redeemed differently",
+            RewardsErrorCodes.CouponWrongKind
+        );
+
     /// <summary>The coupon row is locked (by another transaction); transient, retried with the same key.</summary>
     public static ProblemHttpResult CouponBusy(HttpContext http) =>
         ApiProblems.Busy(http, "The coupon is being changed", RewardsErrorCodes.CouponBusy);

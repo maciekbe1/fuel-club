@@ -13,6 +13,7 @@
       "id": "offers",
       "category": "oferty",
       "message": "Jakie są dostępne oferty?",
+      "setup": { "offer": true },
       "expect": { "tools": ["list_available_rewards:ok"], "end": "done", "answerContains": ["Dostępne oferty"] }
     },
     {

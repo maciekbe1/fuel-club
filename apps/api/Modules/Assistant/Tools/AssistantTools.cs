@@ -50,8 +50,9 @@ public sealed record BalanceData(int Balance);
 public sealed record RewardSummary(
     string Name,
     int PointsCost,
-    decimal DiscountPerLiter,
-    decimal MaxLiters,
+    string Kind,
+    decimal? DiscountPerLiter,
+    decimal? MaxLiters,
     int PointsMissing
 );
 
@@ -95,12 +96,14 @@ public sealed record PurchasePointsData(
     string Rule
 );
 
+/// <summary>Kind: FuelDiscount (with per-liter terms) or Product (a reward handed over, no terms).</summary>
 public sealed record CouponSummary(
     Guid Id,
     string OfferName,
+    string Kind,
     string Status,
-    decimal DiscountPerLiter,
-    decimal MaxLiters
+    decimal? DiscountPerLiter,
+    decimal? MaxLiters
 );
 
 public sealed record ProposalData(Guid ProposalId, Guid CouponId, string OfferName);
@@ -200,6 +203,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             .Select(offer => new RewardSummary(
                 offer.Name,
                 offer.PointsCost,
+                offer.Kind,
                 offer.DiscountPerLiter,
                 offer.MaxLiters,
                 Missing(offer.PointsCost, balance)
@@ -253,14 +257,16 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
         var own = (
             await MyCouponsEndpoints
                 .Own(db, context.UserId)
+                // Fuel discounts only: a product has no amount in zł to compare.
                 .Where(c => c.Status == CouponStatus.Purchased || c.Status == CouponStatus.Active)
+                .Where(c => c.Kind == RewardKind.FuelDiscount)
                 .Select(c => new
                 {
                     c.Id,
                     c.OfferName,
                     c.Status,
-                    c.DiscountPerLiter,
-                    c.MaxLiters,
+                    DiscountPerLiter = c.DiscountPerLiter!.Value,
+                    MaxLiters = c.MaxLiters!.Value,
                 })
                 .ToListAsync(ct)
         )
@@ -274,9 +280,10 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             .ThenBy(c => c.CouponId)
             .ToList();
         var offers = (await CatalogEndpoint.ActiveOffers(db).ToListAsync(ct))
+            .Where(o => o.Kind == nameof(RewardKind.FuelDiscount))
             .Select(o =>
             {
-                var (discount, covered) = Benefit(o.DiscountPerLiter, o.MaxLiters);
+                var (discount, covered) = Benefit(o.DiscountPerLiter!.Value, o.MaxLiters!.Value);
                 return new OfferOption(
                     o.Name,
                     o.PointsCost,
@@ -370,6 +377,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             .Select(coupon => new CouponSummary(
                 coupon.Id,
                 coupon.OfferName,
+                coupon.Kind.ToString(),
                 coupon.Status.ToString(),
                 coupon.DiscountPerLiter,
                 coupon.MaxLiters
@@ -400,6 +408,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             {
                 c.Status,
                 c.OfferName,
+                c.Kind,
                 c.DiscountPerLiter,
                 c.MaxLiters,
             })
@@ -422,6 +431,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
                 proposal.ProposalId,
                 couponId,
                 coupon.OfferName,
+                coupon.Kind.ToString(),
                 coupon.DiscountPerLiter,
                 coupon.MaxLiters,
                 proposal.ExpiresAt,

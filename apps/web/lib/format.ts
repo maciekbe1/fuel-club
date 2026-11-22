@@ -16,3 +16,22 @@ export function formatTerms(discountPerLiter: number, maxLiters: number) {
   const max = Math.floor((product + 500) / 1000) / 100;
   return `${money.format(discountPerLiter)}/l, do ${liters.format(maxLiters)} l (maks. ${money.format(max)})`;
 }
+
+type Benefit = {
+  kind?: string | null;
+  discountPerLiter?: number | null;
+  maxLiters?: number | null;
+};
+
+/** A product reward (ADR 0013) is handed over at the till; it has no per-liter terms. */
+export const isProduct = (benefit: { kind?: string | null }) =>
+  benefit.kind === "Product";
+
+/** Per-liter terms of a fuel discount; null for a product reward. */
+export function benefitTerms(benefit: Benefit) {
+  return isProduct(benefit) ||
+    benefit.discountPerLiter == null ||
+    benefit.maxLiters == null
+    ? null
+    : formatTerms(benefit.discountPerLiter, benefit.maxLiters);
+}

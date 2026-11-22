@@ -6,8 +6,9 @@ public sealed record RewardOfferInput(
     string? Name,
     string? Description,
     int PointsCost,
-    decimal DiscountPerLiter,
-    decimal MaxLiters
+    RewardKind Kind,
+    decimal? DiscountPerLiter,
+    decimal? MaxLiters
 );
 
 public sealed record RewardsValidationError(string Field, string Code)
@@ -53,16 +54,28 @@ public static class RewardOfferRules
         if (input.PointsCost is < 1 or > MaxPointsCost)
             errors.Add(new("pointsCost", RewardsErrorCodes.PointsCostOutOfRange));
 
-        if (input.DiscountPerLiter <= 0m || input.DiscountPerLiter > MaxDiscountPerLiter)
+        if (input.Kind == RewardKind.Product)
+        {
+            // A product has no per-liter terms; a value sent anyway is a form mistake, not ignored.
+            if (input.DiscountPerLiter is not null)
+                errors.Add(new("discountPerLiter", RewardsErrorCodes.NotForProduct));
+            if (input.MaxLiters is not null)
+                errors.Add(new("maxLiters", RewardsErrorCodes.NotForProduct));
+            return errors;
+        }
+
+        if (input.DiscountPerLiter is not { } rate)
+            errors.Add(new("discountPerLiter", RewardsErrorCodes.RequiredField));
+        else if (rate <= 0m || rate > MaxDiscountPerLiter)
             errors.Add(new("discountPerLiter", RewardsErrorCodes.DiscountPerLiterOutOfRange));
-        else if (
-            !FuelPurchaseRules.HasAtMostDecimals(input.DiscountPerLiter, DiscountPerLiterScale)
-        )
+        else if (!FuelPurchaseRules.HasAtMostDecimals(rate, DiscountPerLiterScale))
             errors.Add(new("discountPerLiter", RewardsErrorCodes.DiscountPerLiterPrecision));
 
-        if (input.MaxLiters <= 0m || input.MaxLiters > MaxDiscountLiters)
+        if (input.MaxLiters is not { } liters)
+            errors.Add(new("maxLiters", RewardsErrorCodes.RequiredField));
+        else if (liters <= 0m || liters > MaxDiscountLiters)
             errors.Add(new("maxLiters", RewardsErrorCodes.MaxLitersOutOfRange));
-        else if (!FuelPurchaseRules.HasAtMostDecimals(input.MaxLiters, MaxLitersScale))
+        else if (!FuelPurchaseRules.HasAtMostDecimals(liters, MaxLitersScale))
             errors.Add(new("maxLiters", RewardsErrorCodes.MaxLitersPrecision));
 
         return errors;

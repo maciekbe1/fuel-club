@@ -78,6 +78,9 @@ public sealed class CouponRedemption(AppDbContext db, IOptions<RewardsOptions> o
 
         if (coupons.SingleOrDefault() is not { } coupon)
             return new CouponHoldResult(null, RewardsProblems.CouponNotFound());
+        // Only after the owner: a product is handed over, not applied to fuel.
+        if (coupon.Kind != RewardKind.FuelDiscount)
+            return new CouponHoldResult(null, RewardsProblems.CouponWrongKind());
         if (coupon.Status == CouponStatus.Redeemed)
             return new CouponHoldResult(null, RewardsProblems.CouponRedeemed());
         // Only an active coupon is usable; any other state with a code is treated as missing.
@@ -85,8 +88,8 @@ public sealed class CouponRedemption(AppDbContext db, IOptions<RewardsOptions> o
             return new CouponHoldResult(null, RewardsProblems.CouponNotFound());
 
         var result = CouponDiscount.Calculate(
-            coupon.DiscountPerLiter,
-            coupon.MaxLiters,
+            coupon.DiscountPerLiter!.Value,
+            coupon.MaxLiters!.Value,
             liters,
             grossAmount
         );

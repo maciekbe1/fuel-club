@@ -171,7 +171,7 @@ test("home screen links to existing card, history, offers, coupons and assistant
     [/Karta/, "/karta", "Twoja karta"],
     [/Historia punktów/, "/historia", "Historia punktów"],
     [/Oferty/, "/oferty", "Oferty"],
-    [/Moje kupony/, "/kupony", "Moje kupony"],
+    [/Moje kupony/, "/kupony", "Moje kupony i nagrody"],
     [/Asystent/, "/czat", "Asystent"],
   ] as const) {
     await expect(shortcuts.getByRole("link", { name })).toHaveAttribute(

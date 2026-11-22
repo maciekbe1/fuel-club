@@ -27,8 +27,9 @@ public sealed record ChatConfirmationEvent(
     Guid ProposalId,
     Guid CouponId,
     string OfferName,
-    decimal DiscountPerLiter,
-    decimal MaxLiters,
+    string Kind,
+    decimal? DiscountPerLiter,
+    decimal? MaxLiters,
     DateTimeOffset ExpiresAt,
     string Token
 );

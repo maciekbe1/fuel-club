@@ -77,7 +77,10 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.coupon_not_found` | - | `404`: brak kuponu albo cudzy kupon (także kupon innego klienta przy zakupie) |
 | `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd, zakup) |
 | `rewards.coupon_busy` | - | `503` + `Retry-After`: wiersz kuponu zablokowany dłużej niż `Rewards:CouponLockTimeout` przez inną transakcję (nie przez aktywację - kod trwającej aktywacji nie jest jeszcze widoczny, więc zakup dostaje `404`); ponów zakup z tym samym kluczem (niezapisywany) |
-| `rewards.invalid_format` | `couponCode` | kod nie jest kodem kuponu (`K` + 26 znaków; np. kod karty); przy zakupie także pusty tekst - brak kuponu to brak pola albo `null` |
+| `rewards.not_for_product` | `discountPerLiter`, `maxLiters` | nagroda produktowa nie ma stawki ani limitu |
+| `rewards.kind_immutable` | `kind` | `PUT` z innym rodzajem niż zapisany |
+| `rewards.coupon_wrong_kind` | - | `409`: kod nagrody przy zakupie paliwa (także podgląd z kwotą) albo kod rabatu przy wydaniu nagrody; po sprawdzeniu właściciela |
+| `rewards.invalid_format` | `couponCode`, `kind` | kod nie jest kodem kuponu (`K` + 26 znaków; np. kod karty); przy zakupie także pusty tekst - brak kuponu to brak pola albo `null` |
 | `assistant.validation_failed` | - | `400`: błędy pól czatu w `errors` |
 | `assistant.required_field` | `message` | pusta wiadomość (po przycięciu) |
 | `assistant.too_long` | `message`, `history` | wiadomość > `Assistant:MaxMessageLength` znaków albo historia > `Assistant:MaxHistoryItems` wpisów |

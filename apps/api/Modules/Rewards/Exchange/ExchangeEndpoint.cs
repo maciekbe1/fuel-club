@@ -84,6 +84,7 @@ public static class ExchangeEndpoint
             OfferId = offer.Id,
             OfferName = offer.Name,
             PointsCost = offer.PointsCost,
+            Kind = offer.Kind,
             DiscountPerLiter = offer.DiscountPerLiter,
             MaxLiters = offer.MaxLiters,
             Status = CouponStatus.Purchased,

@@ -307,6 +307,26 @@ Review (`/code-review high`, 8 uwag: 7 przyjętych, 1 odrzucona):
   - dokumentacja;
 - odrzucona: „ostatni zakup” wg czasu rejestracji zamiast daty sprzedaży. Właściciel ustalił datę sprzedaży; przypadek paragonu z datą wsteczną zgłoszony do decyzji.
 
+## P13 - nagrody produktowe (2026-11-22)
+
+ADR 0013 zrealizowany:
+- `Kind` w ofercie i kuponie (`FuelDiscount`/`Product`), nullowalne stawka i limit, `CHECK` rodzaju, FK `(OfferId, Kind)`;
+- `RewardHandovers` + `Coupons.RedeemedHandoverId` (FK złożony, bez cyklu); `CK_Coupons_State` rozróżnia odbiór z zakupem i wydanie;
+- `POST /api/cashier/reward-handovers`: właściciel przed rodzajem, ten sam `404`; `409 coupon_wrong_kind` w obu kierunkach;
+- admin: `kind` przy tworzeniu, `kind_immutable`, `not_for_product`;
+- web: sekcje „Rabaty na paliwo”/„Nagrody”, „Moje kupony i nagrody”, „Aktywuj odbiór”, „Wydaj nagrodę” w kasie, rodzaj w formularzu admina;
+- demo: Kawa 150, Hot dog 250, Myjnia 600.
+
+Przy okazji: eval „offers” sam tworzy ofertę (zależał od danych innych testów).
+
+Testy: `dotnet test` 501/501 (1 pominięty na żywo); E2E 134/134 (nowe `product-rewards.spec`, nagroda w `admin.spec`).
+
+Review (`/code-review high`, 9 uwag, wszystkie przyjęte):
+- tekst aktywnej nagrody; opisy narzędzi i prompt Gemini (`gemini-v3`);
+- zły `kind` w `PUT` → `invalid_format`; kolejność podglądu jak zakup (regresja, sprawdzona mutacją);
+- błąd `kind` w formularzu admina; `429`/`customer_busy` przy wydaniu jako odmowa;
+- `Down` migracji zatrzymuje się przy nagrodach; opis podglądu w OpenAPI; ADR zgodny z kodem.
+
 ## Następny krok
 
 Otwarte:
@@ -315,4 +335,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-Dalej: nagrody (ADR, potem implementacja), potem P11 przekazanie do konsultanta (ADR 0012 przyjęty).
+Dalej: P11 przekazanie do konsultanta (ADR 0012 przyjęty).

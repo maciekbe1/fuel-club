@@ -8,7 +8,7 @@ import { FormAlert } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { ApiError, applyFieldErrors, NetworkError } from "@/lib/api/problem";
 import { keepsPendingOperation, usePendingVars } from "@/lib/idempotency";
-import { formatPoints, formatTerms } from "@/lib/format";
+import { benefitTerms, formatPoints } from "@/lib/format";
 import { CREATE_OPERATION, useCreateReward } from "../hooks";
 import {
   emptyReward,
@@ -24,6 +24,7 @@ const FIELDS = [
   "name",
   "description",
   "pointsCost",
+  "kind",
   "discountPerLiter",
   "maxLiters",
   "isActive",
@@ -74,12 +75,8 @@ export function CreateRewardForm() {
           <p>
             Tworzenie oferty „{restored.name}” (
             {formatPoints(restored.pointsCost ?? 0)},{" "}
-            {formatTerms(
-              restored.discountPerLiter ?? 0,
-              restored.maxLiters ?? 0,
-            )}
-            ) mogło się nie zakończyć. Ponów: oferta nie zostanie utworzona dwa
-            razy.
+            {benefitTerms(restored) ?? "nagroda"}) mogło się nie zakończyć.
+            Ponów: oferta nie zostanie utworzona dwa razy.
           </p>
           <Button type="button" onClick={() => send(restored)}>
             Ponów utworzenie

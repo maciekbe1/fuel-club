@@ -22,25 +22,31 @@ public sealed record CouponPreviewCalculation(
     int PointsAwarded
 );
 
-/// <summary>The coupon's terms; no customer data. <c>Calculation</c> is null without amount and liters.</summary>
+/// <summary>
+/// The coupon's terms; no customer data. <c>Calculation</c> is null without amount and liters, and
+/// always for a product (Kind = Product: the till hands it over instead of a purchase).
+/// </summary>
 public sealed record CouponPreviewResponse(
     string OfferName,
-    decimal DiscountPerLiter,
-    decimal MaxLiters,
+    string Kind,
+    decimal? DiscountPerLiter,
+    decimal? MaxLiters,
     CouponPreviewCalculation? Calculation
 );
 
 /// <summary>
 /// Read-only: no lock, nothing reserved or changed. Order: validation (400) -> active card (404) ->
 /// coupon of the card owner (404, the same for someone else's coupon, so a code does not reveal its
-/// owner) -> redeemed (409). A purchased coupon has no code, so it cannot be found by one.
+/// owner) -> with amount and liters, a product reward (409 wrong kind, the same order as the purchase)
+/// -> redeemed (409). A purchased coupon has no code, so it cannot be found by one.
 /// </summary>
 public static class CouponPreviewEndpoint
 {
     public const string RateLimitPolicy = "coupon-preview";
 
     public const string Description =
-        "Shows a coupon's discount for the scanned card. Without amount and liters returns the terms only. "
+        "Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; "
+        + "a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind. "
         + "Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429).";
 
     public static async Task<Results<Ok<CouponPreviewResponse>, ProblemHttpResult>> Handle(
@@ -98,6 +104,9 @@ public static class CouponPreviewEndpoint
             );
         if (coupon is null)
             return RewardsProblems.CouponNotFound();
+        var priced = request is { Amount: not null, Liters: not null };
+        if (priced && coupon.Kind != RewardKind.FuelDiscount)
+            return RewardsProblems.CouponWrongKind();
         if (coupon.Status == CouponStatus.Redeemed)
             return RewardsProblems.CouponRedeemed();
 
@@ -105,8 +114,8 @@ public static class CouponPreviewEndpoint
         if (request is { Amount: { } gross, Liters: { } litres })
         {
             var result = CouponDiscount.Calculate(
-                coupon.DiscountPerLiter,
-                coupon.MaxLiters,
+                coupon.DiscountPerLiter!.Value,
+                coupon.MaxLiters!.Value,
                 litres,
                 gross
             );
@@ -120,6 +129,7 @@ public static class CouponPreviewEndpoint
         return TypedResults.Ok(
             new CouponPreviewResponse(
                 coupon.OfferName,
+                coupon.Kind.ToString(),
                 coupon.DiscountPerLiter,
                 coupon.MaxLiters,
                 calculation

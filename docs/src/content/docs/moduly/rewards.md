@@ -1,17 +1,19 @@
 ---
 title: Rewards (oferty i kupony)
-description: Oferty z rabatem na litr, kupony klientów, kod kuponu i obliczenie rabatu.
+description: Oferty z rabatem na litr i nagrody produktowe, kupony klientów, kod kuponu, obliczenie rabatu i wydanie nagrody w kasie.
 sidebar:
   order: 3
 ---
 
 :::caution[W trakcie]
-Zrealizowane: model danych, ograniczenia w bazie, reguły (kod kuponu, obliczenie rabatu, walidacja oferty), API ofert (katalog, zarządzanie przez Admin z wersją), wymiana punktów na kupon, odczyt własnych kuponów, aktywacja kuponu, podgląd kuponu dla kasjera z limitem prób, odbiór razem z zakupem, interfejs katalogu z wymianą, ekran „Moje kupony” z aktywacją i kodem QR, kupon w panelu kasjera z podglądem, rabat w historii, panel administratora ofert.
+Zrealizowane: model danych, ograniczenia w bazie, reguły (kod kuponu, obliczenie rabatu, walidacja oferty), API ofert (katalog, zarządzanie przez Admin z wersją), wymiana punktów na kupon, odczyt własnych kuponów, aktywacja kuponu, podgląd kuponu dla kasjera z limitem prób, odbiór razem z zakupem, interfejs katalogu z wymianą, ekran „Moje kupony” z aktywacją i kodem QR, kupon w panelu kasjera z podglądem, rabat w historii, panel administratora ofert, nagrody produktowe z wydaniem w kasie ([ADR 0013](/decyzje/0013-nagrody-produktowe/)).
 :::
 
 ## Co robi
 
 Klient wymienia punkty na kupon z rabatem na paliwo, aktywuje go w telefonie i pokazuje przy kasie razem z kartą. Kasa nalicza rabat na litr do zapisywanego zakupu. Decyzja: [ADR 0006](/decyzje/0006-model-korzysci-kuponu/).
+
+Drugi rodzaj oferty to nagroda (kawa, hot dog, myjnia): ta sama wymiana i aktywacja, ale kasjer wydaje ją bez tankowania i bez punktów - [niżej](#nagrody-produktowe).
 
 ## Gdzie jest kod
 
@@ -27,6 +29,7 @@ Klient wymienia punkty na kupon z rabatem na paliwo, aktywuje go w telefonie i p
 | Moje kupony (odczyt) | `Coupons/MyCouponsEndpoints.cs` |
 | Aktywacja kuponu | `Coupons/ActivateEndpoint.cs` (HTTP) → `Coupons/CouponActivation.cs` (wspólna z potwierdzeniem czatu) |
 | Podgląd kuponu (kasjer) | `Cashier/CouponPreviewEndpoint.cs` |
+| Wydanie nagrody | `Cashier/RewardHandoverEndpoint.cs` |
 | Odbiór z zakupem | `Cashier/CouponRedemption.cs` (implementuje `Modules/Loyalty/Cashier/ICouponRedemption.cs`), wywołanie w `Modules/Loyalty/Cashier/FuelPurchaseEndpoint.cs` |
 | Limit prób (429) | `apps/api/Infrastructure/RateLimiting.cs`, polityka w `RewardsModule.cs` |
 | `Cache-Control: no-store` | `apps/api/Infrastructure/NoStore.cs` |
@@ -61,8 +64,9 @@ Zaokrąglenie połówek od zera, nie bankierskie (0,045 → 0,05, a nie 0,04).
 | `Name` | `varchar(100)` | `CHECK (btrim(Name) <> '')` |
 | `Description` | `varchar(500)` | |
 | `PointsCost` | `integer` | `CHECK 1 - 1 000 000` |
-| `DiscountPerLiter` | `numeric(4,2)` | `CHECK (> 0 AND <= 10)` |
-| `MaxLiters` | `numeric(7,3)` | `CHECK (> 0 AND <= 1000)` |
+| `Kind` | `varchar(16)` | `FuelDiscount` albo `Product` (`CK_*_Kind`); niezmienny po utworzeniu |
+| `DiscountPerLiter` | `numeric(4,2)` NULL | `CHECK (> 0 AND <= 10)`; `CK_*_KindTerms`: wymagane przy `FuelDiscount`, puste przy `Product` |
+| `MaxLiters` | `numeric(7,3)` NULL | `CHECK (> 0 AND <= 1000)`; jak wyżej |
 | `IsActive` | `boolean` | wyłączona: brak nowych wymian, wydane kupony działają |
 | `CreatedAt`, `UpdatedAt` | `timestamptz` | |
 | `Version` | `integer` | `CHECK (>= 1)`; wersja edycji, start od 1 |
@@ -76,19 +80,28 @@ Oferty nie usuwamy: kupony mają FK `RESTRICT`.
 | `Id` | `uuid` | PK |
 | `UserId` | `text` | FK `AspNetUsers` (RESTRICT) |
 | `OfferId` | `uuid` | FK `RewardOffers` (RESTRICT) |
-| `OfferName`, `PointsCost`, `DiscountPerLiter`, `MaxLiters` | | snapshot z chwili wymiany, te same `CHECK` co oferta |
+| `OfferName`, `PointsCost`, `Kind`, `DiscountPerLiter`, `MaxLiters` | | snapshot z chwili wymiany, te same `CHECK` co oferta; FK `(OfferId, Kind)` → `RewardOffers (Id, Kind)`: rodzaj kuponu = rodzaj oferty |
 | `Status` | `varchar(16)` | `Purchased`, `Active`, `Redeemed` |
 | `Code` | `char(27)` | `NULL` przed aktywacją; `CHECK (~ '^K[0-7][0-9A-HJKMNP-TV-Z]{25}$')`, `UNIQUE` |
 | `PurchasedAt`, `ActivatedAt`, `RedeemedAt` | `timestamptz` | `CHECK` kolejności |
 | `RedeemedPurchaseId` | `uuid` | złożony FK `(RedeemedPurchaseId, UserId)` → `FuelPurchases (Id, UserId)` (RESTRICT): kupon tylko na zakup własnego właściciela; `UNIQUE` - jeden kupon na zakup |
 
+| `RedeemedHandoverId` | `uuid` | wydanie nagrody; złożony FK `(RedeemedHandoverId, Id, UserId)` → `RewardHandovers (Id, CouponId, UserId)`: wydanie tego kuponu i tego właściciela; `UNIQUE` |
+
 `CK_Coupons_State` wiąże status z polami:
 
-| Status | `Code` | `ActivatedAt` | `RedeemedAt`, `RedeemedPurchaseId` |
-| --- | --- | --- | --- |
-| `Purchased` | brak | brak | brak |
-| `Active` | jest | jest | brak |
-| `Redeemed` | jest | jest | są |
+| Status | `Code` | `ActivatedAt` | `RedeemedAt` | `RedeemedPurchaseId` | `RedeemedHandoverId` |
+| --- | --- | --- | --- | --- | --- |
+| `Purchased` | brak | brak | brak | brak | brak |
+| `Active` | jest | jest | brak | brak | brak |
+| `Redeemed`, `FuelDiscount` | jest | jest | jest | jest | brak |
+| `Redeemed`, `Product` | jest | jest | jest | brak | jest |
+
+Nagroda nie może więc trafić na zakup paliwa, a rabat - na wydanie.
+
+### `RewardHandovers`
+
+Ślad wydania nagrody: `Id`, `CouponId` (`UNIQUE`), `UserId` (FK), `CashierUserId` (FK), `StationCode`, `RegisterCode` (format jak w `CashierStations`), `HandedOverAt` (`clock_timestamp()`). Brak FK z wydania do kuponu - kupon wskazuje wydanie, więc usuwanie nie ma cyklu.
 
 Precyzję stawki i limitu sprawdza aplikacja (`RewardOfferRules`): `numeric(4,2)` zapisałby 0,205 jako 0,21 bez błędu.
 
@@ -241,6 +254,24 @@ Loyalty zna tylko interfejs `ICouponRedemption`; implementację (`CouponRedempti
 
 Migracja `CouponRedeemedPurchaseOwner` przed dodaniem złożonego FK sprawdza istniejące dane: kupon odebrany na zakup innego klienta zatrzymuje migrację z liczbą takich wierszy i zapytaniem, które je wypisuje. Danych nie przepisuje.
 
+## Nagrody produktowe
+
+Decyzja: [ADR 0013](/decyzje/0013-nagrody-produktowe/).
+
+- Admin wybiera rodzaj przy tworzeniu (`kind`, domyślnie `FuelDiscount`). Nagroda ze stawką albo limitem → `400 rewards.not_for_product`; inny `kind` w `PUT` → `400 rewards.kind_immutable` (brak pola = bez zmiany).
+- Wymiana i aktywacja bez zmian. Kupon kopiuje rodzaj, nazwę i koszt.
+- `POST /api/cashier/reward-handovers` (`Cashier`, CSRF, `Idempotency-Key`, limit jak zakup), body `{ cardCode, couponCode }`:
+  1. stanowisko kasjera, aktywna karta, blokada klienta (`503 loyalty.customer_busy`), ponowne sprawdzenie karty;
+  2. kupon po kodzie **i właścicielu karty** - cudzy i nieznany → ten sam `404 rewards.coupon_not_found`;
+  3. dopiero potem rodzaj: rabat → `409 rewards.coupon_wrong_kind`; odebrany → `409 rewards.coupon_redeemed`;
+  4. wiersz `RewardHandovers` i warunkowy `UPDATE` kuponu (`Status = 'Active'`) w jednej transakcji.
+- Bez zakupu, bez wpisu w historii punktów. Ten sam klucz odtwarza wynik; nowy klucz po wydaniu → `409`.
+- Nagroda w zakupie paliwa → `409 rewards.coupon_wrong_kind`, nic nie zapisane. Podgląd zwraca `kind` i `null` w warunkach; kwota i litry przy nagrodzie → `409 coupon_wrong_kind` przed sprawdzeniem odbioru, jak w zakupie.
+- UI: „Oferty” w sekcjach „Rabaty na paliwo” i „Nagrody”; „Moje kupony i nagrody” z przyciskiem „Aktywuj odbiór”; w kasie po wpisaniu kodu nagrody przycisk „Wydaj nagrodę” zamiast wyliczenia rabatu (nieznany wynik → „Ponów wydanie” tym samym kluczem); admin wybiera rodzaj, pola stawki i limitu tylko dla rabatu, na edycji rodzaj jako tekst.
+- Konta demo: Kawa 150, Hot dog 250, Myjnia 600 pkt (`DemoAccountsSeeder`, tylko gdy brak oferty o tej nazwie).
+- Kasa: `429` i `loyalty.customer_busy` przy wydaniu to pewna odmowa („nie została wydana - spróbuj za chwilę”), nie nieznany wynik.
+- Czat: oferty i kupony z `kind` (prompt `gemini-v3` opisuje rodzaje); `compare_coupons` tylko rabaty; karta potwierdzenia „Aktywować odbiór nagrody…”.
+
 ## Zabezpieczenia
 
 - Rabat liczy serwer z kopii parametrów w kuponie; klient nie wysyła kwoty rabatu.
@@ -267,6 +298,9 @@ Migracja `CouponRedeemedPurchaseOwner` przed dodaniem złożonego FK sprawdza is
 | `apps/web/e2e/cashier-coupon.spec.ts` (mobile + desktop) | **kod wpisywany znak po znaku → jedno zapytanie o warunki, bez wyliczenia**; „Przelicz” → 8,00 zł / 92,00 zł; zmiana litrów → wyliczenie nieaktualne bez zapytania, ponowne → 10,00 zł; zapis → wynik z rabatem i 90 pkt, **wysłany kod, bez rabatu**, formularz wyczyszczony; klient: kupon „Wykorzystany”, historia z rabatem; wykorzystany kupon → komunikat w podglądzie i przy zapisie, bez zapisu; **utracona odpowiedź zakupu z kuponem → ponowienie tym samym kluczem, jeden odbiór**; **spóźniona odpowiedź „Przelicz” po ponownym wpisaniu kuponu ignorowana**; wykorzystany kupon przy zapisie czyści podgląd; `429` (zasymulowane) → komunikat, zapis nadal działa; skan QR kuponu: czytnik karty go ignoruje, czytnik kuponu wypełnia tylko pole kuponu, bez `POST`; w trakcie skanu drugi czytnik wyłączony |
 | `apps/web/e2e/admin.spec.ts` (mobile + desktop) | tworzenie przez formularz (walidacja 0,205 zł/l po stronie klienta), oferta w katalogu klienta, wyłączenie → znika z katalogu; **dwóch adminów edytuje tę samą ofertę: drugi dostaje konflikt z aktualną wersją, formularz zachowany i zablokowany, „Wczytaj aktualną wersję”, potem pierwszy świadomie nadpisuje na wersji 3**; **utracona odpowiedź `PUT` → „Wynik zapisu nieznany”, sprawdzenie stanu → „Zapisano (wersja 2)”, jeden `PUT`**; **utracona odpowiedź tworzenia → wyjście z ekranu i powrót: blokada i to samo tworzenie, ponowienie tym samym kluczem, jedna oferta**; klient i kasjer: brak skrótu, przekierowanie z `/admin/...`, API `403` |
 | `RewardOfferTests.cs` | katalog: tylko aktywne, kolejność koszt → nazwa → `id` (także dla identycznego kosztu i nazwy), pola; dostęp: katalog tylko `User` (`401` anonim, `403` kasjer i sam Admin), część admina tylko `Admin`; tworzenie: `201` + `Location`, `version 1`, odczyt pojedynczy i na liście; idempotencja `POST` (jedna oferta), brak klucza → `400`; walidacja pól (w tym 0,205 zł/l i brak `isActive`) bez zapisu wiersza; brak liczb → `required_field` w `POST` i `PUT`; liczby jako tekst → `400`; zmiana przez EF podnosi wersję, więc starszy formularz dostaje `409`; `PUT` zastępuje formularz i podnosi wersję, odpowiedź = zapisany wiersz; **nieaktualny formularz → `409` bez nadpisania**; **8 równoległych `PUT` z tą samą wersją → dokładnie jeden `200`, 7 × `409`, wersja 2**; `version` wymagane i `>= 1`, walidacja przed konfliktem; nieznane `id` → `404`; wyłączenie ukrywa w katalogu, włączenie przywraca; edycja oferty nie zmienia wydanego kuponu; CSRF |
+| `ProductRewardsTests.cs` | admin: nagroda bez warunków, warunki przy nagrodzie → `not_for_product`, rabat bez warunków i nieznany rodzaj → `400`, zmiana rodzaju → `kind_immutable`, edycja bez `kind` zachowuje rodzaj; wymiana, aktywacja i wydanie: snapshot nazwy i kosztu po zmianie oferty, ponowienie tym samym kluczem, nowy klucz → `coupon_redeemed`, wydanie z kasjerem, stacją i kasą, bez zakupu i bez wpisu w historii; rabat przy wydaniu i nagroda przy zakupie → `coupon_wrong_kind` (bez zakupu); **cudzy kupon rabatowy → `404`, nie „zły rodzaj”**; podgląd nagrody; klient → `403`; **2 równoległe wydania różnymi kluczami → jedno**; baza odrzuca warunki przy nagrodzie, kupon innego rodzaju niż oferta i odebraną nagrodę bez wydania |
+| `apps/web/e2e/product-rewards.spec.ts` (mobile + desktop) | sekcja „Nagrody”, wymiana, „Aktywuj odbiór”, kasjer wpisuje kartę i kod → „Wydaj nagrodę”, komunikat i wyczyszczone pole; ten sam kod ponownie → „wykorzystany”; klient widzi „Wykorzystany” |
+| `apps/web/e2e/admin.spec.ts` - nagroda | wybór „Nagroda (produkt)” ukrywa pola stawki i limitu, lista pokazuje „nagroda”, edycja pokazuje rodzaj bez wyboru i zapisuje wersję 2 |
 | `LoyaltyModelConstraintsTests.cs` | rabat równy brutto (zapłata 0, 0 pkt) przyjęty; rabat poza `0 - brutto` i `PaidAmount ≠ GrossAmount - Discount` odrzucone; znak `Delta` zgodny z typem |
 
 Próby negatywne: zaokrąglenie bankierskie (`ToEven`) i brak ograniczenia do brutto wywracają testy obliczeń; `UPDATE` bez warunku na wersję wywraca testy nieaktualnego formularza i równoległej edycji; brak podnoszenia wersji w `SaveChanges` wywraca oba testy zapisu przez EF; wymiana bez warunku `Balance >= koszt`, bez `FOR SHARE` albo ze sprawdzeniem wersji przed wyłączeniem wywraca odpowiednie testy wymiany. Aktywacja bez warunku na status wywraca testy odebranego kuponu, ponownej aktywacji i równoległych aktywacji; `now()` zamiast `clock_timestamp()` wywraca test czasu; kod wklejony w SQL wywraca test logów; brak `no-store` albo filtr tylko na endpoincie (wewnątrz idempotencji) wywraca testy nagłówka. Podgląd bez warunku na właściciela kuponu wywraca testy cudzego kuponu; bez sprawdzenia statusu - test odebranego; bez `RequireRateLimiting` - test limitu. Katalog bez obsługi nieznanego wyniku wywraca test utraconej odpowiedzi wymiany; wymiana bez `persist` wywraca test wyjścia z ekranu; aktywacja bez odczytu `GET` po próbie wywraca testy aktywacji; przeliczenie bez numeru żądania wywraca test spóźnionej odpowiedzi; edycja traktująca brak odpowiedzi jak zwykły błąd wywraca test utraconego `PUT`; tworzenie bez `persist` wywraca test utraconej odpowiedzi tworzenia. Odbiór z `now()` zamiast `clock_timestamp()` wywraca test czasu i test aktywacji zatwierdzonej w trakcie czekania (`CK_Coupons_Timeline`); bez sprawdzenia paragonu przed kuponem - test pierwszeństwa paragonu; bez właściciela w `UPDATE` - test odbioru z innym właścicielem; pusty kod traktowany jak brak - test walidacji; bez obsługi `lock_timeout` - test `503`; bez sprawdzenia statusu - testy odebranego kuponu i równoległych zakupów.

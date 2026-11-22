@@ -153,6 +153,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                         || userIds.Contains(purchase.RegisteredByUserId)
                     )
                 )
+                || db.RewardHandovers.Any(handover =>
+                    handover.Id == coupon.RedeemedHandoverId
+                    && userIds.Contains(handover.CashierUserId)
+                )
+            )
+            .ExecuteDeleteAsync();
+        // After the coupons that point at them.
+        await db
+            .RewardHandovers.Where(handover =>
+                userIds.Contains(handover.UserId) || userIds.Contains(handover.CashierUserId)
             )
             .ExecuteDeleteAsync();
         await db

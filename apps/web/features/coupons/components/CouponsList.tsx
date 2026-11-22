@@ -8,7 +8,7 @@ import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
-import { formatPoints, formatTerms } from "@/lib/format";
+import { benefitTerms, formatPoints, isProduct } from "@/lib/format";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { cn } from "@/lib/utils";
 import { useActivateCoupon, useCoupons } from "../hooks";
@@ -198,7 +198,9 @@ function CouponItem({
             {coupon.offerName}
           </h2>
           <p className="text-sm">
-            Rabat {formatTerms(coupon.discountPerLiter, coupon.maxLiters)}
+            {benefitTerms(coupon)
+              ? `Rabat ${benefitTerms(coupon)}`
+              : "Nagroda do odbioru w kasie"}
           </p>
           <p className="text-xs text-muted-foreground">
             Kupiony {dateTime.format(new Date(coupon.purchasedAt))} za{" "}
@@ -223,15 +225,18 @@ function CouponItem({
       {coupon.status === "Purchased" && (
         <div className="flex flex-col items-start gap-2">
           <p className="text-sm text-muted-foreground">
-            Aktywuj kupon przed tankowaniem - dostaniesz kod do pokazania przy
-            kasie. Aktywacja nie zużywa kuponu.
+            {isProduct(coupon)
+              ? "Aktywuj odbiór - dostaniesz kod do pokazania w kasie. Aktywacja nie wydaje nagrody."
+              : "Aktywuj kupon przed tankowaniem - dostaniesz kod do pokazania przy kasie. Aktywacja nie zużywa kuponu."}
           </p>
           <Button onClick={onActivate} disabled={busy}>
             {activating
               ? "Aktywuję…"
               : unknown
                 ? "Ponów aktywację"
-                : "Aktywuj kupon"}
+                : isProduct(coupon)
+                  ? "Aktywuj odbiór"
+                  : "Aktywuj kupon"}
           </Button>
         </div>
       )}
@@ -255,7 +260,9 @@ function CouponItem({
             </figcaption>
           </figure>
           <p className="text-sm text-muted-foreground">
-            Pokaż przy kasie razem z kartą. Kupon działa przy jednym tankowaniu.
+            {isProduct(coupon)
+              ? "Pokaż kod w kasie razem z kartą - kasjer wyda nagrodę."
+              : "Pokaż przy kasie razem z kartą. Kupon działa przy jednym tankowaniu."}
           </p>
           <CopyButton code={coupon.code} />
         </div>

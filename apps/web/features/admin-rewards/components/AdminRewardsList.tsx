@@ -4,7 +4,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { readErrorMessage } from "@/lib/api/problem";
-import { formatPoints, formatTerms } from "@/lib/format";
+import { formatPoints, benefitTerms } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAdminRewards } from "../hooks";
 
@@ -63,8 +63,7 @@ export function AdminRewardsList() {
                 <p className="font-semibold">{offer.name}</p>
                 <p className="text-sm text-muted-foreground">
                   {formatPoints(offer.pointsCost)} ·{" "}
-                  {formatTerms(offer.discountPerLiter, offer.maxLiters)} ·
-                  wersja {offer.version}
+                  {benefitTerms(offer) ?? "nagroda"} · wersja {offer.version}
                 </p>
               </div>
               <div className="flex items-center gap-3">
