@@ -6,6 +6,7 @@ import {
   History,
   ScanLine,
   Ticket,
+  TicketCheck,
 } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
@@ -74,6 +75,12 @@ export function HomeScreen() {
           title="Oferty"
           description="Wymień punkty na kupon"
         />
+        <Shortcut
+          href="/kupony"
+          icon={TicketCheck}
+          title="Moje kupony"
+          description="Aktywuj i pokaż przy kasie"
+        />
         {cashierShortcut}
       </nav>
     </div>
@@ -86,7 +93,7 @@ function Shortcut({
   title,
   description,
 }: {
-  href: "/karta" | "/historia" | "/oferty" | "/kasa";
+  href: "/karta" | "/historia" | "/oferty" | "/kupony" | "/kasa";
   icon: ComponentType<{ className?: string }>;
   title: string;
   description: string;

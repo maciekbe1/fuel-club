@@ -9,7 +9,7 @@ import { ADMIN, CASHIER } from "./accounts";
 
 export const PASSWORD = "E2e-Password-123!";
 
-async function csrf(request: APIRequestContext) {
+export async function csrf(request: APIRequestContext) {
   const response = await request.get("/api/auth/csrf");
   return ((await response.json()) as { token: string }).token;
 }
@@ -71,7 +71,12 @@ export async function cashier(baseURL: string) {
   const token = await csrf(request);
 
   return {
-    async purchase(cardCode: string, amount: number, liters = 10) {
+    async purchase(
+      cardCode: string,
+      amount: number,
+      liters = 10,
+      couponCode?: string,
+    ) {
       const response = await request.post("/api/cashier/fuel-purchases", {
         headers: {
           "X-CSRF-TOKEN": token,
@@ -83,9 +88,15 @@ export async function cashier(baseURL: string) {
           liters,
           saleDate: warsawToday(),
           receiptNumber: `E2E/${crypto.randomUUID()}`.toUpperCase(),
+          couponCode,
         },
       });
       expect(response.status(), await response.text()).toBe(201);
+      return (await response.json()) as {
+        discount: number;
+        paidAmount: number;
+        pointsAwarded: number;
+      };
     },
     dispose: () => request.dispose(),
   };
@@ -176,3 +187,38 @@ export const test = base.extend<{
 });
 
 export { expect };
+
+/**
+ * A purchased (not yet active) coupon for the customer on `page`: points from a real purchase, then
+ * the exchange through the API. Returns the coupon id and the customer's card code.
+ */
+export async function buyCoupon(
+  page: Page,
+  staff: Staff,
+  baseURL: string,
+  name = offerName("Kupon"),
+) {
+  const offer = await staff.createOffer({
+    name,
+    pointsCost: 500,
+    discountPerLiter: 0.2,
+    maxLiters: 50,
+  });
+  const card = await issueCard(page);
+  const pos = await cashier(baseURL);
+  await pos.purchase(card, 500);
+  await pos.dispose();
+  const response = await page.request.post(
+    `/api/rewards/${offer.id}/exchange`,
+    {
+      headers: {
+        "X-CSRF-TOKEN": await csrf(page.request),
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      data: { version: offer.version },
+    },
+  );
+  expect(response.status(), await response.text()).toBe(201);
+  const body = (await response.json()) as { coupon: { id: string } };
+  return { couponId: body.coupon.id, card, name };
+}

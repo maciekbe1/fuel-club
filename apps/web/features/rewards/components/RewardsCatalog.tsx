@@ -8,7 +8,7 @@ import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
 import { keepsIdempotencyKey, readPending } from "@/lib/idempotency";
 import { EXCHANGE_OPERATION, useExchange, useRewards } from "../hooks";
-import { formatPoints, formatTerms } from "../format";
+import { formatPoints, formatTerms } from "@/lib/format";
 import type { ExchangeVars, Reward } from "../services";
 
 const toVars = (offer: Reward): ExchangeVars => ({
@@ -160,8 +160,11 @@ export function RewardsCatalog() {
           role="status"
           className="rounded-2xl border border-emerald-500/40 bg-emerald-50 p-4 text-sm text-emerald-950 dark:bg-emerald-950 dark:text-emerald-50"
         >
-          Kupiono kupon „{outcome.offerName}”. Aktywuj go w telefonie przed
-          tankowaniem.
+          Kupiono kupon „{outcome.offerName}”. Aktywuj go w{" "}
+          <Link href="/kupony" className="font-medium underline">
+            Moich kuponach
+          </Link>{" "}
+          przed tankowaniem.
         </p>
       )}
       {outcome?.kind === "final" && (

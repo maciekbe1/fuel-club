@@ -6,14 +6,18 @@ import { useMemo } from "react";
 const QUIET_ZONE = 4;
 
 /**
- * QR with exactly the raw card code, computed locally (no network). Dark modules on a white
- * background in every theme: scanners need the contrast and the quiet zone.
+ * QR with exactly the raw code (card or coupon), computed locally (no network). Dark modules on a
+ * white background in every theme: scanners need the contrast and the quiet zone.
  */
-export function CardQr({
+export function CodeQr({
   code,
+  label,
+  testId,
   className,
 }: {
   code: string;
+  label: string;
+  testId?: string;
   className?: string;
 }) {
   const { size, path } = useMemo(() => {
@@ -28,11 +32,11 @@ export function CardQr({
 
   return (
     <svg
-      data-testid="card-qr"
+      data-testid={testId}
       viewBox={`0 0 ${size} ${size}`}
       shapeRendering="crispEdges"
       role="img"
-      aria-label="Kod QR karty do zeskanowania przy kasie"
+      aria-label={label}
       className={className}
     >
       <rect width={size} height={size} fill="#fff" />

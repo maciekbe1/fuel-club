@@ -2,12 +2,12 @@
 
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { CodeQr } from "@/components/code/CodeQr";
+import { CopyButton } from "@/components/code/CopyButton";
 import { Button } from "@/components/ui/button";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
 import type { useRotateCard } from "../hooks";
 import { formatCardCode, type LoyaltyCard } from "../services";
-import { CardQr } from "./CardQr";
-import { CopyButton } from "./CopyButton";
 import { mutationError, orange } from "./messages";
 
 const issuedAt = new Intl.DateTimeFormat("pl-PL", {
@@ -66,7 +66,12 @@ export function ActiveCard({
       </section>
 
       <figure className="flex flex-col items-center gap-3 rounded-3xl border bg-white p-5 text-neutral-900">
-        <CardQr code={card.code} className="size-56 max-w-full" />
+        <CodeQr
+          code={card.code}
+          label="Kod QR karty do zeskanowania przy kasie"
+          testId="card-qr"
+          className="size-56 max-w-full"
+        />
         <figcaption className="text-center text-sm">
           Pokaż kod QR przy kasie
         </figcaption>
