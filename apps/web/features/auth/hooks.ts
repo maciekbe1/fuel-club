@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { ApiError } from "@/lib/api/problem";
 import { clearPendingOperations } from "@/lib/idempotency";
 import { queryKeys } from "@/lib/query-keys";
 import { authService, type Me, type RegisterInput } from "./services";
@@ -25,15 +25,23 @@ export function useLogin() {
   });
 }
 
+/**
+ * A full page load, not a client navigation: Next keeps visited screens hidden in the DOM (with
+ * their data, e.g. coupon codes), and the next person on this device must not get them.
+ */
 export function useLogout() {
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const wipe = () => {
+    queryClient.clear();
+    clearPendingOperations();
+    window.location.replace("/login");
+  };
   return useMutation({
     mutationFn: authService.logout,
-    onSuccess: () => {
-      queryClient.clear();
-      clearPendingOperations();
-      router.replace("/login");
+    onSuccess: wipe,
+    // An expired session (401) is logged out already; the screens still have to go.
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 401) wipe();
     },
   });
 }

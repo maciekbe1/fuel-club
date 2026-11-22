@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - pending
+Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - pending
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -45,6 +45,16 @@ Próby negatywne: przeliczenie bez numeru żądania → pada test spóźnionej o
 Przeglądarka (Chrome, :3200, kasjer demo, karta i kupon Anny): kod kuponu wpisany małymi literami ze spacjami → warunki; 120,50 zł / 30 l → „Przelicz” 6,00 zł / 114,50 zł / 114 pkt; zapis → wynik z rabatem, formularz wyczyszczony.
 Review (`/code-review high`, 9 uwag, wszystkie przyjęte): dwa czytniki naraz (jedna kamera); nieaktualny podgląd po błędzie/odblokowaniu; gcTime 0 zużywał limit; komunikat „nieaktualne” bez wyniku i blokada przeliczenia przy zmianie karty; logika HTTP w komponencie (przeniesiona do hooka); brak testu czytnika karty z QR kuponu; słaba asercja punktów; opis skanera; literówka w docs.
 
+## P4 - administracja (done, 2026-11-22)
+
+Zakres: feature `admin-rewards` (`/admin/oferty`, `nowa`, `[id]`), strażnik `app/(app)/admin/layout.tsx` (bez roli Admin → `/`), skrót na ekranie głównym tylko dla Admin. Formularz RHF + zod (granice jak `RewardOfferRules`). Tworzenie: idempotentne z `persist`, niedokończone tworzenie przywracane po powrocie. Edycja: `PUT` z wersją z wczytania; `409` → panel konfliktu (aktualna wersja, formularz zachowany, „Wczytaj aktualną wersję” / „Zapisz moje zmiany na wersji N”); nieznany wynik → blokada i „Sprawdź aktualny stan” (zapisano / nie zapisano / konflikt). Wyłączanie przez pole „Aktywna”.
+Poprawka przy okazji (bezpieczeństwo, istniejący kod): wylogowanie i „Zaloguj się” przy wygasłej sesji robią pełne przeładowanie - Next 16 trzymał w ukrytym DOM ekrany poprzedniego użytkownika (kody kuponów); wylogowanie czyści też przy `401`.
+Testy (2026-11-22): typecheck, lint, format - passed; `npx playwright test` - passed 94/94; docs build - passed. API bez zmian.
+Próby negatywne: edycja bez obsługi nieznanego wyniku → pada test utraconego PUT; tworzenie bez `persist` → pada test wyjścia z ekranu; wylogowanie przez `router.replace` → pada test kodów w DOM; brak czyszczenia przy 401 → pada test wygasłej sesji.
+Przeglądarka (Chrome, :3200, admin demo): skrót „Administracja ofert”, lista 3 ofert z wersjami, edycja kosztu 2000 → 2100, „Zapisano (wersja 2)”. Zaobserwowany wyciek ukrytego DOM po wylogowaniu (kupony Anny widoczne w drzewie po zalogowaniu kasjera) → poprawione jw.
+Review (`/code-review high`, 4 uwagi, wszystkie przyjęte): tworzenie bez trwałego klucza; „Zaloguj się” nawigacją klienta; wylogowanie przy 401 nic nie czyściło; odmontowany czytnik zwalniał cudzą blokadę kamery.
+Uwaga: ostrzeżenia dev `NEXT_REDIRECT` (instant validation) przy przekierowaniach strażników - to samo daje istniejący strażnik sesji; tylko tryb dev.
+
 ## Następny krok
 
-P4 - administracja (wg specs/PLAN.md i SPEC.md): lista i edycja ofert z wersją (409 bez nadpisania), nieznany wynik PUT, guard `app/(app)/admin/layout.tsx`; E2E, przeglądarka, review.
+P5 - kontrakt czatu: ADR (decyzja moja), wg specs/PLAN.md i SPEC.md.

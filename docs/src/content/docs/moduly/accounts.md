@@ -48,7 +48,7 @@ Poza zakresem: reset hasła, weryfikacja e-maila, zmiana danych konta.
 2. `(app)/layout.tsx`: `GET /api/auth/me` na serwerze. `401` oznacza `/login`.
 3. Dane `me` trafiają do `useMe()` bez ponownego żądania.
 
-**Wylogowanie**: `POST /api/auth/logout`, potem `queryClient.clear()` i przejście na `/login`.
+**Wylogowanie**: `POST /api/auth/logout`, potem `queryClient.clear()`, usunięcie zapisanych kluczy nierozstrzygniętych operacji i **pełne przeładowanie** `/login` (`window.location.replace`). Nawigacja klienta nie wystarcza: Next 16 trzyma odwiedzone ekrany ukryte w DOM razem z danymi (np. kodami kuponów), a z urządzenia może potem korzystać ktoś inny (test E2E „logging out leaves no coupon code”). Wygasła sesja (`401` z `logout`) czyści tak samo (test „expired session”). Odnośniki „Zaloguj się” przy wygasłej sesji (`components/auth/LoginAgainLink.tsx`) to zwykłe `<a>`, też z pełnym przeładowaniem.
 
 ## Dane
 

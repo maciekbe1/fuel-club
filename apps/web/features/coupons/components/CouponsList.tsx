@@ -4,6 +4,7 @@ import { CheckCircle2, Ticket } from "lucide-react";
 import Link from "next/link";
 import { CodeQr } from "@/components/code/CodeQr";
 import { CopyButton } from "@/components/code/CopyButton";
+import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
@@ -35,13 +36,7 @@ const STATUS: Record<string, { label: string; className: string }> = {
 const sessionExpired = (error: unknown) =>
   error instanceof ApiError && error.status === 401;
 
-function LoginLink() {
-  return (
-    <Link href="/login" className={buttonVariants({ size: "sm" })}>
-      Zaloguj się
-    </Link>
-  );
-}
+const LoginLink = LoginAgainLink;
 
 function activationError(error: Error) {
   if (error instanceof NetworkError)

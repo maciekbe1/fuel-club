@@ -3,7 +3,8 @@
 import { Ticket } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
+import { Button } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
 import { keepsIdempotencyKey, readPending } from "@/lib/idempotency";
@@ -120,9 +121,7 @@ export function RewardsCatalog() {
           )}
         </p>
         {rewards.error instanceof ApiError && rewards.error.status === 401 ? (
-          <Link href="/login" className={buttonVariants({ size: "sm" })}>
-            Zaloguj się
-          </Link>
+          <LoginAgainLink />
         ) : (
           <RetryButton
             busy={rewards.isFetching}

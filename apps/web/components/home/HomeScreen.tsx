@@ -6,6 +6,7 @@ import {
   History,
   ScanLine,
   Ticket,
+  Settings,
   TicketCheck,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,13 +22,26 @@ export function HomeScreen() {
   const { data: me } = useMe();
   const isCustomer = me?.roles.includes("User") ?? false;
   const isCashier = me?.roles.includes("Cashier") ?? false;
-  const cashierShortcut = isCashier && (
-    <Shortcut
-      href="/kasa"
-      icon={ScanLine}
-      title="Kasa"
-      description="Zarejestruj zakup paliwa"
-    />
+  const isAdmin = me?.roles.includes("Admin") ?? false;
+  const staffShortcuts = (isCashier || isAdmin) && (
+    <>
+      {isCashier && (
+        <Shortcut
+          href="/kasa"
+          icon={ScanLine}
+          title="Kasa"
+          description="Zarejestruj zakup paliwa"
+        />
+      )}
+      {isAdmin && (
+        <Shortcut
+          href="/admin/oferty"
+          icon={Settings}
+          title="Administracja ofert"
+          description="Twórz, zmieniaj i wyłączaj oferty"
+        />
+      )}
+    </>
   );
 
   if (me && !isCustomer) {
@@ -38,12 +52,12 @@ export function HomeScreen() {
           To konto obsługi stacji. Saldo, karta i historia punktów są dostępne
           na kontach klientów.
         </p>
-        {cashierShortcut && (
+        {staffShortcuts && (
           <nav
             aria-label="Na skróty"
             className="mt-3 grid gap-3 sm:grid-cols-2"
           >
-            {cashierShortcut}
+            {staffShortcuts}
           </nav>
         )}
       </div>
@@ -81,7 +95,7 @@ export function HomeScreen() {
           title="Moje kupony"
           description="Aktywuj i pokaż przy kasie"
         />
-        {cashierShortcut}
+        {staffShortcuts}
       </nav>
     </div>
   );
@@ -93,7 +107,13 @@ function Shortcut({
   title,
   description,
 }: {
-  href: "/karta" | "/historia" | "/oferty" | "/kupony" | "/kasa";
+  href:
+    | "/karta"
+    | "/historia"
+    | "/oferty"
+    | "/kupony"
+    | "/kasa"
+    | "/admin/oferty";
   icon: ComponentType<{ className?: string }>;
   title: string;
   description: string;

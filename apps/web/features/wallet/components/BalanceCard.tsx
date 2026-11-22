@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, readErrorMessage } from "@/lib/api/problem";
 import { cn } from "@/lib/utils";
@@ -51,15 +50,7 @@ export function BalanceCard({ className }: { className?: string }) {
               )}
             </p>
             {wallet.error instanceof ApiError && wallet.error.status === 401 ? (
-              <Link
-                href="/login"
-                className={cn(
-                  buttonVariants({ size: "sm" }),
-                  "bg-brand-orange text-brand-navy hover:bg-brand-orange/90",
-                )}
-              >
-                Zaloguj się
-              </Link>
+              <LoginAgainLink className="bg-brand-orange text-brand-navy hover:bg-brand-orange/90" />
             ) : (
               <RetryButton
                 busy={wallet.isFetching}

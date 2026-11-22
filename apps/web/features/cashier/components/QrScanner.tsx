@@ -144,11 +144,18 @@ export function QrScanner({
 
   const active = state.kind === "starting" || state.kind === "scanning";
 
+  // The last value reported to the parent: an unmounted scanner frees the lock only if it held it.
+  const reportedRef = useRef(false);
   useEffect(() => {
+    reportedRef.current = active;
     onActiveRef.current?.(active);
   }, [active]);
-  // Unmounted while scanning (e.g. the section is reset): the camera is free again.
-  useEffect(() => () => onActiveRef.current?.(false), []);
+  useEffect(
+    () => () => {
+      if (reportedRef.current) onActiveRef.current?.(false);
+    },
+    [],
+  );
 
   return (
     <div className="flex flex-col gap-3">

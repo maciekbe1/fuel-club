@@ -173,3 +173,45 @@ test("activation failing before the server: retry with the same key activates on
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);
 });
+
+test("logging out leaves no coupon code in the page for the next person", async ({
+  page,
+  customer,
+  staff,
+  baseURL,
+}) => {
+  void customer;
+  const { name } = await buyCoupon(page, staff, baseURL!);
+  await page.goto("/");
+  await page.getByRole("link", { name: /Moje kupony/ }).click();
+  const coupon = page.getByTestId("coupon").filter({ hasText: name });
+  await coupon.getByRole("button", { name: "Aktywuj kupon" }).click();
+  await expect(coupon.getByTestId("coupon-code")).toBeVisible();
+
+  await page.getByRole("button", { name: "Wyloguj" }).click();
+  await page.waitForURL("/login");
+  // Hidden screens kept by client navigation count too.
+  await expect(page.locator("[data-code]")).toHaveCount(0);
+  await expect(page.getByText(name)).toHaveCount(0);
+});
+
+test("expired session: Wyloguj still clears the screens", async ({
+  page,
+  context,
+  customer,
+  staff,
+  baseURL,
+}) => {
+  void customer;
+  const { name } = await buyCoupon(page, staff, baseURL!);
+  await page.goto("/kupony");
+  const coupon = page.getByTestId("coupon").filter({ hasText: name });
+  await coupon.getByRole("button", { name: "Aktywuj kupon" }).click();
+  await expect(coupon.getByTestId("coupon-code")).toBeVisible();
+
+  // The session ends on the server side (cookie gone): logout answers 401.
+  await context.clearCookies();
+  await page.getByRole("button", { name: "Wyloguj" }).click();
+  await page.waitForURL("/login");
+  await expect(page.locator("[data-code]")).toHaveCount(0);
+});
