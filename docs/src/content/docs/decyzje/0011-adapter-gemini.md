@@ -42,13 +42,16 @@ Zakres uzgodniony z właścicielem:
 
 - **Wysyłane:**
   - wiadomość i historia rozmowy z ekranu;
-  - wyniki narzędzi: saldo, oferty, kupony (id, nazwa, stan, warunki - bez kodów), wynik propozycji aktywacji.
+  - wyniki narzędzi: saldo, oferty (z brakującymi punktami), kupony (id, nazwa, stan, warunki - bez kodów), wynik propozycji aktywacji;
+  - porównanie kuponów: planowane litry i kwota podane przez klienta, rabaty, koszt i brakujące punkty;
+  - wyjaśnienie punktów (zgoda właściciela 2026-11-22): **tylko** brutto, rabat, zapłacono, naliczone punkty i zasada obliczenia ostatniego zakupu.
 - **Nie wysyłane:**
   - id użytkownika, e-mail;
   - kody kart i kuponów;
-  - token potwierdzenia (`ChatService` usuwa go przed modelem).
+  - token potwierdzenia (`ChatService` usuwa go przed modelem);
+  - data, numer paragonu, stacja, kasa, litry i id zakupu.
 
-Test sprawdza brak id i e-maila w żądaniu. Ślady tur nadal zawierają tylko metadane. Retencję po stronie Google określa umowa i plan konta Google, nie ta aplikacja.
+Testy sprawdzają brak id i e-maila w żądaniu oraz dokładny zestaw pól wyjaśnienia punktów (bez stacji, kasy, paragonu i daty). Ślady tur nadal zawierają tylko metadane. Retencję po stronie Google określa umowa i plan konta Google, nie ta aplikacja.
 
 ## Alternatywy
 

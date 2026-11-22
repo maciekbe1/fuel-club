@@ -124,6 +124,19 @@
         "end": "error",
         "errorCode": "assistant.tool_limit"
       }
+    },
+    {
+      "id": "compare-coupons",
+      "category": "porownanie-kuponow",
+      "message": "Tankuję 40 l za 250 zł. Który kupon wybrać?",
+      "setup": { "ownCoupons": ["Purchased"] },
+      "expect": { "tools": ["compare_coupons:ok"], "end": "done", "answerContains": ["Kolejność: najwyższy rabat"] }
+    },
+    {
+      "id": "explain-points-no-purchases",
+      "category": "wyjasnienie-punktow",
+      "message": "Dlaczego dostałem tyle punktów?",
+      "expect": { "tools": ["explain_purchase_points:ok"], "end": "done", "answerContains": ["Nie widzę jeszcze żadnego Twojego zakupu"] }
     }
   ]
 }

@@ -279,6 +279,23 @@ Testy:
 
 Próby negatywne: regresje 1, 2, 4 i 5 padają bez poprawek.
 
+## P12 - przydatniejszy czat (2026-11-22)
+
+Kolejność uzgodniona: narzędzia czatu → nagrody → P11.
+- Nowe narzędzia:
+  - `compare_coupons(liters, grossAmount?)`: własne kupony osobno od ofert, wzór kasy, szacunek bez kwoty, kryterium kolejności w wyniku;
+  - `explain_purchase_points`: ostatni własny zakup, remisy rozstrzygnięte.
+- `pointsMissing` w ofertach.
+- Gemini: 6 deklaracji, prompt `gemini-v2`.
+- Zgoda właściciela na eksport: brutto, rabat, zapłacono, punkty, zasada (ADR 0011).
+- Demo: reguły porównania i wyjaśnienia. 2 nowe przypadki evali.
+
+Testy:
+- `dotnet test` passed 496/496 (1 pominięty na żywo);
+- `npm run e2e` passed 130/130.
+
+Niestabilny test „stop cancels the turn” (5/16 także na starym kodzie): stop przed wyjściem żądania - sygnał już przerwany, bez zdarzenia. Test czeka na żądanie i sprawdza `signal.aborted` - 30/30.
+
 ## Następny krok
 
 Otwarte:
@@ -287,4 +304,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-Uzgodnione dalej: P11 przekazanie rozmowy do konsultanta (rola Support). Najpierw ADR i kontrakt, potem implementacja.
+Dalej: nagrody (ADR, potem implementacja), potem P11 przekazanie do konsultanta (ADR 0012 przyjęty).

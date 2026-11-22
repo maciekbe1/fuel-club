@@ -57,9 +57,11 @@ Zamknięta lista. Nazwa spoza listy, argument nieznany, brakujący lub w złym f
 | Narzędzie | Argumenty | Wynik dla modelu |
 | --- | --- | --- |
 | `get_my_balance` | brak | saldo |
-| `list_available_rewards` | brak | aktywne oferty (nazwa, koszt, stawka, limit) |
+| `list_available_rewards` | brak | aktywne oferty (nazwa, koszt, stawka, limit, `pointsMissing` = max(0, koszt - saldo)) |
 | `list_my_coupons` | `status?`: `Purchased`, `Active`, `Redeemed` | kupony: id, nazwa, stan, warunki; **bez kodów** |
 | `propose_coupon_activation` | `couponId` (GUID) | propozycja albo odmowa; niczego nie zmienia |
+| `compare_coupons` | `liters` (liczba > 0, do 3 miejsc), `grossAmount?` (zł, do 2 miejsc) | rabat każdego własnego kuponu `Purchased`/`Active` i osobno każdej oferty za punkty (z `pointsMissing`); wzór jak w kasie; bez `grossAmount` - `estimate = true`, bo rabat nie przekroczy kwoty zakupu; kolejność i jej kryterium w wyniku |
+| `explain_purchase_points` | brak | ostatni własny zakup (data sprzedaży, potem czas rejestracji, potem id): brutto, rabat, zapłacono, punkty, zasada; także zakup za 0 pkt; brak zakupów → `reason: no_purchases` |
 
 - Tożsamość pochodzi tylko z sesji (`ToolContext.UserId`); żadne narzędzie nie ma parametru użytkownika.
 - Kod kuponu nie trafia do modelu ani do zdarzeń czatu - pokazuje go ekran „Moje kupony” i odpowiedź potwierdzenia.

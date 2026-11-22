@@ -232,7 +232,7 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         var response = contents[2]!["parts"]![0]!["functionResponse"]!;
         Assert.Equal("get_my_balance", response["name"]!.GetValue<string>());
         Assert.Equal(777, response["response"]!["data"]!["balance"]!.GetValue<int>());
-        Assert.Equal(4, second["tools"]![0]!["functionDeclarations"]!.AsArray().Count);
+        Assert.Equal(6, second["tools"]![0]!["functionDeclarations"]!.AsArray().Count);
 
         // Tokens reach the trace (thinking included in output).
         await using var scope = factory.Services.CreateAsyncScope();
@@ -338,6 +338,54 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         // A call's id goes back with its response; a call without one gets none.
         Assert.Null(responses[0]!["functionResponse"]!["id"]);
         Assert.Equal("call-2", responses[1]!["functionResponse"]!["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Explaining_points_sends_only_the_approved_amounts_to_gemini()
+    {
+        var gemini = new FakeGemini(
+            (HttpStatusCode.OK, CallBody("explain_purchase_points", new { }, "sig-E")),
+            (HttpStatusCode.OK, TextBody("Zapłaciłeś 114 zł, więc 114 pkt."))
+        );
+        await using var host = Host(gemini);
+        var (client, userId, _) = await CustomerAsync(host, 0);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.FuelPurchases.Add(
+                new FuelPurchase
+                {
+                    Id = Guid.CreateVersion7(),
+                    UserId = userId,
+                    StationCode = "ST-777",
+                    RegisterCode = "K9",
+                    SaleDate = new DateOnly(2026, 11, 20),
+                    ReceiptNumber = "PAR/SECRET-1",
+                    GrossAmount = 120m,
+                    Discount = 6m,
+                    PaidAmount = 114m,
+                    Liters = 20m,
+                    PointsAwarded = 114,
+                    RegisteredByUserId = userId,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        var events = await ChatAsync(client, "Dlaczego 114 punktów?");
+
+        Assert.Equal("done", events[^1].Name);
+        var body = gemini.Sent[1].Body;
+        var data = JsonNode.Parse(body)!["contents"]![2]!["parts"]![0]!["functionResponse"]![
+            "response"
+        ]!["data"]!.AsObject();
+        Assert.Equal(
+            ["discount", "grossAmount", "paidAmount", "pointsAwarded", "rule"],
+            data.Select(p => p.Key).Order()
+        );
+        foreach (var leaked in new[] { "ST-777", "K9", "PAR/SECRET-1", "2026-11-20" })
+            Assert.DoesNotContain(leaked, body);
     }
 
     [Fact]

@@ -253,18 +253,24 @@ test("stop cancels the turn and frees the composer", async ({
       const url = input instanceof Request ? input.url : String(input);
       const signal =
         init?.signal ?? (input instanceof Request ? input.signal : undefined);
-      if (url.endsWith("/api/chat") && signal)
-        signal.addEventListener("abort", () => {
-          (window as unknown as { __chatAborted: boolean }).__chatAborted =
-            true;
-        });
+      const mark = () => {
+        (window as unknown as { __chatAborted: boolean }).__chatAborted = true;
+      };
+      // Already aborted (stop before the request left) fires no event: check it too.
+      if (url.endsWith("/api/chat") && signal) {
+        if (signal.aborted) mark();
+        else signal.addEventListener("abort", mark);
+      }
       return original(input, init);
     };
   });
   await openChat(page);
 
+  // Stop once the chat request has left (a CSRF token request goes first).
+  const sent = page.waitForRequest("**/api/chat");
   const turn = await ask(page, "saldo");
   await expect(turn).toHaveAttribute("data-status", "streaming");
+  await sent;
   await page.getByRole("button", { name: "Zatrzymaj" }).click();
 
   await expect(turn).toHaveAttribute("data-status", "cancelled");
@@ -347,4 +353,36 @@ test("a suggestion keeps the typed draft", async ({ page, customer }) => {
     "done",
   );
   await expect(box).toHaveValue("moje pytanie");
+});
+
+test("coupon comparison and points explanation come from the server tools", async ({
+  page,
+  customer,
+}) => {
+  void customer;
+  await openChat(page);
+
+  await page
+    .getByRole("button", {
+      name: "Tankuję 40 l za 250 zł - który kupon wybrać?",
+    })
+    .click();
+  const compare = page.getByTestId("chat-turn").last();
+  await expect(compare).toHaveAttribute("data-status", "done");
+  await expect(
+    compare.getByRole("list", { name: "Użyte narzędzia" }),
+  ).toHaveText("Porównanie kuponów: sprawdzono");
+  await expect(compare.getByTestId("chat-answer")).toContainText(
+    "Kolejność: najwyższy rabat w zł",
+  );
+
+  await page
+    .getByLabel("Wiadomość do asystenta")
+    .fill("Dlaczego dostałem tyle punktów?");
+  await page.getByRole("button", { name: "Wyślij" }).click();
+  const explain = page.getByTestId("chat-turn").last();
+  await expect(explain).toHaveAttribute("data-status", "done");
+  await expect(
+    explain.getByRole("list", { name: "Użyte narzędzia" }),
+  ).toHaveText("Rachunek punktów: sprawdzono");
 });

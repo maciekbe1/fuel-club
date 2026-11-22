@@ -837,4 +837,223 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         Assert.True(stream.Response.Headers.CacheControl?.NoTransform);
         Assert.True(stream.Response.Headers.CacheControl?.NoStore);
     }
+
+    private async Task<ToolResult> RunToolAsync(Customer customer, string name, object? arguments)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var tools = scope.ServiceProvider.GetRequiredService<AssistantTools>();
+        return await tools.ExecuteAsync(
+            new ToolCall(name, JsonSerializer.SerializeToElement(arguments ?? new { })),
+            new ToolContext(customer.UserId),
+            CancellationToken.None
+        );
+    }
+
+    private Task<int> OfferAsync(string label, int cost, decimal perLiter, decimal maxLiters) =>
+        DbAsync(async db =>
+        {
+            db.RewardOffers.Add(
+                new RewardOffer
+                {
+                    Id = Guid.CreateVersion7(),
+                    Name = $"{label} {_tag}",
+                    Description = "",
+                    PointsCost = cost,
+                    DiscountPerLiter = perLiter,
+                    MaxLiters = maxLiters,
+                    IsActive = true,
+                }
+            );
+            return await db.SaveChangesAsync();
+        });
+
+    private Task<int> PurchaseAsync(
+        string userId,
+        DateOnly saleDate,
+        decimal gross,
+        decimal discount,
+        DateTimeOffset createdAt
+    ) =>
+        DbAsync(async db =>
+        {
+            var paid = gross - discount;
+            db.FuelPurchases.Add(
+                new FuelPurchase
+                {
+                    Id = Guid.CreateVersion7(),
+                    UserId = userId,
+                    StationCode = "ST-001",
+                    RegisterCode = "K1",
+                    SaleDate = saleDate,
+                    ReceiptNumber = $"R-{Guid.NewGuid():N}".ToUpperInvariant()[..20],
+                    GrossAmount = gross,
+                    Discount = discount,
+                    PaidAmount = paid,
+                    Liters = 10m,
+                    PointsAwarded = (int)decimal.Floor(paid),
+                    RegisteredByUserId = userId,
+                    CreatedAt = createdAt,
+                }
+            );
+            return await db.SaveChangesAsync();
+        });
+
+    [Fact]
+    public async Task Compare_coupons_separates_own_coupons_from_offers_and_caps_by_the_amount()
+    {
+        var customer = await AccountAsync(balance: 1000);
+        var purchased = await CouponAsync(customer, "Weekend"); // 0.20 zł/l up to 50 l; costs 100
+        var active = await CouponAsync(customer, "Aktywny");
+        await ConfirmCouponDirectlyAsync(customer, active.Id);
+        await OfferAsync("Duży", 5000, 0.50m, 30m);
+        var other = await AccountAsync();
+        var foreign = await CouponAsync(other, "Obcy");
+
+        var capped = await RunToolAsync(
+            customer,
+            AssistantTools.CompareCoupons,
+            new { liters = 40, grossAmount = 10 }
+        );
+        Assert.Equal(ToolStatus.Ok, capped.Status);
+        var c = Assert.IsType<CouponComparison>(capped.Data);
+        Assert.False(c.Estimate);
+        Assert.Equal(AssistantTools.ComparisonCriterion, c.Criterion);
+        Assert.Equal(
+            new[] { purchased.Id, active.Id }.Order(),
+            c.OwnCoupons.Select(o => o.CouponId).Order()
+        );
+        Assert.DoesNotContain(c.OwnCoupons, o => o.CouponId == foreign.Id);
+        Assert.All(c.OwnCoupons, o => Assert.Equal(8.00m, o.Discount));
+        var big = c.OffersForPoints.Single(o => o.Name == $"Duży {_tag}");
+        // 0.50 x 30 l = 15 zł, but never more than the 10 zł purchase.
+        Assert.Equal(10m, big.Discount);
+        Assert.Equal(5000 - 800, big.PointsMissing);
+
+        var estimate = Assert.IsType<CouponComparison>(
+            (await RunToolAsync(customer, AssistantTools.CompareCoupons, new { liters = 40 })).Data
+        );
+        Assert.True(estimate.Estimate);
+        Assert.Equal(15m, estimate.OffersForPoints.Single(o => o.Name == $"Duży {_tag}").Discount);
+        Assert.Equal(
+            estimate.OffersForPoints.OrderByDescending(o => o.Discount).Select(o => o.Discount),
+            estimate.OffersForPoints.Select(o => o.Discount)
+        );
+
+        foreach (
+            var bad in new object[]
+            {
+                new { liters = "40" },
+                new { liters = -1 },
+                new { liters = 40.0001 },
+                new { },
+                new { liters = 40, grossAmount = 0 },
+                new { liters = 40, userId = other.UserId },
+            }
+        )
+            Assert.Equal(
+                ToolStatus.Rejected,
+                (await RunToolAsync(customer, AssistantTools.CompareCoupons, bad)).Status
+            );
+    }
+
+    [Fact]
+    public async Task Offers_carry_the_missing_points_from_the_balance()
+    {
+        var customer = await AccountAsync(balance: 300);
+        await OfferAsync("Tani", 100, 0.10m, 10m);
+        await OfferAsync("Drogi", 750, 0.10m, 10m);
+
+        var result = await RunToolAsync(customer, AssistantTools.ListAvailableRewards, null);
+
+        var offers = Assert.IsType<List<RewardSummary>>(result.Data);
+        Assert.Equal(0, offers.Single(o => o.Name == $"Tani {_tag}").PointsMissing);
+        Assert.Equal(450, offers.Single(o => o.Name == $"Drogi {_tag}").PointsMissing);
+    }
+
+    [Fact]
+    public async Task Explain_points_uses_the_own_latest_purchase_with_a_fixed_tie_break()
+    {
+        var customer = await AccountAsync();
+        var other = await AccountAsync();
+        var none = await RunToolAsync(customer, AssistantTools.ExplainPurchasePoints, null);
+        Assert.Equal((ToolStatus.Ok, "no_purchases"), (none.Status, none.Reason));
+        Assert.Null(none.Data);
+
+        var day = new DateOnly(2026, 11, 20);
+        var t = new DateTimeOffset(2026, 11, 20, 8, 0, 0, TimeSpan.Zero);
+        await PurchaseAsync(customer.UserId, day.AddDays(-1), 200m, 0m, t.AddDays(1));
+        await PurchaseAsync(customer.UserId, day, 50m, 0m, t);
+        await PurchaseAsync(customer.UserId, day, 120m, 6m, t.AddHours(1));
+        await PurchaseAsync(other.UserId, day.AddDays(5), 999m, 0m, t);
+
+        var latest = Assert.IsType<PurchasePointsData>(
+            (await RunToolAsync(customer, AssistantTools.ExplainPurchasePoints, null)).Data
+        );
+        Assert.Equal(
+            (120m, 6m, 114m, 114),
+            (latest.GrossAmount, latest.Discount, latest.PaidAmount, latest.PointsAwarded)
+        );
+        Assert.Equal(AssistantTools.PointsRule, latest.Rule);
+
+        // A purchase fully covered by a discount gives 0 points and is still explained.
+        await PurchaseAsync(customer.UserId, day.AddDays(1), 5m, 5m, t);
+        var zero = Assert.IsType<PurchasePointsData>(
+            (await RunToolAsync(customer, AssistantTools.ExplainPurchasePoints, null)).Data
+        );
+        Assert.Equal((0m, 0), (zero.PaidAmount, zero.PointsAwarded));
+
+        Assert.Equal(
+            ToolStatus.Rejected,
+            (
+                await RunToolAsync(
+                    customer,
+                    AssistantTools.ExplainPurchasePoints,
+                    new { userId = other.UserId }
+                )
+            ).Status
+        );
+    }
+
+    [Fact]
+    public async Task Demo_compares_coupons_for_a_fill_up_and_explains_points()
+    {
+        var customer = await AccountAsync();
+        await CouponAsync(customer, "Weekend");
+
+        var compare = await ChatAsync(
+            customer.Client,
+            "Tankuję 40 litrów za 250 zł. Który kupon wybrać?"
+        );
+        Assert.Equal("compare_coupons:ok", ToolsOf(compare).Single());
+        Assert.Contains("Kolejność: najwyższy rabat", compare.Text);
+        Assert.Contains("8,00 zł", compare.Text);
+        Assert.DoesNotContain("szacunek", compare.Text);
+
+        var ask = await ChatAsync(customer.Client, "Który kupon się opłaca?");
+        Assert.Empty(ToolsOf(ask));
+        Assert.Contains("Ile litrów", ask.Text);
+
+        await PurchaseAsync(
+            customer.UserId,
+            new DateOnly(2026, 11, 20),
+            120m,
+            6m,
+            DateTimeOffset.UtcNow
+        );
+        var explain = await ChatAsync(
+            customer.Client,
+            "Dlaczego dostałem 114 zamiast 120 punktów?"
+        );
+        Assert.Equal("explain_purchase_points:ok", ToolsOf(explain).Single());
+        Assert.Contains("zapłacono 114,00 zł", explain.Text);
+        Assert.DoesNotContain("Nie mogę", explain.Text);
+    }
+
+    private static IEnumerable<string> ToolsOf(Stream stream) =>
+        stream
+            .Of("tool")
+            .Select(t =>
+                $"{t.GetProperty("name").GetString()}:{t.GetProperty("status").GetString()}"
+            )
+            .ToList();
 }

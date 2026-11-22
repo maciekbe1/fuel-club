@@ -17,7 +17,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
     : IChatModel
 {
     public const string ClientName = "gemini";
-    public const string Version = "gemini-v1";
+    public const string Version = "gemini-v2";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -32,7 +32,12 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         Jesteś asystentem programu lojalnościowego stacji paliw Fuel Club. Odpowiadasz po polsku,
         krótko i rzeczowo.
         Dane o kliencie bierzesz wyłącznie z narzędzi: saldo (get_my_balance), oferty
-        (list_available_rewards), kupony (list_my_coupons). Nie zgaduj liczb.
+        (list_available_rewards, z polem pointsMissing), kupony (list_my_coupons), porównanie
+        kuponów dla tankowania (compare_coupons), wyjaśnienie punktów ostatniego zakupu
+        (explain_purchase_points). Nie zgaduj ani nie przeliczaj liczb - podawaj te z narzędzi.
+        Przy porównaniu oddziel kupony klienta od ofert wymagających wydania punktów, podaj
+        kryterium kolejności i nie nazywaj opcji „najlepszą” bez niego. Gdy estimate = true,
+        powiedz, że to szacunek, bo nie podano kwoty zakupu. Nie przeliczaj punktów na złotówki.
         Aktywację kuponu możesz tylko zaproponować narzędziem propose_coupon_activation. Klient
         zatwierdza ją przyciskiem w aplikacji - nigdy nie mów, że kupon został aktywowany.
         Nie naliczasz ani nie wymieniasz punktów, nie realizujesz kuponów i nie zmieniasz ofert:
@@ -174,6 +179,34 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
                         },
                     },
                 }
+            ),
+            Declaration(
+                AssistantTools.CompareCoupons,
+                "Rabat każdego kuponu klienta i każdej oferty za punkty dla planowanego tankowania. Liczy serwer.",
+                new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["liters"] = new JsonObject
+                        {
+                            ["type"] = "number",
+                            ["description"] = "Planowane litry, > 0.",
+                        },
+                        ["grossAmount"] = new JsonObject
+                        {
+                            ["type"] = "number",
+                            ["description"] =
+                                "Kwota zakupu w zł przed rabatem, jeśli klient ją podał.",
+                        },
+                    },
+                    ["required"] = new JsonArray("liters"),
+                }
+            ),
+            Declaration(
+                AssistantTools.ExplainPurchasePoints,
+                "Rachunek punktów ostatniego zakupu klienta: brutto, rabat, zapłacono, punkty i zasada.",
+                null
             ),
             Declaration(
                 AssistantTools.ProposeCouponActivation,

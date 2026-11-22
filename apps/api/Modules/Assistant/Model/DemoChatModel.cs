@@ -28,6 +28,16 @@ public sealed partial class DemoChatModel : IChatModel
         var text = Normalize(context.Message);
         var intro = context.History.Count == 0 ? "Asystent w trybie demo (reguły, bez AI). " : "";
 
+        // A question about awarded points, before the refusal rules ("naliczono" is not a request).
+        if (ExplainPoints().IsMatch(text))
+            return
+                context.ToolResults.LastOrDefault(r =>
+                    r.Name == AssistantTools.ExplainPurchasePoints
+                )
+                    is { } explained
+                ? Reply(intro + Describe(explained))
+                : Call(AssistantTools.ExplainPurchasePoints);
+
         if (Forbidden().IsMatch(text))
             return Reply(
                 intro
@@ -41,6 +51,9 @@ public sealed partial class DemoChatModel : IChatModel
 
         if (activation)
             return Task.FromResult(NextActivationStep(context, text, intro));
+
+        if (Compare().IsMatch(text))
+            return Task.FromResult(NextComparisonStep(context, text, intro));
 
         foreach (var tool in Wanted(text))
             if (done.All(result => result.Name != tool))
@@ -132,6 +145,40 @@ public sealed partial class DemoChatModel : IChatModel
         );
     }
 
+    private static ModelStep NextComparisonStep(ChatModelContext context, string text, string intro)
+    {
+        var done = context.ToolResults.LastOrDefault(r => r.Name == AssistantTools.CompareCoupons);
+        if (done is not null)
+            return new ModelStep.Reply(intro + Describe(done));
+        var liters = Number(LitersAmount().Match(text));
+        if (liters is null)
+            return new ModelStep.Reply(
+                intro + "Ile litrów chcesz zatankować? Napisz np. „40 l za 250 zł”."
+            );
+        var gross = Number(MoneyAmount().Match(text));
+        return new ModelStep.Tool(
+            new ToolCall(
+                AssistantTools.CompareCoupons,
+                gross is null
+                    ? Arguments(new { liters })
+                    : Arguments(new { liters, grossAmount = gross })
+            )
+        );
+    }
+
+    private static decimal? Number(Match match) =>
+        match.Success
+        && decimal.TryParse(
+            match.Groups[1].Value.Replace(',', '.'),
+            NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture,
+            out var value
+        )
+            ? value
+            : null;
+
+    private static string Money(decimal value) => $"{value.ToString("N2", Polish)} zł";
+
     private static ModelStep Propose(string couponId) =>
         new ModelStep.Tool(
             new ToolCall(AssistantTools.ProposeCouponActivation, Arguments(new { couponId }))
@@ -163,9 +210,21 @@ public sealed partial class DemoChatModel : IChatModel
                     offers.Select(o =>
                         $"{o.Name} - {o.PointsCost.ToString("N0", Polish)} pkt, "
                         + $"{o.DiscountPerLiter.ToString("0.00", Polish)} zł/l do {o.MaxLiters.ToString("0.###", Polish)} l"
+                        + (
+                            o.PointsMissing > 0
+                                ? $" (brakuje {o.PointsMissing.ToString("N0", Polish)} pkt)"
+                                : " (stać Cię)"
+                        )
                     )
                 )
                 + ".",
+            (AssistantTools.CompareCoupons, CouponComparison c) => DescribeComparison(c),
+            (AssistantTools.ExplainPurchasePoints, PurchasePointsData p) =>
+                $"Ostatni zakup: brutto {Money(p.GrossAmount)}, rabat {Money(p.Discount)}, "
+                    + $"zapłacono {Money(p.PaidAmount)} → {p.PointsAwarded.ToString("N0", Polish)} pkt. "
+                    + $"Zasada: {p.Rule}",
+            (AssistantTools.ExplainPurchasePoints, null) =>
+                "Nie widzę jeszcze żadnego Twojego zakupu, więc nie ma czego wyjaśnić.",
             (AssistantTools.ListMyCoupons, List<CouponSummary> { Count: 0 }) =>
                 "Nie masz jeszcze kuponów.",
             (AssistantTools.ListMyCoupons, List<CouponSummary> coupons) => "Twoje kupony: "
@@ -182,6 +241,44 @@ public sealed partial class DemoChatModel : IChatModel
             },
             _ => "Nie mogę tego zrobić.",
         };
+    }
+
+    private static string DescribeComparison(CouponComparison c)
+    {
+        var head =
+            $"Dla {c.Liters.ToString("0.###", Polish)} l"
+            + (c.GrossAmount is { } g ? $" za {Money(g)}" : "")
+            + ". Kolejność: najwyższy rabat w zł.";
+        if (c.Estimate)
+            head += " To szacunek - rabat nie przekroczy kwoty zakupu, której nie podano.";
+        var own =
+            c.OwnCoupons.Count == 0
+                ? "Nie masz kuponów do użycia."
+                : "Twoje kupony: "
+                    + string.Join(
+                        "; ",
+                        c.OwnCoupons.Select(o =>
+                            $"{o.OfferName} ({StatusLabel(o.Status)}) - rabat {Money(o.Discount)}"
+                        )
+                    )
+                    + ".";
+        var offers =
+            c.OffersForPoints.Count == 0
+                ? "Nie ma ofert za punkty."
+                : "Oferty za punkty: "
+                    + string.Join(
+                        "; ",
+                        c.OffersForPoints.Select(o =>
+                            $"{o.Name} - {o.PointsCost.ToString("N0", Polish)} pkt, rabat {Money(o.Discount)}"
+                            + (
+                                o.PointsMissing > 0
+                                    ? $", brakuje {o.PointsMissing.ToString("N0", Polish)} pkt"
+                                    : ""
+                            )
+                        )
+                    )
+                    + ".";
+        return $"{head} {own} {offers}";
     }
 
     private static string StatusLabel(string status) =>
@@ -231,6 +328,20 @@ public sealed partial class DemoChatModel : IChatModel
 
     [GeneratedRegex(@"kupon")]
     private static partial Regex Coupons();
+
+    [GeneratedRegex(
+        @"(dlaczego|czemu|skad|wyjasnij|ile\s+(punktow\s+)?dostalem|naliczon)[^?]*(punkt|pkt)|(punkt|pkt)[^?]*(dostalem|naliczon)"
+    )]
+    private static partial Regex ExplainPoints();
+
+    [GeneratedRegex(@"(ktory|jaki)\s+kupon|oplaca|wybrac|zaoszczedz|porownaj|najwiekszy\s+rabat")]
+    private static partial Regex Compare();
+
+    [GeneratedRegex(@"(\d+(?:[.,]\d+)?)\s*(?:l\b|litr)")]
+    private static partial Regex LitersAmount();
+
+    [GeneratedRegex(@"(\d+(?:[.,]\d+)?)\s*(?:zl|pln)")]
+    private static partial Regex MoneyAmount();
 
     [GeneratedRegex(@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")]
     private static partial Regex CouponId();

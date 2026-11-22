@@ -2,6 +2,8 @@ using System.Text.Json;
 using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Modules.Assistant.Chat;
 using FuelClub.Api.Modules.Assistant.Confirmation;
+using FuelClub.Api.Modules.Loyalty.Domain;
+using FuelClub.Api.Modules.Loyalty.Points;
 using FuelClub.Api.Modules.Loyalty.Wallet;
 using FuelClub.Api.Modules.Rewards.Catalog;
 using FuelClub.Api.Modules.Rewards.Coupons;
@@ -44,11 +46,53 @@ public sealed record ToolResult(
 
 public sealed record BalanceData(int Balance);
 
+/// <summary>PointsMissing = max(0, cost - balance), computed here, never by the model.</summary>
 public sealed record RewardSummary(
     string Name,
     int PointsCost,
     decimal DiscountPerLiter,
-    decimal MaxLiters
+    decimal MaxLiters,
+    int PointsMissing
+);
+
+/// <summary>A coupon the user already has (Purchased or Active), with its discount for the fill-up.</summary>
+public sealed record CouponOption(
+    Guid CouponId,
+    string OfferName,
+    string Status,
+    decimal Discount,
+    decimal LitersCovered
+);
+
+/// <summary>An offer that costs points first; Discount is what its coupon would give.</summary>
+public sealed record OfferOption(
+    string Name,
+    int PointsCost,
+    int PointsMissing,
+    decimal Discount,
+    decimal LitersCovered
+);
+
+/// <summary>
+/// Both lists sorted by Criterion. Estimate: no gross amount was given, so the discount may still be
+/// capped by the purchase amount.
+/// </summary>
+public sealed record CouponComparison(
+    decimal Liters,
+    decimal? GrossAmount,
+    bool Estimate,
+    string Criterion,
+    List<CouponOption> OwnCoupons,
+    List<OfferOption> OffersForPoints
+);
+
+/// <summary>The approved export for Gemini: amounts, points and the rule (ADR 0011).</summary>
+public sealed record PurchasePointsData(
+    decimal GrossAmount,
+    decimal Discount,
+    decimal PaidAmount,
+    int PointsAwarded,
+    string Rule
 );
 
 public sealed record CouponSummary(
@@ -71,6 +115,15 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
     public const string ListAvailableRewards = "list_available_rewards";
     public const string ListMyCoupons = "list_my_coupons";
     public const string ProposeCouponActivation = "propose_coupon_activation";
+    public const string CompareCoupons = "compare_coupons";
+    public const string ExplainPurchasePoints = "explain_purchase_points";
+
+    public const string PointsRule =
+        "1 pkt za każdą pełną złotówkę zapłaconą po rabacie (zapłacono = brutto - rabat), "
+        + "zaokrąglenie w dół.";
+
+    public const string ComparisonCriterion =
+        "najwyższy rabat w zł dla podanego tankowania; przy równym rabacie - kolejność nazw";
 
     public static readonly IReadOnlyList<string> Names =
     [
@@ -78,6 +131,8 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
         ListAvailableRewards,
         ListMyCoupons,
         ProposeCouponActivation,
+        CompareCoupons,
+        ExplainPurchasePoints,
     ];
 
     public Task<ToolResult> ExecuteAsync(
@@ -88,7 +143,9 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
         call.Name switch
         {
             GetMyBalance => NoArguments(call) ?? BalanceAsync(context, cancellationToken),
-            ListAvailableRewards => NoArguments(call) ?? RewardsAsync(cancellationToken),
+            ListAvailableRewards => NoArguments(call) ?? RewardsAsync(context, cancellationToken),
+            CompareCoupons => CompareAsync(call, context, cancellationToken),
+            ExplainPurchasePoints => NoArguments(call) ?? ExplainAsync(context, cancellationToken),
             ListMyCoupons => CouponsAsync(call, context, cancellationToken),
             ProposeCouponActivation => ProposeAsync(call, context, cancellationToken),
             // The name is model output: it is not echoed back.
@@ -136,18 +193,149 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             new BalanceData(await WalletEndpoints.BalanceAsync(db, context.UserId, ct))
         );
 
-    private async Task<ToolResult> RewardsAsync(CancellationToken ct)
+    private async Task<ToolResult> RewardsAsync(ToolContext context, CancellationToken ct)
     {
-        var offers = await CatalogEndpoint
-            .ActiveOffers(db)
+        var balance = await WalletEndpoints.BalanceAsync(db, context.UserId, ct);
+        var offers = (await CatalogEndpoint.ActiveOffers(db).ToListAsync(ct))
             .Select(offer => new RewardSummary(
                 offer.Name,
                 offer.PointsCost,
                 offer.DiscountPerLiter,
-                offer.MaxLiters
+                offer.MaxLiters,
+                Missing(offer.PointsCost, balance)
             ))
-            .ToListAsync(ct);
+            .ToList();
         return new(ListAvailableRewards, ToolStatus.Ok, offers);
+    }
+
+    private static int Missing(int cost, int balance) => Math.Max(0, cost - balance);
+
+    /// <summary>
+    /// Discounts for a planned fill-up, computed with the same formula as the till. Own usable
+    /// coupons and offers that cost points are kept apart; nothing is called "best" here.
+    /// </summary>
+    private async Task<ToolResult> CompareAsync(
+        ToolCall call,
+        ToolContext context,
+        CancellationToken ct
+    )
+    {
+        var arguments = NumberArguments(call.Arguments, "liters", "grossAmount");
+        if (
+            arguments is null
+            || !arguments.TryGetValue("liters", out var liters)
+            || liters <= 0m
+            || liters > FuelPurchaseRules.MaxLiters
+            || decimal.Round(liters, FuelPurchaseRules.LitersScale) != liters
+        )
+            return Reject(call.Name, "invalid_arguments");
+        decimal? gross = arguments.TryGetValue("grossAmount", out var g) ? g : null;
+        if (
+            gross is { } amount
+            && (
+                amount <= 0m
+                || amount > FuelPurchaseRules.MaxAmount
+                || decimal.Round(amount, FuelPurchaseRules.AmountScale) != amount
+            )
+        )
+            return Reject(call.Name, "invalid_arguments");
+
+        (decimal Discount, decimal Covered) Benefit(decimal perLiter, decimal maxLiters)
+        {
+            var covered = Math.Min(liters, maxLiters);
+            var discount = gross is { } total
+                ? CouponDiscount.Calculate(perLiter, maxLiters, liters, total).Discount
+                : Math.Round(perLiter * covered, 2, MidpointRounding.AwayFromZero);
+            return (discount, covered);
+        }
+
+        var balance = await WalletEndpoints.BalanceAsync(db, context.UserId, ct);
+        var own = (
+            await MyCouponsEndpoints
+                .Own(db, context.UserId)
+                .Where(c => c.Status == CouponStatus.Purchased || c.Status == CouponStatus.Active)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.OfferName,
+                    c.Status,
+                    c.DiscountPerLiter,
+                    c.MaxLiters,
+                })
+                .ToListAsync(ct)
+        )
+            .Select(c =>
+            {
+                var (discount, covered) = Benefit(c.DiscountPerLiter, c.MaxLiters);
+                return new CouponOption(c.Id, c.OfferName, c.Status.ToString(), discount, covered);
+            })
+            .OrderByDescending(c => c.Discount)
+            .ThenBy(c => c.OfferName, StringComparer.Ordinal)
+            .ThenBy(c => c.CouponId)
+            .ToList();
+        var offers = (await CatalogEndpoint.ActiveOffers(db).ToListAsync(ct))
+            .Select(o =>
+            {
+                var (discount, covered) = Benefit(o.DiscountPerLiter, o.MaxLiters);
+                return new OfferOption(
+                    o.Name,
+                    o.PointsCost,
+                    Missing(o.PointsCost, balance),
+                    discount,
+                    covered
+                );
+            })
+            .OrderByDescending(o => o.Discount)
+            .ThenBy(o => o.Name, StringComparer.Ordinal)
+            .ToList();
+        return new(
+            CompareCoupons,
+            ToolStatus.Ok,
+            new CouponComparison(liters, gross, gross is null, ComparisonCriterion, own, offers)
+        );
+    }
+
+    /// <summary>The latest own purchase; none is an answer too (no data, reason no_purchases).</summary>
+    private async Task<ToolResult> ExplainAsync(ToolContext context, CancellationToken ct)
+    {
+        var purchase = await PurchasePoints.LatestAsync(db, context.UserId, ct);
+        if (purchase is null)
+            return new(ExplainPurchasePoints, ToolStatus.Ok, Reason: "no_purchases");
+        return new(
+            ExplainPurchasePoints,
+            ToolStatus.Ok,
+            new PurchasePointsData(
+                purchase.GrossAmount,
+                purchase.Discount,
+                purchase.PaidAmount,
+                purchase.PointsAwarded,
+                PointsRule
+            )
+        );
+    }
+
+    /// <summary>Only the named properties, each a JSON number; anything else rejects the call.</summary>
+    private static Dictionary<string, decimal>? NumberArguments(
+        JsonElement arguments,
+        params string[] allowed
+    )
+    {
+        var values = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        if (arguments.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+            return values;
+        if (arguments.ValueKind != JsonValueKind.Object)
+            return null;
+        foreach (var property in arguments.EnumerateObject())
+        {
+            if (
+                !allowed.Contains(property.Name)
+                || property.Value.ValueKind != JsonValueKind.Number
+                || !property.Value.TryGetDecimal(out var value)
+            )
+                return null;
+            values[property.Name] = value;
+        }
+        return values;
     }
 
     private async Task<ToolResult> CouponsAsync(

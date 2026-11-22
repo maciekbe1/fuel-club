@@ -17,6 +17,8 @@ const TOOL_LABELS: Record<string, string> = {
   list_available_rewards: "Dostępne oferty",
   list_my_coupons: "Twoje kupony",
   propose_coupon_activation: "Propozycja aktywacji",
+  compare_coupons: "Porównanie kuponów",
+  explain_purchase_points: "Rachunek punktów",
 };
 
 const TOOL_STATUS: Record<string, string> = {
@@ -28,6 +30,8 @@ const TOOL_STATUS: Record<string, string> = {
 const SUGGESTIONS = [
   "Ile mam punktów?",
   "Jakie są oferty?",
+  "Tankuję 40 l za 250 zł - który kupon wybrać?",
+  "Dlaczego dostałem tyle punktów?",
   "Pokaż moje kupony",
   "Aktywuj mój kupon",
 ];
