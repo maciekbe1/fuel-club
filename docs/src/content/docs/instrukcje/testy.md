@@ -51,7 +51,7 @@ npx playwright install chromium   # raz
 npm run e2e
 ```
 
-Next łączy się z API przez proxy `e2e/fault-proxy.mjs` (`:5282`), które przekazuje ruch bez zmian. Ciasteczko `e2e-fault=503` albo `e2e-fault=drop` w kontekście jednego testu wymusza awarię `GET /api/auth/me` (status albo zerwane połączenie) tylko dla tego testu.
+Next łączy się z API przez proxy `e2e/fault-proxy.mjs` (`:5282`), które przekazuje ruch bez zmian. Ciasteczko `e2e-fault=503` albo `e2e-fault=drop` w kontekście jednego testu wymusza awarię `GET /api/auth/me` (status albo zerwane połączenie) tylko dla tego testu. Dla `POST /api/chat`: `e2e-fault=sse-split` przesyła strumień w 3-bajtowych kawałkach i wstrzymuje go 1,5 s przed pierwszym `delta`, `sse-cut` zrywa połączenie w tym miejscu.
 
 Inna baza: `FUELCLUB_E2E_DATABASE`, ale nazwa bazy musi być `fuelclub_e2e` - inaczej `playwright.config.ts` przerywa uruchomienie przed migracją. Każdy test rejestruje nowe konto (`e2e-<uuid>@example.test`), więc testy nie zależą od siebie i nie wymagają czyszczenia. Serwery nie są używane ponownie (`reuseExistingServer: false`): działający proces mógłby pominąć migrację albo wskazywać inną bazę. Zajęty port `:5281`, `:5282` lub `:3100` kończy uruchomienie błędem.
 

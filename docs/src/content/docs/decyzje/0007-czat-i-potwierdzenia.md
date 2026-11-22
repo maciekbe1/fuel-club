@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-22). Zrealizowane w API: endpoint czatu ze strumieniem SSE, narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji. Interfejs czatu: [P6, planowany](/moduly/assistant/).
+Decyzja przyjęta (2026-11-22). Zrealizowane w API: endpoint czatu ze strumieniem SSE, narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji. Interfejs czatu: `/czat` ([moduł](/moduly/assistant/)).
 
 ## Problem
 
@@ -28,7 +28,7 @@ Tekst modelu („aktywuję kupon”) nie jest zgodą. Potrzebny jest kontrakt st
   - `history`: najwyżej 20 wpisów `{ role: "user" | "assistant", text ≤ 2000 }`.
   - Walidacja przed strumieniem: błąd to zwykłe `400` ProblemDetails.
 - Odpowiedź `text/event-stream` z nagłówkami:
-  - `Cache-Control: no-store`, `X-Accel-Buffering: no` (proxy nie buforuje);
+  - `Cache-Control: no-store, no-transform`, `X-Accel-Buffering: no` (proxy nie buforuje ani nie kompresuje);
   - `Content-Encoding: identity`.
 - Ramka: `event: <typ>` + `data: <JSON w jednej linii>` + pusta linia. Heartbeat to komentarz `: ping` co `HeartbeatInterval` (domyślnie 15 s).
 - Zdarzenia (payloady w OpenAPI jako `ChatStreamContract`, typy na froncie z `schema.d.ts`):
@@ -105,4 +105,5 @@ Zamknięta lista. Nazwa spoza listy, argument nieznany, brakujący lub w złym f
 
 - Kontrakt strumienia jest w OpenAPI, ale bez opisu sekwencji. Kolejność i końce tury opisuje ten ADR i testują testy API.
 - Token zawiera identyfikatory (zaszyfrowane). Odzyskanie Data Protection keys pozwala je odczytać. Na produkcji klucze muszą być trwałe i chronione ([P9](/instrukcje/)), inaczej restart unieważnia propozycje.
+- Next nie kompresuje odpowiedzi (`compress: false`): skompresowany strumień przychodził w całości na końcu, a `no-transform` znika przy odnowieniu ciasteczka sesji.
 - Adapter demo nie rozumie języka. Evals (P7) sprawdzają narzędzia, właściciela danych i skutki, nie jakość tekstu.

@@ -8,6 +8,7 @@ import {
   Ticket,
   Settings,
   TicketCheck,
+  MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
@@ -95,6 +96,12 @@ export function HomeScreen() {
           title="Moje kupony"
           description="Aktywuj i pokaż przy kasie"
         />
+        <Shortcut
+          href="/czat"
+          icon={MessageCircle}
+          title="Asystent"
+          description="Zapytaj o saldo, oferty i kupony"
+        />
         {staffShortcuts}
       </nav>
     </div>
@@ -112,6 +119,7 @@ function Shortcut({
     | "/historia"
     | "/oferty"
     | "/kupony"
+    | "/czat"
     | "/kasa"
     | "/admin/oferty";
   icon: ComponentType<{ className?: string }>;

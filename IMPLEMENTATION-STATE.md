@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - done; P6 - pending
+Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - done; P6 - done; P7 - pending
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -87,6 +87,42 @@ Review (`/code-review high`, 9 uwag, 8 przyjętych):
 
 Odrzucona: jedno miejsce na klucz na operację w `sessionStorage` - katalog blokuje wszystkie wymiany przy nieznanym wyniku, także po powrocie na ekran, więc drugiej wymiany nie da się zacząć.
 
+## P6 - transport i ekran czatu (done, 2026-11-22)
+
+Zakres: `features/assistant` i ekran `/czat` ze skrótem „Asystent”.
+- `fetch` ze strumieniem + `eventsource-parser`.
+- Tura w stanie `streaming`/`done`/`error`/`cancelled`; sukces tylko po `done`. Koniec strumienia bez `done` albo zerwanie → błąd „niepełna”.
+- „Zatrzymaj” przerywa żądanie.
+- Etykiety narzędzi, karta potwierdzenia: przyciski aktywne dopiero po `done`, „Nie teraz”, ponowienie z tym samym kluczem. Kod kuponu nie trafia do czatu.
+- Historia: tylko zakończone tury.
+- Proxy E2E ma tryby `sse-split` (3 bajty, przerwa przed `delta`) i `sse-cut`.
+
+Błąd znaleziony przez E2E: Next kompresował (gzip) odpowiedź z rewrite i oddawał cały strumień na końcu.
+- Poprawka: `compress: false`, a API wysyła też `no-transform`.
+- Samo `no-transform` nie wystarcza, bo odnowienie ciasteczka podmienia `Cache-Control` - stąd osobny test API na hoście bez odnawiania.
+- Wcześniejszy curl przez proxy tego nie pokazał, bo nie wysyłał `Accept-Encoding`.
+
+Testy (2026-11-22): `dotnet test` passed 442/442; `npx playwright test` passed 118/118 (24 w `chat.spec`); typecheck, lint i docs build passed.
+
+Próby negatywne, każda wywraca swój test:
+- kompresja Next bez `no-transform` → test podzielonego strumienia (sam `compress: false` wystarcza);
+- czyste zakończenie bez `done` traktowane jako sukces → nowy test. `sse-cut` tego nie łapał, bo zerwanie idzie ścieżką wyjątku;
+- karta bez stanu oczekiwania → test potwierdzenia po `done`.
+
+Przeglądarka (Chrome, :3200, Anna): saldo z etykietą narzędzia, oznaczenie demo, „aktywuj” → „Nie masz kuponów do aktywacji”. Okna nie dało się zwęzić; widok telefonu sprawdza projekt E2E `mobile`.
+
+Review (`/code-review high`, 10 uwag, wszystkie przyjęte):
+- karta mówiła „zapytaj ponownie” w trakcie odpowiedzi;
+- pytanie wysłane między `done` a zamknięciem strumienia ginęło;
+- zła ramka nie zamykała połączenia;
+- ręczne typy DTO;
+- każdy `400` jako błąd długości;
+- `403` jako „niedostępny”;
+- mylący komentarz;
+- pozostałości `.next-probe` w tsconfig;
+- brak testu `no-transform` w docs;
+- Enter przy IME i podpowiedź czyszcząca wpisany tekst.
+
 ## Następny krok
 
-P6 - transport i UI czatu, wg specs/PLAN.md i SPEC.md.
+P7a - lokalne evals i metadane śladów, wg specs/PLAN.md (rozbicie P7) i SPEC.md §3.

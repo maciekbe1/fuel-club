@@ -45,7 +45,9 @@ public static class ChatEndpoints
 
         var response = http.Response;
         response.ContentType = "text/event-stream; charset=utf-8";
-        response.Headers.CacheControl = "no-store";
+        // no-transform: a compressing proxy (Next dev/start does it by default) would
+        // otherwise gzip the stream and hold it until the end.
+        response.Headers.CacheControl = "no-store, no-transform";
         response.Headers["X-Accel-Buffering"] = "no";
         response.Headers.ContentEncoding = "identity";
         var correlationId = Guid.CreateVersion7().ToString("N");

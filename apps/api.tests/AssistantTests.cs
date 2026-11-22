@@ -772,4 +772,18 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         var wallet = await customer.Client.GetAsync("/api/me/wallet");
         Assert.NotEqual(true, wallet.Headers.CacheControl?.NoStore);
     }
+
+    [Fact]
+    public async Task Chat_stream_forbids_proxy_transformation()
+    {
+        // Compressing proxies would otherwise buffer the whole stream. The main host renews the
+        // session cookie on every request, which replaces Cache-Control, so use a host that does not.
+        await using var host = factory.WithoutPerRequestSessionRenewal();
+        var customer = await AccountAsync(host: host);
+
+        var stream = await ChatAsync(customer.Client, "saldo");
+
+        Assert.True(stream.Response.Headers.CacheControl?.NoTransform);
+        Assert.True(stream.Response.Headers.CacheControl?.NoStore);
+    }
 }
