@@ -1,4 +1,4 @@
-import { chromium, type Browser, type Page } from "@playwright/test";
+import { chromium, type Page } from "@playwright/test";
 import { CASHIER } from "./accounts";
 import {
   cameraState,
@@ -8,6 +8,7 @@ import {
   writeQrVideo,
 } from "./camera";
 import { expect, loginAs, test } from "./fixtures";
+import { openRegister } from "./register";
 
 const PURCHASES = "**/api/cashier/fuel-purchases";
 
@@ -15,24 +16,6 @@ async function showCard(page: Page) {
   await page.goto("/karta");
   await page.getByRole("button", { name: "Wydaj kartę" }).click();
   return (await page.getByTestId("card-code").getAttribute("data-code"))!;
-}
-
-async function openRegister(
-  browser: Browser,
-  baseURL: string,
-  init?: () => void,
-) {
-  const context = await browser.newContext({
-    baseURL,
-    locale: "pl-PL",
-    timezoneId: "Europe/Warsaw",
-  });
-  const page = await context.newPage();
-  if (init) await page.addInitScript(init);
-  await loginAs(page, CASHIER.email, CASHIER.password);
-  await page.getByRole("link", { name: /Kasa/ }).click();
-  await expect(page.getByTestId("station-code")).toHaveText(CASHIER.station);
-  return { context, page };
 }
 
 async function fillPurchase(page: Page, code: string) {
@@ -186,7 +169,9 @@ test("QR scan fills the card code without submitting, then stops the camera", as
       r.method() === "POST" && r.url().endsWith("/fuel-purchases") && posts++,
   );
 
-  await register.page.getByRole("button", { name: "Skanuj kod QR" }).click();
+  await register.page
+    .getByRole("button", { name: "Skanuj kod QR karty" })
+    .click();
   await expect(register.page.getByLabel("Kod karty klienta")).toHaveValue(
     code,
     { timeout: 15_000 },
@@ -197,7 +182,7 @@ test("QR scan fills the card code without submitting, then stops the camera", as
     live: 0,
   });
   await expect(
-    register.page.getByRole("button", { name: "Skanuj kod QR" }),
+    register.page.getByRole("button", { name: "Skanuj kod QR karty" }),
   ).toBeVisible();
   expect(posts).toBe(0);
   await expect(register.page.getByText("Zakup zapisany")).toBeHidden();
@@ -213,7 +198,9 @@ test("leaving the register stops the camera", async ({ baseURL }) => {
   });
   const register = await openRegister(camera, baseURL!, TRACK_STREAMS);
 
-  await register.page.getByRole("button", { name: "Skanuj kod QR" }).click();
+  await register.page
+    .getByRole("button", { name: "Skanuj kod QR karty" })
+    .click();
   await expect(
     register.page.getByText("Skieruj kamerę na kod QR"),
   ).toBeVisible();
@@ -237,7 +224,9 @@ test("camera permission denied: a clear message, pasting still works", async ({
 }) => {
   const register = await openRegister(browser, baseURL!, DENY_CAMERA);
 
-  await register.page.getByRole("button", { name: "Skanuj kod QR" }).click();
+  await register.page
+    .getByRole("button", { name: "Skanuj kod QR karty" })
+    .click();
   await expect(
     register.page
       .getByRole("alert")
@@ -340,7 +329,9 @@ test("stopping while the camera permission is pending: the late stream is stoppe
   });
   const register = await openRegister(camera, baseURL!, HOLD_CAMERA);
 
-  await register.page.getByRole("button", { name: "Skanuj kod QR" }).click();
+  await register.page
+    .getByRole("button", { name: "Skanuj kod QR karty" })
+    .click();
   await expect
     .poll(() =>
       register.page.evaluate(
@@ -362,7 +353,7 @@ test("stopping while the camera permission is pending: the late stream is stoppe
     register.page.getByText("Skieruj kamerę na kod QR"),
   ).toBeHidden();
   await expect(
-    register.page.getByRole("button", { name: "Skanuj kod QR" }),
+    register.page.getByRole("button", { name: "Skanuj kod QR karty" }),
   ).toBeVisible();
   await camera.close();
 });
@@ -394,7 +385,9 @@ test("locking the form stops the scanner and ignores a late scan", async ({
   });
 
   await fillPurchase(register.page, code);
-  await register.page.getByRole("button", { name: "Skanuj kod QR" }).click();
+  await register.page
+    .getByRole("button", { name: "Skanuj kod QR karty" })
+    .click();
   await register.page.getByRole("button", { name: "Zapisz zakup" }).click();
   await expect(register.page.getByLabel("Kod karty klienta")).toBeDisabled();
 

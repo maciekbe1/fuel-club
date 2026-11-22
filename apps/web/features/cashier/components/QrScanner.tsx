@@ -4,7 +4,6 @@ import jsQR from "jsqr";
 import { Camera, CameraOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { looksLikeCardCode } from "../schemas";
 
 type State =
   | { kind: "idle" }
@@ -24,18 +23,30 @@ function cameraError(error: unknown) {
 }
 
 /**
- * Reads a card QR from the camera and hands the code over; it never submits anything. The camera is
+ * Reads a QR accepted by `accept` (card or coupon) from the camera and hands the code over; it never
+ * submits anything. Only one scanner on the screen may use the camera: the parent disables the other
+ * one while `onActiveChange` reports this one active. The camera is
  * stopped after a successful scan, on "Zatrzymaj", when `disabled` turns on (form locked) and when
  * the component unmounts. Every start is an attempt with an id; stopping invalidates it, so a stream
  * that arrives late (permission granted after "Zatrzymaj") is stopped at once and a late scan is ignored.
  */
 export function QrScanner({
   onScan,
+  accept,
+  subject,
   disabled,
+  onActiveChange,
 }: {
   onScan: (code: string) => void;
+  /** Only codes of this kind fill the field; a card QR held to the coupon scanner is ignored. */
+  accept: (text: string) => boolean;
+  /** "karty klienta" or "kuponu": names the button and the hint. */
+  subject: string;
   disabled?: boolean;
+  onActiveChange?: (active: boolean) => void;
 }) {
+  const acceptRef = useRef(accept);
+  const onActiveRef = useRef(onActiveChange);
   const [state, setState] = useState<State>({ kind: "idle" });
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -45,7 +56,9 @@ export function QrScanner({
 
   useEffect(() => {
     onScanRef.current = onScan;
-  }, [onScan]);
+    acceptRef.current = accept;
+    onActiveRef.current = onActiveChange;
+  }, [onScan, accept, onActiveChange]);
 
   const stop = () => {
     attemptRef.current++;
@@ -82,7 +95,7 @@ export function QrScanner({
       });
       if (
         result &&
-        looksLikeCardCode(result.data) &&
+        acceptRef.current(result.data) &&
         attempt === attemptRef.current
       ) {
         stop();
@@ -131,6 +144,12 @@ export function QrScanner({
 
   const active = state.kind === "starting" || state.kind === "scanning";
 
+  useEffect(() => {
+    onActiveRef.current?.(active);
+  }, [active]);
+  // Unmounted while scanning (e.g. the section is reset): the camera is free again.
+  useEffect(() => () => onActiveRef.current?.(false), []);
+
   return (
     <div className="flex flex-col gap-3">
       <div
@@ -146,7 +165,7 @@ export function QrScanner({
       </div>
       {state.kind === "scanning" && (
         <p role="status" className="text-sm text-muted-foreground">
-          Skieruj kamerę na kod QR karty klienta.
+          Skieruj kamerę na kod QR {subject}.
         </p>
       )}
       {state.kind === "error" && (
@@ -174,7 +193,7 @@ export function QrScanner({
           disabled={disabled}
         >
           <Camera className="size-4" aria-hidden />
-          Skanuj kod QR
+          Skanuj kod QR {subject}
         </Button>
       )}
     </div>

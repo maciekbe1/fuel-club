@@ -10,12 +10,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { warsawToday } from "../schemas";
+import { looksLikeCardCode, warsawToday } from "../schemas";
+import { CouponSection } from "./CouponSection";
 import { QrScanner } from "./QrScanner";
 import { UnknownOutcome } from "./UnknownOutcome";
 import type { PurchaseFlow } from "./usePurchaseFlow";
 
 const plain = new Intl.NumberFormat("pl-PL");
+const money = new Intl.NumberFormat("pl-PL", {
+  style: "currency",
+  currency: "PLN",
+});
 
 export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
   const {
@@ -28,6 +33,10 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
     locked,
     send,
     onSubmit,
+    scanner,
+    setScanner,
+    previewGeneration,
+    forgetPreviews,
   } = flow;
   const { errors } = form.formState;
 
@@ -43,6 +52,11 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
             <p className="font-semibold">
               Zakup zapisany. Przyznano {plain.format(saved.pointsAwarded)} pkt.
             </p>
+            <p data-testid="purchase-result" className="text-sm">
+              {saved.discount > 0
+                ? `Rabat z kuponu ${money.format(saved.discount)} · do zapłaty ${money.format(saved.paidAmount)}`
+                : `Do zapłaty ${money.format(saved.paidAmount)}`}
+            </p>
             {saved.pointsAwarded === 0 && (
               <p className="text-sm">Kwota poniżej 1 zł nie daje punktów.</p>
             )}
@@ -57,6 +71,8 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
           onUnlock={() => {
             purchase.reset();
             setPending(null);
+            // The coupon may have been redeemed by the purchase whose outcome is unknown.
+            forgetPreviews();
           }}
         />
       )}
@@ -85,7 +101,10 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
             />
           </FormField>
           <QrScanner
-            disabled={locked}
+            disabled={locked || scanner === "coupon"}
+            onActiveChange={(active) => setScanner(active ? "card" : null)}
+            accept={looksLikeCardCode}
+            subject="karty klienta"
             onScan={(code) =>
               form.setValue("cardCode", code, {
                 shouldValidate: true,
@@ -95,6 +114,7 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
           />
 
           <div className="grid gap-5 sm:grid-cols-2">
+            {/* Amount and liters first: the coupon preview below uses them. */}
             <FormField id="amount" label="Kwota (zł)" error={errors.amount}>
               <Input
                 inputMode="decimal"
@@ -142,6 +162,9 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
               />
             </FormField>
           </div>
+
+          {/* A new generation remounts the section: its calculation goes with the forgotten previews. */}
+          <CouponSection key={previewGeneration} flow={flow} />
 
           <Button
             type="submit"

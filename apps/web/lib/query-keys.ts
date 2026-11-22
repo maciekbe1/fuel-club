@@ -5,7 +5,12 @@ export const queryKeys = {
   transactions: ["transactions"] as const,
   rewards: ["rewards"] as const,
   coupons: ["coupons"] as const,
-  cashier: { station: ["cashier", "station"] as const },
+  cashier: {
+    station: ["cashier", "station"] as const,
+    couponPreviews: ["cashier", "coupon-preview"] as const,
+    couponPreview: (cardCode: string, couponCode: string) =>
+      ["cashier", "coupon-preview", cardCode, couponCode] as const,
+  },
   admin: {
     all: ["admin"] as const,
     users: ["admin", "users"] as const,

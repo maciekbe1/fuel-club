@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0 - done; P1 - done; P2 - done; P3 - pending
+Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - pending
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -37,6 +37,14 @@ Próba negatywna: aktywacja bez odczytu `GET` po próbie → padają 3 testy akt
 Przeglądarka (Chrome, :3200, anna demo): kupon „Do aktywacji” → aktywacja → QR, kod w grupach, „Kopiuj kod”, data aktywacji.
 Review (`/code-review high`, 6 uwag): `persist` - odrzucone (powód wyżej, zapisane tu); 401 bez logowania - przyjęte; fallback statusu - przyjęte; brak testu cudzej aktywacji - przyjęte (POST → 404, kupon dalej „Do aktywacji”); wyciek kontekstu - przyjęte (`await using`); opis QR w docs - przyjęte.
 
+## P3 - kupon w kasie i historia (done, 2026-11-22)
+
+Zakres: `CouponSection` w formularzu kasy: pole kodu kuponu (normalizacja jak na serwerze), czytnik QR kuponu (czytniki przyjmują tylko swój format, nie działają naraz); warunki po pełnych kodach karty i kuponu (`useCouponTerms`, klucz z obu kodów, bez ponowień, 5 min w pamięci); rabat tylko na „Przelicz rabat” (`useCouponCalculation`, numer żądania, spóźnione odpowiedzi ignorowane); zmiana kwoty/litrów → wyliczenie nieaktualne bez zapytania; zmiana kodu → wyliczenie usunięte; błędy 404/409/429. Zapis wysyła kod (bez rabatu); wynik: rabat, do zapłaty, punkty; `coupon_busy` jak nieznany wynik. Po ostatecznym wyniku zapisu i po odblokowaniu podglądy zapomniane (sekcja remontowana). Historia: brutto + linia rabatu i zapłaty. `openRegister` wydzielony do `e2e/register.ts`.
+Testy (2026-11-22): typecheck, lint, format - passed; `npx playwright test` - passed 80/80; docs build - passed. API bez zmian.
+Próby negatywne: przeliczenie bez numeru żądania → pada test spóźnionej odpowiedzi; czytnik kuponu bez blokady przy aktywnym czytniku karty → pada test skanu; brak czyszczenia podglądu po odrzuconym zapisie → pada test kuponu odebranego gdzie indziej.
+Przeglądarka (Chrome, :3200, kasjer demo, karta i kupon Anny): kod kuponu wpisany małymi literami ze spacjami → warunki; 120,50 zł / 30 l → „Przelicz” 6,00 zł / 114,50 zł / 114 pkt; zapis → wynik z rabatem, formularz wyczyszczony.
+Review (`/code-review high`, 9 uwag, wszystkie przyjęte): dwa czytniki naraz (jedna kamera); nieaktualny podgląd po błędzie/odblokowaniu; gcTime 0 zużywał limit; komunikat „nieaktualne” bez wyniku i blokada przeliczenia przy zmianie karty; logika HTTP w komponencie (przeniesiona do hooka); brak testu czytnika karty z QR kuponu; słaba asercja punktów; opis skanera; literówka w docs.
+
 ## Następny krok
 
-P3 - kupon w kasie i historia: pole kodu kuponu w panelu kasjera (podgląd warunków po pełnym kodzie, rabat po „Przelicz”, bez wywołań na każdy znak), zakup z kuponem, wynik z rabatem i kwotą zapłaconą; historia klienta pokazuje brutto/rabat/zapłacono; E2E pełnego przepływu, błędy (cudzy/odebrany/zajęty), limit 429; przeglądarka; review.
+P4 - administracja (wg specs/PLAN.md i SPEC.md): lista i edycja ofert z wersją (409 bez nadpisania), nieznany wynik PUT, guard `app/(app)/admin/layout.tsx`; E2E, przeglądarka, review.

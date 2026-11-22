@@ -268,7 +268,7 @@ QR odczytuje czytnik w [panelu kasjera](#frontend---panel-kasjera).
 `/historia` renderuje `HistoryList` z `features/history/` (`services.ts` → `hooks.ts` → `components/`).
 
 - `useHistory`: `useInfiniteQuery` (`queryKeys.transactions`), strona 20 wpisów, następna strona z `nextCursor`. „Pokaż więcej” znika, gdy `nextCursor` jest `null`.
-- Wpis: typ („Tankowanie”, „Wymiana na kupon” z nazwą oferty), zmiana punktów ze znakiem, saldo po operacji, data i godzina zapisu (Europe/Warsaw). Dla tankowania: stacja, data sprzedaży, kwota (zł), litry.
+- Wpis: typ („Tankowanie”, „Wymiana na kupon” z nazwą oferty), zmiana punktów ze znakiem, saldo po operacji, data i godzina zapisu (Europe/Warsaw). Dla tankowania: stacja, data sprzedaży, kwota brutto (zł), litry; przy kuponie dodatkowa linia „Rabat z kuponu X zł · zapłacono Y zł” (`grossAmount`, `discount`, `paidAmount`). Punkty liczone są od kwoty zapłaconej.
 - Stany: szkielet przy ładowaniu; błąd pierwszej strony z „Spróbuj ponownie”; błąd kolejnej strony pod listą (wczytane wpisy zostają); pusta historia z odnośnikiem do karty.
 - Pod listą informacja, że zakup za mniej niż 1 zł nie daje punktów i nie pojawia się w historii.
 
@@ -278,22 +278,22 @@ QR odczytuje czytnik w [panelu kasjera](#frontend---panel-kasjera).
 
 - Zakup w toku (formularz, mutacja z kluczem, dane do ponowienia) to `usePurchaseFlow`, wywoływany w `CashierPanel` nad widokami stanowiska; `PurchaseForm` i `UnknownOutcome` dostają go z góry. Nieudane odświeżenie stanowiska (np. po powrocie do okna) pokazuje ostrzeżenie i nie usuwa formularza.
 - Stanowisko: `GET /api/cashier/station`, tylko do odczytu. Formularz nie wysyła stacji ani kasy - API bierze je ze stanowiska zalogowanego kasjera.
-- Pola: kod karty, kwota, litry, data sprzedaży (domyślnie dziś w Europe/Warsaw, bez przyszłych dat), numer paragonu. Kwota i litry przyjmują przecinek i są wysyłane jako **liczby JSON** (`"123,45"` → `123.45`); kod karty bez spacji, wielkimi literami.
-- Wynik: „Zakup zapisany. Przyznano N pkt.” (przy 0 pkt dopisek o kwocie poniżej 1 zł); formularz czyszczony dla następnego klienta. Kasjer nie widzi salda klienta.
+- Pola: kod karty, kwota, litry, data sprzedaży (domyślnie dziś w Europe/Warsaw, bez przyszłych dat), numer paragonu, opcjonalny kod kuponu ([podgląd i odbiór kuponu](/moduly/rewards/#interfejs---kupon-w-kasie)). Puste pole kuponu = zakup bez kuponu (pole nie jest wysyłane). Kwota i litry przyjmują przecinek i są wysyłane jako **liczby JSON** (`"123,45"` → `123.45`); kod karty bez spacji, wielkimi literami.
+- Wynik: „Zakup zapisany. Przyznano N pkt.” i linia z rabatem i kwotą do zapłaty (`discount`, `paidAmount` z odpowiedzi; przy 0 pkt dopisek o kwocie poniżej 1 zł); formularz i podglądy kuponów czyszczone dla następnego klienta. Kasjer nie widzi salda klienta.
 - Błędy pól z API (`errors[field]`) trafiają pod pola; `card_not_found` pod kod karty, `receipt_already_registered` pod numer paragonu.
-- **Nieznany wynik** (brak odpowiedzi, `5xx`, `in_progress`, `customer_busy`): komunikat, formularz **zablokowany**, „Ponów zapis zakupu” wysyła te same dane z tym samym `Idempotency-Key`. „Odblokuj formularz…” wymaga potwierdzenia z ostrzeżeniem: zakup mógł już zostać zapisany, odblokowanie nie cofa zapisu, a **zmiana numeru paragonu omija ochronę przed duplikatem** (`UNIQUE` paragonu chroni tylko ten sam numer). Zalecane: najpierw ponowić albo ustalić wynik.
+- **Nieznany wynik** (brak odpowiedzi, `5xx`, `in_progress`, `customer_busy`, `coupon_busy`): komunikat, formularz **zablokowany**, „Ponów zapis zakupu” wysyła te same dane z tym samym `Idempotency-Key`. „Odblokuj formularz…” wymaga potwierdzenia z ostrzeżeniem: zakup mógł już zostać zapisany, odblokowanie nie cofa zapisu, a **zmiana numeru paragonu omija ochronę przed duplikatem** (`UNIQUE` paragonu chroni tylko ten sam numer). Zalecane: najpierw ponowić albo ustalić wynik.
 
 Czytnik QR (`components/QrScanner.tsx`):
 
 - `getUserMedia` (tylna kamera) → klatki `<video>` na `<canvas>` → `jsQR`. Działa w każdej przeglądarce z kamerą (bez `BarcodeDetector`, którego Safari nie ma).
-- Przyjmuje tylko tekst w formacie kodu karty; wpisuje go w pole i **nie zatwierdza zakupu**. Wpisywanie i wklejanie zostają dostępne.
+- Dwa czytniki: karty i kuponu. Każdy przyjmuje tylko swój format (`accept`): QR kuponu przy czytniku karty jest ignorowany i odwrotnie. Wynik trafia w pole i **nie zatwierdza zakupu**. Wpisywanie i wklejanie zostają dostępne.
 - Kamera jest zatrzymywana (`track.stop()`) po skanie, przyciskiem „Zatrzymaj kamerę”, przy **zablokowaniu formularza** (zapis w toku lub nieznany wynik) i przy odmontowaniu (opuszczenie ekranu).
 - Każde uruchomienie to próba z identyfikatorem; zatrzymanie ją unieważnia. Strumień, który przyjdzie po zatrzymaniu (zgoda udzielona później), jest od razu zatrzymywany, a spóźniony wynik skanu ignorowany.
 - Komunikaty: brak zgody, brak kamery, kamera zajęta, brak HTTPS (`isSecureContext`). Kamera w przeglądarce działa tylko na `https://` albo `localhost` - test na telefonie: [HTTPS na telefonie](/instrukcje/kasjer-i-konta-demo/#kamera-na-telefonie-https).
 
 ## Testy E2E
 
-`apps/web/e2e/` (`loyalty-card.spec.ts`, `history.spec.ts`, `session.spec.ts`, `cashier.spec.ts`; wymiana punktów: `rewards.spec.ts`, opis w [Rewards](/moduly/rewards/#testy)), projekty `mobile` (Pixel 7) i `desktop`; uruchomienie: [Uruchomienie testów](/instrukcje/testy/).
+`apps/web/e2e/` (`loyalty-card.spec.ts`, `history.spec.ts`, `session.spec.ts`, `cashier.spec.ts`; wymiana punktów: `rewards.spec.ts`, kupony: `coupons.spec.ts`, kupon w kasie: `cashier-coupon.spec.ts`, opis w [Rewards](/moduly/rewards/#testy)), projekty `mobile` (Pixel 7) i `desktop`; uruchomienie: [Uruchomienie testów](/instrukcje/testy/).
 
 | Test | Sprawdza |
 | --- | --- |

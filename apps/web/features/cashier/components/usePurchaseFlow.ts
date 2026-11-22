@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
-import { useRegisterPurchase } from "../hooks";
+import { useForgetCouponPreviews, useRegisterPurchase } from "../hooks";
 import {
   purchaseMessages,
   purchaseSchema,
@@ -17,6 +17,7 @@ import type { FuelPurchaseBody, FuelPurchaseResult } from "../services";
 
 const FIELDS = [
   "cardCode",
+  "couponCode",
   "amount",
   "liters",
   "saleDate",
@@ -31,12 +32,22 @@ export type PurchaseFlow = ReturnType<typeof usePurchaseFlow>;
  */
 export function usePurchaseFlow() {
   const purchase = useRegisterPurchase();
+  const removePreviews = useForgetCouponPreviews();
+  const [previewGeneration, setPreviewGeneration] = useState(0);
+  // Which QR scanner holds the camera; the other one is disabled meanwhile.
+  const [scanner, setScanner] = useState<"card" | "coupon" | null>(null);
+  /** After a purchase attempt the coupon may be redeemed: drop the terms and the calculation. */
+  const forgetPreviews = () => {
+    removePreviews();
+    setPreviewGeneration((generation) => generation + 1);
+  };
   const [pending, setPending] = useState<FuelPurchaseBody | null>(null);
   const [saved, setSaved] = useState<FuelPurchaseResult | null>(null);
   const form = useForm<PurchaseValues>({
     resolver: zodResolver(purchaseSchema),
     defaultValues: {
       cardCode: "",
+      couponCode: "",
       amount: "",
       liters: "",
       saleDate: warsawToday(),
@@ -58,8 +69,10 @@ export function usePurchaseFlow() {
       const result = await purchase.mutateAsync(body);
       setSaved(result);
       setPending(null);
+      forgetPreviews();
       form.reset({
         cardCode: "",
+        couponCode: "",
         amount: "",
         liters: "",
         saleDate: body.saleDate,
@@ -68,6 +81,7 @@ export function usePurchaseFlow() {
     } catch (error) {
       if (keepsIdempotencyKey(error as Error)) return;
       setPending(null);
+      forgetPreviews();
       if (applyFieldErrors(error, form.setError, purchaseMessages, FIELDS))
         return;
       const code = error instanceof ApiError ? error.code : undefined;
@@ -93,5 +107,9 @@ export function usePurchaseFlow() {
     locked,
     send,
     onSubmit,
+    scanner,
+    setScanner,
+    previewGeneration,
+    forgetPreviews,
   };
 }

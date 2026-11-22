@@ -7,6 +7,8 @@ import { ApiError, NetworkError } from "@/lib/api/problem";
 function unknownMessage(error: Error) {
   if (error instanceof ApiError && error.code === "loyalty.customer_busy")
     return "Konto klienta jest chwilowo zajęte. Zakup nie został zapisany - ponów za chwilę.";
+  if (error instanceof ApiError && error.code === "rewards.coupon_busy")
+    return "Kupon klienta jest chwilowo zajęty. Zakup nie został zapisany - ponów za chwilę.";
   if (error instanceof ApiError && error.code === "idempotency.in_progress")
     return "Ten zakup jest właśnie zapisywany. Ponów za chwilę.";
   if (error instanceof NetworkError)

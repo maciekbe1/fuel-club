@@ -157,9 +157,15 @@ function HistoryItem({ item }: { item: Transaction }) {
             {[
               `Stacja ${purchase.stationCode}`,
               saleDate.format(new Date(`${purchase.saleDate}T00:00:00Z`)),
-              money.format(purchase.amount),
+              money.format(purchase.grossAmount),
               `${liters.format(purchase.liters)} l`,
             ].join(" · ")}
+          </p>
+        )}
+        {purchase && purchase.discount > 0 && (
+          <p data-testid="history-discount" className="text-sm">
+            Rabat z kuponu {money.format(purchase.discount)} · zapłacono{" "}
+            {money.format(purchase.paidAmount)}
           </p>
         )}
         {exchange && (
