@@ -92,7 +92,11 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
   const hasCoupon = couponText.trim() !== "";
   const couponField = form.register("couponCode");
   // The last handed-over reward; cleared when the cashier types or scans another code.
-  const [handedOver, setHandedOver] = useState<string | null>(null);
+  // Shown for the card it was handed over to; another card (next customer, form reset) hides it.
+  const [handedOver, setHandedOver] = useState<{
+    offerName: string;
+    cardCode: string;
+  } | null>(null);
 
   return (
     <section
@@ -153,22 +157,24 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
 
       {terms.isSuccess && couponCode && cardCode && isProduct(terms.data) && (
         <RewardHandover
+          // A new pair of codes is a new operation: no state (error, unknown outcome) carries over.
+          key={`${cardCode}:${couponCode}`}
           offerName={terms.data.offerName}
           cardCode={cardCode}
           couponCode={couponCode}
           locked={locked}
           onDone={() => {
-            setHandedOver(terms.data.offerName);
+            setHandedOver({ offerName: terms.data.offerName, cardCode });
             form.setValue("couponCode", "", { shouldDirty: true });
           }}
         />
       )}
-      {handedOver && (
+      {handedOver && handedOver.cardCode === cardCode && (
         <p
           role="status"
           className="rounded-xl border border-emerald-600/30 bg-emerald-50 p-3 text-sm font-medium text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
         >
-          Wydano nagrodę „{handedOver}”. Bez tankowania i bez punktów.
+          Wydano nagrodę „{handedOver.offerName}”. Bez tankowania i bez punktów.
         </p>
       )}
 
@@ -247,7 +253,11 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
   );
 }
 
-/** Answers where the server certainly handed nothing over; any other failure is an unknown outcome. */
+/**
+ * Answers where this attempt certainly handed nothing over. After an unknown outcome they say nothing
+ * about the earlier attempt with the same key (the rate limiter runs before idempotency), so the
+ * outcome stays unknown.
+ */
 function busyMessage(error: unknown) {
   if (error instanceof ApiError && error.status === 429)
     return "Limit prób na tej kasie został wyczerpany. Nagroda nie została wydana - spróbuj za chwilę.";
@@ -287,19 +297,25 @@ function RewardHandover({
 }) {
   const handOver = useHandOverReward();
   const forgetPreviews = useForgetCouponPreviews();
+  // An earlier attempt with this key ended without a known outcome.
+  const [uncertain, setUncertain] = useState(false);
   const busy = handOver.isError ? busyMessage(handOver.error) : null;
   const unknown =
-    handOver.isError && !busy && keepsIdempotencyKey(handOver.error)
+    handOver.isError &&
+    keepsIdempotencyKey(handOver.error) &&
+    (uncertain || !busy)
       ? handOver.error
       : null;
+  const refusal = unknown ? null : busy;
 
   const send = async () => {
     try {
       await handOver.mutateAsync({ cardCode, couponCode });
       forgetPreviews();
       onDone();
-    } catch {
+    } catch (error) {
       // Shown below from the mutation state.
+      if (keepsIdempotencyKey(error) && !busyMessage(error)) setUncertain(true);
     }
   };
 
@@ -312,12 +328,12 @@ function RewardHandover({
         <span className="font-semibold">{offerName}</span>: nagroda do wydania.
         Nie zapisuj tankowania z tym kodem.
       </p>
-      {busy && (
+      {refusal && (
         <p role="alert" className="text-destructive">
-          {busy}
+          {refusal}
         </p>
       )}
-      {handOver.isError && !unknown && !busy && (
+      {handOver.isError && !unknown && !refusal && (
         <p role="alert" className="text-destructive">
           {handoverError(handOver.error)}
         </p>
@@ -327,6 +343,7 @@ function RewardHandover({
           {unknown instanceof NetworkError
             ? "Nie dotarła odpowiedź serwera - nie wiadomo, czy nagroda została wydana."
             : "Nie wiadomo, czy nagroda została wydana."}{" "}
+          {busy && "Serwer chwilowo odmówił ponowienia - spróbuj za chwilę. "}
           Ponów: nagroda nie zostanie wydana dwa razy.
         </p>
       )}

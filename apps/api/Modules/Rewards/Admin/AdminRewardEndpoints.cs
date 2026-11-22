@@ -112,7 +112,11 @@ public static class AdminRewardEndpoints
             request.IsActive
         );
         if (kind is null)
+        {
+            // Unknown kind: per-liter errors would point at fields a product must not have.
+            errors.RemoveAll(error => error.Field is "discountPerLiter" or "maxLiters");
             errors.Add(new("kind", RewardsErrorCodes.InvalidFormat));
+        }
         if (errors.Count > 0)
             return RewardsProblems.Validation("Offer is not valid", errors);
 

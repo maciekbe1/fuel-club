@@ -200,7 +200,9 @@ function CouponItem({
           <p className="text-sm">
             {benefitTerms(coupon)
               ? `Rabat ${benefitTerms(coupon)}`
-              : "Nagroda do odbioru w kasie"}
+              : coupon.status === "Redeemed"
+                ? "Nagroda wydana w kasie"
+                : "Nagroda do odbioru w kasie"}
           </p>
           <p className="text-xs text-muted-foreground">
             Kupiony {dateTime.format(new Date(coupon.purchasedAt))} za{" "}

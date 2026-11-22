@@ -246,6 +246,11 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
             }
         );
         Assert.Equal(HttpStatusCode.BadRequest, unknownKind.StatusCode);
+        // Only the kind: per-liter "required" errors would point at fields a product must not have.
+        Assert.Equal(
+            ["kind"],
+            (await unknownKind.Content.ReadFromJsonAsync<ProblemBody>())!.Errors!.Keys
+        );
 
         var url = $"/api/admin/rewards/{offer.Id}";
         var toFuel = await SendAsync(

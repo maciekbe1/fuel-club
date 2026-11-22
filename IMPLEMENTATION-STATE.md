@@ -319,7 +319,7 @@ ADR 0013 zrealizowany:
 
 Przy okazji: eval „offers” sam tworzy ofertę (zależał od danych innych testów).
 
-Testy: `dotnet test` 501/501 (1 pominięty na żywo); E2E 134/134 (nowe `product-rewards.spec`, nagroda w `admin.spec`).
+Testy: `dotnet test` 501/501 (1 pominięty na żywo), po ponownym review 502/502; E2E 134/134 przed poprawkami (nowe `product-rewards.spec`, nagroda w `admin.spec`).
 
 Review (`/code-review high`, 9 uwag, wszystkie przyjęte):
 - tekst aktywnej nagrody; opisy narzędzi i prompt Gemini (`gemini-v3`);
@@ -333,7 +333,13 @@ Cofnięcie migracji na tymczasowej bazie (`fuelclub_rollback_*` na 5434, usunię
 1. `Up` → `Down` bez nagród → `Up`: działa;
 2. z ofertą „Kawa” i jej kuponem `Down` kończy się `P0001`, historia nadal na `ProductRewards`, oferta i kupon bez zmian.
 
-Wyszło przy tym: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
+Ponowne review (`/code-review high`, 6 uwag, wszystkie przyjęte):
+- ważne: `429` na ponowieniu po zgubionej odpowiedzi pokazywał „nie została wydana” (limit działa przed idempotencją) - teraz zostaje nieznany wynik; stan wydania przechodził na inny kod z podglądem w pamięci - komponent kluczowany parą kodów;
+- drobne: „Nagroda wydana w kasie”; komunikat wydania tylko dla tej karty; nieznany rodzaj przy tworzeniu bez błędów stawki i limitu;
+- wynik: E2E 64/64 w plikach nagród, admina, kuponów i kasy;
+- testy: E2E zgubiona odpowiedź → `429` → ponowienie (jeden klucz, jedno wydanie), zmiana kodu; `ProductRewardsMigrationTests` (baza tymczasowa) zamiast ręcznego sprawdzenia. Mutacje: bez stanu niepewności, bez klucza komponentu, bez strażnika `Down`, z `DEFAULT 0` - każda wywraca test.
+
+Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
 ## Następny krok
 
