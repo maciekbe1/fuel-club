@@ -41,7 +41,7 @@ cd apps/web && npm run format         # check: npm run format:check
 
 Prawdziwe API i osobna baza `fuelclub_e2e` w kontenerze `postgres-test`. Playwright sam uruchamia:
 
-- API na `:5281` - najpierw `dotnet ef database update` na bazie E2E (tworzy ją, jeśli nie istnieje), konta demo wyłączone, kasjer `kasjer-e2e@example.test` (stanowisko `E2E-01`) z `BootstrapCashier` w zmiennych środowiskowych (`e2e/accounts.ts`; hasło tylko testowe),
+- API na `:5281` - najpierw `dotnet ef database update` na bazie E2E (tworzy ją, jeśli nie istnieje), konta demo wyłączone, kasjer `kasjer-e2e@example.test` (stanowisko `E2E-01`) z `BootstrapCashier` i administrator `admin-e2e@example.test` z `BootstrapAdmin` w zmiennych środowiskowych (`e2e/accounts.ts`; hasła tylko testowe; administrator tworzy oferty w testach wymiany),
 - Next na `:3100` z `NEXT_DIST_DIR=.next-e2e`, więc działa obok zwykłego `npm run dev` (`:3000`, `.next`).
 
 ```sh
@@ -60,3 +60,7 @@ Raport po błędzie: `test-results/` (trace: `npx playwright show-trace ...`).
 :::caution[Planowane]
 Evals agenta nie są jeszcze zrealizowane.
 :::
+
+## Ręczne sprawdzenie w przeglądarce
+
+`specs/browser-instance.sh start` uruchamia osobną instancję: API `:5291` na bazie `fuelclub_browser` (kontener `postgres-test`, konta demo z hasłem testowym ze skryptu) i Next `:3200` (`.next-browser`). Nie dotyka bazy dev ani `:5271`/`:3000`. `specs/browser-instance.sh stop` ją zatrzymuje.

@@ -57,7 +57,8 @@ Token jest powiązany z tożsamością. Po logowaniu i wylogowaniu klient woła 
 - po sukcesie, ostatecznym `4xx` (zapisany błąd domenowy, walidacja, `409 idempotency.key_reused`) albo zmianie danych powstaje nowy UUID - inaczej każde kolejne kliknięcie odtwarzałoby zapisany błąd,
 - mutacje bez danych (`mutate()`) też dostają klucz,
 - `409 key_reused` jest pokazywany jako błąd domenowy, nie sieciowy,
-- mutacje nie mają auto-retry (`retry: false`). Ponowienie jest świadome i z tym samym kluczem.
+- mutacje nie mają auto-retry (`retry: false`). Ponowienie jest świadome i z tym samym kluczem,
+- opcja `persist` trzyma klucz nierozstrzygniętej operacji w `sessionStorage` karty, aż przyjdzie ostateczna odpowiedź: wyjście z ekranu ani przeładowanie nie pozwala powtórzyć operacji z nowym kluczem (używa jej wymiana punktów). Logowanie, rejestracja i wylogowanie czyszczą te wpisy.
 
 ### 7. SSE
 

@@ -225,7 +225,7 @@ Dostęp: rola `User` wymagana. Konto, które ma dodatkowo `Cashier` lub `Admin`,
 - Ładowanie: szkielet, `aria-busy`, tekst dla czytników ekranu.
 - Błąd: brak sieci, sesja wygasła (link do logowania), inny błąd; przycisk „Spróbuj ponownie”. Komunikat pojawia się po ponowieniach z `Providers` (2 dodatkowe próby dla błędów sieci i 5xx).
 - Saldo 0: zachęta do pierwszego tankowania z kartą.
-- Odnośniki do `/karta` i `/historia`. Zasada: link pojawia się dopiero razem z ekranem - żaden aktywny odnośnik nie prowadzi do 404.
+- Odnośniki do `/karta`, `/historia` i `/oferty`. Zasada: link pojawia się dopiero razem z ekranem - żaden aktywny odnośnik nie prowadzi do 404.
 - Konto bez roli `User` (sam personel): bez zapytania o saldo (API dałoby `403`), krótki komunikat.
 
 Stany ładowania i błędu salda sprawdzone ręcznie (telefon 390 px i desktop). E2E sprawdza odnośniki i saldo 0.
@@ -293,7 +293,7 @@ Czytnik QR (`components/QrScanner.tsx`):
 
 ## Testy E2E
 
-`apps/web/e2e/` (`loyalty-card.spec.ts`, `history.spec.ts`, `session.spec.ts`, `cashier.spec.ts`), projekty `mobile` (Pixel 7) i `desktop`; uruchomienie: [Uruchomienie testów](/instrukcje/testy/).
+`apps/web/e2e/` (`loyalty-card.spec.ts`, `history.spec.ts`, `session.spec.ts`, `cashier.spec.ts`; wymiana punktów: `rewards.spec.ts`, opis w [Rewards](/moduly/rewards/#testy)), projekty `mobile` (Pixel 7) i `desktop`; uruchomienie: [Uruchomienie testów](/instrukcje/testy/).
 
 | Test | Sprawdza |
 | --- | --- |
@@ -310,7 +310,7 @@ Czytnik QR (`components/QrScanner.tsx`):
 | kasa: brak zgody | `NotAllowedError` → komunikat, pole kodu nadal do wklejenia |
 | kasa: konto klienta | brak odnośnika „Kasa”, `/kasa` pokazuje brak stanowiska | 
 | anulowanie | brak żądania wymiany, kod bez zmian |
-| ekran główny | dwa odnośniki, oba prowadzą do istniejących stron (`200`), saldo 0 |
+| ekran główny | trzy odnośniki (karta, historia, oferty), wszystkie prowadzą do istniejących stron (`200`), saldo 0 |
 | historia: paginacja | 25 zakupów przez prawdziwy endpoint kasy; 20 wpisów, najnowszy z danymi tankowania i saldem po; „Pokaż więcej” → 25 wpisów, malejąco bez luk i duplikatów, przycisk znika |
 | historia: izolacja | dwóch klientów w osobnych kontekstach przeglądarki widzi tylko własne wpisy |
 | historia: pusta | także po zakupie za 0,99 zł (0 pkt) |

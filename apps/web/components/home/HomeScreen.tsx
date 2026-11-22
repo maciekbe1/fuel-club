@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronRight, CreditCard, History, ScanLine } from "lucide-react";
+import {
+  ChevronRight,
+  CreditCard,
+  History,
+  ScanLine,
+  Ticket,
+} from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
 import { useMe } from "@/features/auth/hooks";
@@ -62,6 +68,12 @@ export function HomeScreen() {
           title="Historia punktów"
           description="Ostatnie tankowania"
         />
+        <Shortcut
+          href="/oferty"
+          icon={Ticket}
+          title="Oferty"
+          description="Wymień punkty na kupon"
+        />
         {cashierShortcut}
       </nav>
     </div>
@@ -74,7 +86,7 @@ function Shortcut({
   title,
   description,
 }: {
-  href: "/karta" | "/historia" | "/kasa";
+  href: "/karta" | "/historia" | "/oferty" | "/kasa";
   icon: ComponentType<{ className?: string }>;
   title: string;
   description: string;

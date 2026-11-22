@@ -160,16 +160,17 @@ test("cancelling the confirmation keeps the card", async ({
   expect(rotations).toBe(0);
 });
 
-test("home screen links to existing card and history pages", async ({
+test("home screen links to existing card, history and offers pages", async ({
   page,
   customer,
 }) => {
   void customer;
   const shortcuts = page.getByRole("navigation", { name: "Na skróty" });
-  await expect(shortcuts.getByRole("link")).toHaveCount(2);
+  await expect(shortcuts.getByRole("link")).toHaveCount(3);
   for (const [name, href, heading] of [
     [/Karta/, "/karta", "Twoja karta"],
     [/Historia punktów/, "/historia", "Historia punktów"],
+    [/Oferty/, "/oferty", "Oferty"],
   ] as const) {
     await expect(shortcuts.getByRole("link", { name })).toHaveAttribute(
       "href",

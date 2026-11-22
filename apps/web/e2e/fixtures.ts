@@ -5,7 +5,7 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { CASHIER } from "./accounts";
+import { ADMIN, CASHIER } from "./accounts";
 
 export const PASSWORD = "E2e-Password-123!";
 
@@ -91,9 +91,87 @@ export async function cashier(baseURL: string) {
   };
 }
 
-export const test = base.extend<{ customer: { email: string } }>({
+export type OfferTerms = {
+  name: string;
+  description?: string;
+  pointsCost: number;
+  discountPerLiter: number;
+  maxLiters: number;
+  isActive?: boolean;
+};
+
+/** The bootstrap admin, logged in through the API; manages offers like the admin panel would. */
+export async function admin(baseURL: string) {
+  const request = await playwrightRequest.newContext({ baseURL });
+  const login = await request.post("/api/auth/login", {
+    headers: { "X-CSRF-TOKEN": await csrf(request) },
+    data: { email: ADMIN.email, password: ADMIN.password },
+  });
+  expect(login.ok()).toBe(true);
+  const token = await csrf(request);
+  const body = (terms: OfferTerms) => ({
+    description: "Na dowolne paliwo",
+    isActive: true,
+    ...terms,
+  });
+
+  const created = new Map<string, OfferTerms & { version: number }>();
+
+  return {
+    async createOffer(terms: OfferTerms) {
+      const response = await request.post("/api/admin/rewards", {
+        headers: {
+          "X-CSRF-TOKEN": token,
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        data: body(terms),
+      });
+      expect(response.status(), await response.text()).toBe(201);
+      const offer = (await response.json()) as { id: string; version: number };
+      created.set(offer.id, { ...terms, version: offer.version });
+      return offer;
+    },
+    async updateOffer(id: string, version: number, terms: OfferTerms) {
+      const response = await request.put(`/api/admin/rewards/${id}`, {
+        headers: { "X-CSRF-TOKEN": token },
+        data: { ...body(terms), version },
+      });
+      expect(response.status(), await response.text()).toBe(200);
+      const offer = (await response.json()) as { id: string; version: number };
+      if (created.has(id))
+        created.set(id, { ...terms, version: offer.version });
+      return offer;
+    },
+    /** Deactivates the offers this test created, so the shared e2e catalog does not grow. */
+    async retire() {
+      for (const [id, offer] of created)
+        await request.put(`/api/admin/rewards/${id}`, {
+          headers: { "X-CSRF-TOKEN": token },
+          data: { ...body(offer), isActive: false, version: offer.version },
+        });
+      await request.dispose();
+    },
+  };
+}
+
+export type Staff = Awaited<ReturnType<typeof admin>>;
+
+/** A unique offer name, so parallel tests find their own offer in the shared catalog. */
+export const offerName = (label: string) =>
+  `${label} ${crypto.randomUUID().slice(0, 8)}`;
+
+export const test = base.extend<{
+  customer: { email: string };
+  staff: Staff;
+}>({
   customer: async ({ page }, provide) => {
     await provide(await newCustomer(page, "Anna"));
+  },
+  /** The admin for this test; its offers are deactivated afterwards. */
+  staff: async ({ baseURL }, provide) => {
+    const staff = await admin(baseURL!);
+    await provide(staff);
+    await staff.retire();
   },
 });
 
