@@ -113,8 +113,12 @@ public static class AdminRewardEndpoints
         );
         if (kind is null)
         {
-            // Unknown kind: per-liter errors would point at fields a product must not have.
-            errors.RemoveAll(error => error.Field is "discountPerLiter" or "maxLiters");
+            // Unknown kind: "required" per-liter errors would point at fields a product must not
+            // have; real value errors (range, precision) stay.
+            errors.RemoveAll(error =>
+                error.Field is "discountPerLiter" or "maxLiters"
+                && error.Code == RewardsErrorCodes.RequiredField
+            );
             errors.Add(new("kind", RewardsErrorCodes.InvalidFormat));
         }
         if (errors.Count > 0)

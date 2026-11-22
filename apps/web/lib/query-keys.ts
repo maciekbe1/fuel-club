@@ -10,6 +10,9 @@ export const queryKeys = {
     couponPreviews: ["cashier", "coupon-preview"] as const,
     couponPreview: (cardCode: string, couponCode: string) =>
       ["cashier", "coupon-preview", cardCode, couponCode] as const,
+    /** In memory only: a handover of this pair ended without a known outcome (codes never stored). */
+    handoverUncertain: (cardCode: string, couponCode: string) =>
+      ["cashier", "handover-uncertain", cardCode, couponCode] as const,
   },
   admin: {
     all: ["admin"] as const,

@@ -251,6 +251,27 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
             ["kind"],
             (await unknownKind.Content.ReadFromJsonAsync<ProblemBody>())!.Errors!.Keys
         );
+        // ...but a real value error is reported in the same round trip.
+        var typoKind = await SendAsync(
+            admin,
+            HttpMethod.Post,
+            "/api/admin/rewards",
+            new
+            {
+                name,
+                pointsCost = 150,
+                kind = "fuelDiscount",
+                discountPerLiter = 0.205m,
+                maxLiters = 50m,
+                isActive = true,
+            }
+        );
+        var typoErrors = (await typoKind.Content.ReadFromJsonAsync<ProblemBody>())!.Errors!;
+        Assert.Equal("rewards.invalid_format", typoErrors["kind"][0].Code);
+        Assert.Equal(
+            "rewards.discount_per_liter_precision",
+            typoErrors["discountPerLiter"][0].Code
+        );
 
         var url = $"/api/admin/rewards/{offer.Id}";
         var toFuel = await SendAsync(

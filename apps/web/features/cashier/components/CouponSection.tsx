@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useWatch } from "react-hook-form";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
@@ -7,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, NetworkError } from "@/lib/api/problem";
 import { benefitTerms, isProduct } from "@/lib/format";
-import { keepsIdempotencyKey } from "@/lib/idempotency";
+import { keepsIdempotencyKey, keepsPendingOperation } from "@/lib/idempotency";
+import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import {
   useCouponCalculation,
@@ -91,12 +93,13 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
 
   const hasCoupon = couponText.trim() !== "";
   const couponField = form.register("couponCode");
-  // The last handed-over reward; cleared when the cashier types or scans another code.
-  // Shown for the card it was handed over to; another card (next customer, form reset) hides it.
+  // The last handed-over reward. Cleared (not just hidden) when the cashier types or scans another
+  // code or the card changes (next customer, form reset), so it never comes back for that card.
   const [handedOver, setHandedOver] = useState<{
     offerName: string;
     cardCode: string;
   } | null>(null);
+  if (handedOver && handedOver.cardCode !== cardCode) setHandedOver(null);
 
   return (
     <section
@@ -169,7 +172,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           }}
         />
       )}
-      {handedOver && handedOver.cardCode === cardCode && (
+      {handedOver && (
         <p
           role="status"
           className="rounded-xl border border-emerald-600/30 bg-emerald-50 p-3 text-sm font-medium text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
@@ -297,25 +300,53 @@ function RewardHandover({
 }) {
   const handOver = useHandOverReward();
   const forgetPreviews = useForgetCouponPreviews();
-  // An earlier attempt with this key ended without a known outcome.
-  const [uncertain, setUncertain] = useState(false);
-  const busy = handOver.isError ? busyMessage(handOver.error) : null;
-  const unknown =
-    handOver.isError &&
-    keepsIdempotencyKey(handOver.error) &&
-    (uncertain || !busy)
-      ? handOver.error
-      : null;
+  const queryClient = useQueryClient();
+  const uncertainKey = queryKeys.cashier.handoverUncertain(
+    cardCode,
+    couponCode,
+  );
+  // An attempt for this pair ended without a known outcome. Kept in the query cache (memory), so
+  // it survives a remount after the cashier edits and retypes a code; the codes are never stored.
+  const [uncertain, setUncertainState] = useState(
+    () => queryClient.getQueryData<boolean>(uncertainKey) === true,
+  );
+  const setUncertain = (value: boolean) => {
+    setUncertainState(value);
+    queryClient.setQueryData(uncertainKey, value);
+  };
+  // "Already handed over" right after an unknown outcome: most likely by that lost attempt.
+  const [redeemedAfterUnknown, setRedeemedAfterUnknown] = useState(false);
+
+  const error = handOver.isError ? handOver.error : null;
+  const busy = error ? busyMessage(error) : null;
+  const expired = error instanceof ApiError && error.status === 401;
+  // After an unknown outcome every non-final answer (429, 503, 401) leaves it unknown.
+  // Also with no error yet: after a remount the earlier unknown outcome is still shown.
+  const unknown = error
+    ? uncertain || (keepsIdempotencyKey(error) && !busy)
+    : uncertain;
   const refusal = unknown ? null : busy;
 
   const send = async () => {
     try {
       await handOver.mutateAsync({ cardCode, couponCode });
+      setUncertain(false);
       forgetPreviews();
       onDone();
-    } catch (error) {
+    } catch (failure) {
       // Shown below from the mutation state.
-      if (keepsIdempotencyKey(error) && !busyMessage(error)) setUncertain(true);
+      if (keepsPendingOperation(failure)) {
+        if (keepsIdempotencyKey(failure) && !busyMessage(failure))
+          setUncertain(true);
+        return;
+      }
+      // A final answer ends the operation: the next attempt has a new key.
+      setRedeemedAfterUnknown(
+        uncertain &&
+          failure instanceof ApiError &&
+          failure.code === "rewards.coupon_redeemed",
+      );
+      setUncertain(false);
     }
   };
 
@@ -333,17 +364,20 @@ function RewardHandover({
           {refusal}
         </p>
       )}
-      {handOver.isError && !unknown && !refusal && (
+      {error && !unknown && !refusal && (
         <p role="alert" className="text-destructive">
-          {handoverError(handOver.error)}
+          {redeemedAfterUnknown
+            ? "Nagroda jest już oznaczona jako wydana - najpewniej przy poprzedniej próbie, której odpowiedź nie dotarła. Sprawdź, czy klient ją otrzymał."
+            : handoverError(error)}
         </p>
       )}
       {unknown && (
         <p role="alert" className="font-medium">
-          {unknown instanceof NetworkError
+          {error instanceof NetworkError
             ? "Nie dotarła odpowiedź serwera - nie wiadomo, czy nagroda została wydana."
             : "Nie wiadomo, czy nagroda została wydana."}{" "}
           {busy && "Serwer chwilowo odmówił ponowienia - spróbuj za chwilę. "}
+          {expired && "Sesja wygasła - zaloguj się ponownie i ponów. "}
           Ponów: nagroda nie zostanie wydana dwa razy.
         </p>
       )}

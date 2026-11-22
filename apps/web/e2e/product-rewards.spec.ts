@@ -237,3 +237,71 @@ test("the state of one reward code does not carry over to another, the banner be
   await expect(banner).toHaveCount(0);
   await context.close();
 });
+
+test("an unknown handover outcome survives a retyped code and a 401; the banner does not come back for the card", async ({
+  page,
+  browser,
+  customer,
+  staff,
+  baseURL,
+}) => {
+  void customer;
+  const [first, second] = [offerName("Kawa"), offerName("Myjnia")];
+  const { card, codes } = await activeRewards(page, staff, baseURL!, [
+    first,
+    second,
+  ]);
+  const { context, page: register } = await till(browser, baseURL!);
+  const handover = register.getByTestId("reward-handover");
+  const cardField = register.getByLabel("Kod karty klienta");
+  const coupon = register.getByLabel("Kod kuponu");
+
+  let call = 0;
+  await register.route(HANDOVERS, async (route) => {
+    call += 1;
+    if (call === 1) {
+      // Committed, the answer is lost.
+      await route.fetch();
+      await route.abort("failed");
+    } else if (call === 2) {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ status: 401 }),
+      });
+    } else await route.continue();
+  });
+
+  await cardField.fill(card);
+  await coupon.fill(codes[0]);
+  await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
+  await expect(handover.getByRole("alert")).toContainText("Nie dotarła");
+
+  // A 401 on the retry keeps the outcome unknown.
+  await handover.getByRole("button", { name: "Ponów wydanie" }).click();
+  await expect(handover.getByRole("alert")).toContainText("Sesja wygasła");
+  await expect(handover.getByRole("alert")).toContainText("Nie wiadomo");
+
+  // A typo fix remounts the panel: the warning stays; the server says it was handed over.
+  await coupon.fill(codes[0].slice(0, -1));
+  await coupon.fill(codes[0]);
+  await expect(handover.getByRole("alert")).toContainText("Nie wiadomo");
+  await handover.getByRole("button", { name: "Ponów wydanie" }).click();
+  await expect(handover.getByRole("alert")).toContainText(
+    "najpewniej przy poprzedniej próbie",
+  );
+  await register.unroute(HANDOVERS);
+
+  // The banner is cleared with the card, not just hidden.
+  await coupon.fill(codes[1]);
+  await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
+  const banner = register
+    .getByRole("status")
+    .filter({ hasText: `Wydano nagrodę „${second}”` });
+  await expect(banner).toBeVisible();
+  await cardField.fill("");
+  await cardField.fill(card);
+  await expect(register.getByLabel("Kod karty klienta")).toHaveValue(card);
+  await expect(banner).toHaveCount(0);
+  await context.close();
+});

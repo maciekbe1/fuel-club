@@ -336,8 +336,14 @@ Cofnięcie migracji na tymczasowej bazie (`fuelclub_rollback_*` na 5434, usunię
 Ponowne review (`/code-review high`, 6 uwag, wszystkie przyjęte):
 - ważne: `429` na ponowieniu po zgubionej odpowiedzi pokazywał „nie została wydana” (limit działa przed idempotencją) - teraz zostaje nieznany wynik; stan wydania przechodził na inny kod z podglądem w pamięci - komponent kluczowany parą kodów;
 - drobne: „Nagroda wydana w kasie”; komunikat wydania tylko dla tej karty; nieznany rodzaj przy tworzeniu bez błędów stawki i limitu;
-- wynik: E2E 64/64 w plikach nagród, admina, kuponów i kasy;
+- wynik: E2E 64/64 w plikach nagród, admina, kuponów i kasy (po trzecim review 66/66);
 - testy: E2E zgubiona odpowiedź → `429` → ponowienie (jeden klucz, jedno wydanie), zmiana kodu; `ProductRewardsMigrationTests` (baza tymczasowa) zamiast ręcznego sprawdzenia. Mutacje: bez stanu niepewności, bez klucza komponentu, bez strażnika `Down`, z `DEFAULT 0` - każda wywraca test.
+
+Trzecie review (`/code-review high`, 5 uwag, wszystkie przyjęte):
+- ważne: `401` na ponowieniu po nieznanym wyniku kasował ostrzeżenie - teraz zostaje;
+- przemontowanie po poprawieniu kodu gubiło klucz (było już przed kluczowaniem komponentu) - bez `persist`, żeby kody nie trafiały do `sessionStorage`. Niepewność pary trzymana w pamięci cache zapytań; `409 coupon_redeemed` po niej pokazany jako „najpewniej wydana przy poprzedniej próbie - sprawdź”;
+- drobne: ostateczna odpowiedź kasuje ostrzeżenie; komunikat wydania kasowany przy zmianie karty, nie tylko ukrywany; przy nieznanym rodzaju usuwane tylko „wymagane” błędy stawki i limitu;
+- testy: E2E `401` + przemontowanie + komunikat, API literówki rodzaju z błędem precyzji. Mutacje (bez cache, `401` kasuje, filtrowanie komunikatu) wywracają test.
 
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
