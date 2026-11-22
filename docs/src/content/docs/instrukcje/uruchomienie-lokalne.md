@@ -31,8 +31,11 @@ Bez tej wartości API nie wystartuje (`Connection string 'DefaultConnection' is 
 
 ```sh
 dotnet tool restore
+dotnet restore
 dotnet ef database update --project apps/api
 ```
+
+Na świeżym klonie `dotnet ef` bez `dotnet restore` kończy się błędem `NETSDK1004` (brak `project.assets.json`).
 
 API nie migruje bazy samo. Bez tego kroku nie wystartuje i wskaże brakujące migracje. Szczegóły: [Migracje](/instrukcje/migracje/).
 

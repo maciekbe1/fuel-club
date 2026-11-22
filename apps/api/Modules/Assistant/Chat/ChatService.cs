@@ -78,22 +78,23 @@ public sealed class ChatService(
             await sse.EventAsync("error", new ChatErrorEvent(code, message), aborted);
         }
 
-        await sse.EventAsync(
-            "meta",
-            new ChatMetaEvent(
-                correlationId,
-                model.Provider,
-                model.Model,
-                model.PromptVersion,
-                model.Demo
-            ),
-            aborted
-        );
-
         var results = new List<ToolResult>();
         var history = request.History ?? [];
         try
         {
+            // Inside the try: a client gone before the first event ends the turn as cancelled.
+            await sse.EventAsync(
+                "meta",
+                new ChatMetaEvent(
+                    correlationId,
+                    model.Provider,
+                    model.Model,
+                    model.PromptVersion,
+                    model.Demo
+                ),
+                aborted
+            );
+
             while (true)
             {
                 // The model sees results without the confirmation token: only the client gets it.

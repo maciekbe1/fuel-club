@@ -2,7 +2,7 @@
 
 import { Ticket } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
@@ -53,6 +53,20 @@ function unknownMessage(error: Error) {
   return "Błąd serwera - nie wiadomo, czy wymiana się udała. Ponów: kupon nie zostanie kupiony dwa razy.";
 }
 
+const noSubscription = () => () => {};
+
+function usePendingExchange() {
+  const raw = useSyncExternalStore(
+    noSubscription,
+    () =>
+      JSON.stringify(
+        readPending<ExchangeVars>(EXCHANGE_OPERATION)?.vars ?? null,
+      ),
+    () => "null",
+  );
+  return JSON.parse(raw) as ExchangeVars | null;
+}
+
 type Outcome =
   | { kind: "success"; offerName: string }
   | { kind: "final"; message: string };
@@ -68,11 +82,10 @@ export function RewardsCatalog() {
   const [selected, setSelected] = useState<Reward | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   // An exchange left unfinished before this screen was (re)mounted, e.g. after a lost response.
-  const [restored, setRestored] = useState<ExchangeVars | null>(() =>
-    typeof window === "undefined"
-      ? null
-      : (readPending<ExchangeVars>(EXCHANGE_OPERATION)?.vars ?? null),
-  );
+  // Read after hydration (the server snapshot is null), cleared once it got a final answer.
+  const stored = usePendingExchange();
+  const [cleared, setCleared] = useState(false);
+  const restored = cleared ? null : stored;
 
   // While the outcome is unknown only the same exchange may be retried (same offer, version, key).
   const unknown =
@@ -88,12 +101,12 @@ export function RewardsCatalog() {
     try {
       await exchange.mutateAsync(vars);
       setSelected(null);
-      setRestored(null);
+      setCleared(true);
       setOutcome({ kind: "success", offerName: vars.name });
     } catch (error) {
       if (keepsIdempotencyKey(error)) return;
       setSelected(null);
-      setRestored(null);
+      setCleared(true);
       setOutcome({ kind: "final", message: finalMessage(error) });
     }
   };

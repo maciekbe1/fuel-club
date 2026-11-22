@@ -55,7 +55,14 @@ public static class ChatEndpoints
 
         var aborted = http.RequestAborted;
         await using var sse = new SseWriter(response, json.Value.SerializerOptions);
-        await response.Body.FlushAsync(aborted);
+        try
+        {
+            await response.Body.FlushAsync(aborted);
+        }
+        catch (Exception) when (aborted.IsCancellationRequested)
+        {
+            // The client left before the stream started; RunAsync records the turn as cancelled.
+        }
 
         using var stopHeartbeat = CancellationTokenSource.CreateLinkedTokenSource(aborted);
         var heartbeat = HeartbeatAsync(sse, options.Value.HeartbeatInterval, stopHeartbeat.Token);

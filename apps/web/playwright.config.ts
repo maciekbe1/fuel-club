@@ -49,6 +49,7 @@ export default defineConfig({
         // Every test logs in from 127.0.0.1 and one cashier serves all tests: the limits would stop the suite.
         RateLimits__AuthPermitLimit: "100000",
         RateLimits__PurchasePermitLimit: "100000",
+        Rewards__PreviewPermitLimit: "1000",
         BootstrapCashier__Email: CASHIER.email,
         BootstrapCashier__Password: CASHIER.password,
         BootstrapCashier__StationCode: CASHIER.station,

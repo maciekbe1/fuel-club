@@ -179,6 +179,34 @@ Review (`/code-review high`, 8 uwag, wszystkie przyjęte):
 
 Wpadka procesu: `git checkout -- apps/api/Migrations` cofnął snapshot; migracja odtworzona (nowe id `20261122164023`), wpis historii poprawiony w bazach test/e2e/browser.
 
+## P7c - judge (niewykonany, 2026-11-22)
+
+Brak klucza dostawcy modelu w środowisku. Zgodnie z planem nie blokuje MVP. Jawnie opisany w `referencja/odbior-mvp.md`: brak oceny próbek, budżetu, próbki błędów i kalibracji, a kolejka nie ma powodu „niska ocena”.
+
+## P8 - CI i odbiór lokalnego MVP (done, 2026-11-22)
+
+- `README.md` (świeży start, konta demo, scenariusz, kontrole, stan), `.env.example` (wyjątek w `.gitignore`), `.github/workflows/ci.yml` (API + evale, CSharpier, typecheck, lint, format, build Next, zgodność `schema.d.ts` z OpenAPI, E2E, docs).
+- `e2e/demo.spec.ts`: pełny scenariusz przez UI - klient i kasjer w osobnych kontekstach, aktywacja przez czat, jeden odbiór, odmowa drugiego, historia i saldo.
+- `referencja/odbior-mvp.md`: kryteria SPEC → dowód albo jawny brak.
+- Świeży klon wg README (osobna baza `fuelclub_fresh`, zmienne środowiskowe zamiast user-secrets, inne porty): znaleziony realny błąd - `dotnet ef` bez `dotnet restore` (NETSDK1004). Poprawione w README i instrukcji. Potem migracja, `/health/db`, przekierowanie na `/login` i logowanie kasjera demo przez Next zadziałały. Baza usunięta.
+
+Testy (2026-11-22): `dotnet test` passed 476/476; E2E 124/124 w trzech kolejnych pełnych przebiegach; typecheck, lint, format:check, `next build`, CSharpier check, docs build passed. CI nie było uruchomione na GitHubie (brak push).
+
+Review (`/code-review high`, 5 uwag, wszystkie przyjęte):
+- **Next nie ustawia `X-Forwarded-For` przy rewrite** i przepuszcza nagłówek klienta. Moje założenie z P7b było błędne, potwierdziła to sonda z serwerem zwracającym nagłówki. `proxy.ts` usuwa go teraz dla `/api/*`, chyba że `TRUST_FORWARDED_FOR=true` (sonda: bez zaufania znika, z zaufaniem przechodzi). Lokalnie limit logowań jest wspólny; ADR 0009 poprawiony.
+- CI bez `dotnet restore` przed `dotnet ef`.
+- `meta` i pierwszy flush SSE poza obsługą rozłączenia.
+- `429` zakupu pokazywany jako błąd serwera.
+- `RewardsCatalog` czytał `sessionStorage` w inicjalizatorze stanu (ryzyko hydratacji) → `useSyncExternalStore`.
+
+Poprawki sprawdzone testami i sondą, bez drugiego przeglądu.
+
+Stabilność E2E:
+- limit podglądu kuponów (30/min na jedynego kasjera E2E) wyczerpywał się w pełnym przebiegu → `Rewards__PreviewPermitLimit=1000` w Playwright (test 429 podglądu jest mockowany);
+- test „stop cancels the turn” polegał na `requestfailed` dla wstrzymanej trasy, co nie jest pewne → sprawdza przerwanie sygnału `fetch` w stronie.
+
+Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane przez `proxy.ts` na `/api`.
+
 ## Następny krok
 
-P7c - opcjonalny judge (bez klucza: odnotować jako niezrealizowany), potem P8.
+P9 - hosting w dostępnym zakresie: obrazy, instrukcja; bez konta nie wdrażać.

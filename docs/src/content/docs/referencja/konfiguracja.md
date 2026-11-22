@@ -49,6 +49,7 @@ sidebar:
 
 | Zmienna | Domyślnie | Opis |
 | --- | --- | --- |
+| `TRUST_FORWARDED_FOR` | brak | `true` tylko za proxy hostingu, które ustawia `X-Forwarded-For`; inaczej `proxy.ts` usuwa ten nagłówek z żądań `/api/*` ([ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#limity)) |
 | `API_INTERNAL_URL` | `http://localhost:5271` | prywatny adres API dla rewrite i Server Components. Czytany przy buildzie. |
 | `OPENAPI_URL` | `http://localhost:5271/openapi/v1.json` | źródło dla `npm run api:types` |
 

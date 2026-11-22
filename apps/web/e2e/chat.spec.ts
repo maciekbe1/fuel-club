@@ -242,13 +242,24 @@ test("stop cancels the turn and frees the composer", async ({
   customer,
 }) => {
   void customer;
-  let aborted = false;
   await page.route("**/api/chat", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 10_000));
     await route.abort().catch(() => {});
   });
-  page.on("requestfailed", (request) => {
-    if (request.url().endsWith("/api/chat")) aborted = true;
+  // The page's own fetch signal: Playwright's requestfailed for a held route is not reliable.
+  await page.addInitScript(() => {
+    const original = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const url = input instanceof Request ? input.url : String(input);
+      const signal =
+        init?.signal ?? (input instanceof Request ? input.signal : undefined);
+      if (url.endsWith("/api/chat") && signal)
+        signal.addEventListener("abort", () => {
+          (window as unknown as { __chatAborted: boolean }).__chatAborted =
+            true;
+        });
+      return original(input, init);
+    };
   });
   await openChat(page);
 
@@ -259,7 +270,13 @@ test("stop cancels the turn and frees the composer", async ({
   await expect(turn).toHaveAttribute("data-status", "cancelled");
   await expect(turn).toContainText("Zatrzymano");
   await expect(page.getByRole("button", { name: "Wyślij" })).toBeVisible();
-  await expect.poll(() => aborted).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __chatAborted?: boolean }).__chatAborted,
+      ),
+    )
+    .toBe(true);
 });
 
 test("a stream that ends cleanly without done is not a finished answer", async ({

@@ -90,7 +90,8 @@ Wszystko to bez treści rozmów, kodów, adresów IP i cudzych danych osobowych.
 | czat | 20 tur/min na użytkownika | bez zmian |
 
 - Przeglądarka łączy się z API przez rewrite Nexta, więc adres gniazda to serwer Nexta. Limit używa adresu z `X-Forwarded-For` (`UseForwardedHeaders`, `ClientAddress.cs`) - tylko od zaufanych proxy: loopback domyślnie (Next na tym samym hoście), inne w `ForwardedHeaders:KnownProxies`. Brany jest ostatni wpis (`ForwardLimit` 1).
-- Next ustawia `X-Forwarded-For` tylko, gdy go nie ma. Wystawiony bezpośrednio przepuściłby więc adres podany przez klienta. Zewnętrzne proxy (P9) musi nadpisywać ten nagłówek. Blokada konta Identity działa niezależnie od adresu.
+- Rewrite Nexta **nie** ustawia `X-Forwarded-For` i przepuszcza nagłówek podany przez klienta (sprawdzone serwerem zwracającym nagłówki). Dlatego `proxy.ts` usuwa go dla `/api/*`, chyba że `TRUST_FORWARDED_FOR=true`. Tę wartość ustaw tylko wtedy, gdy przed Nextem stoi proxy hostingu, które ten nagłówek ustawia lub dopisuje (P9).
+- Bez takiego proxy (lokalnie) wszyscy klienci dzielą jeden limit adresu serwera Next: 10 nieudanych prób na minutę blokuje logowanie wszystkim. W demo na jednym komputerze to akceptowalne. Na serwerze wymagane jest proxy z `X-Forwarded-For`. Blokada konta Identity działa niezależnie od adresu.
 - `429` przy ponowieniu zakupu nie kasuje klucza idempotencji na froncie: limit działa przed odtworzeniem zapisanej odpowiedzi, więc zakup mógł się już zapisać.
 
 ## Alternatywy

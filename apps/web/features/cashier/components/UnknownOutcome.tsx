@@ -11,6 +11,8 @@ function unknownMessage(error: Error) {
     return "Kupon klienta jest chwilowo zajęty. Zakup nie został zapisany - ponów za chwilę.";
   if (error instanceof ApiError && error.code === "idempotency.in_progress")
     return "Ten zakup jest właśnie zapisywany. Ponów za chwilę.";
+  if (error instanceof ApiError && error.status === 429)
+    return "Za dużo zakupów w krótkim czasie. Jeśli to ponowienie, zakup mógł już zostać zapisany. Ponów za chwilę: zakup nie zostanie zapisany dwa razy.";
   if (error instanceof NetworkError)
     return "Nie dotarła odpowiedź serwera - nie wiadomo, czy zakup został zapisany. Ponów: zakup nie zostanie zapisany dwa razy.";
   return "Błąd serwera - nie wiadomo, czy zakup został zapisany. Ponów: zakup nie zostanie zapisany dwa razy.";
