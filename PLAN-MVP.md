@@ -165,7 +165,7 @@ Identyfikator z URL nie zastępuje kontroli właściciela. Dostęp do cudzego ku
 
 Wersjonowane scenariusze agenta: saldo, dostępne nagrody, brak punktów, własny kupon, cudzy kupon, próba nadania punktów, prompt injection, niepoprawne argumenty, brak potwierdzenia i awaria dostawcy.
 
-Sprawdzamy wybrane narzędzie, zakres danych, wynik domenowy oraz brak niedozwolonych skutków. Lokalne evals deterministyczne w CI; testy jakości Gemini oddzielnie i tylko po podaniu klucza.
+Sprawdzamy wybrane narzędzie, zakres danych, wynik domenowy oraz brak niedozwolonych skutków. Lokalne evals deterministyczne w CI (`apps/api.tests/Evals/`); testy jakości Gemini oddzielnie i tylko po podaniu klucza.
 
 Logi strukturalne z correlationId, czasem narzędzia, wynikiem i trybem dostawcy. Proste reguły wykrywają: serię odmów autoryzacji, częste konflikty kluczy, powtarzane próby odbioru, przekroczenia limitów narzędzi i błędy AI. Progi konfigurowalne; bez deklarowania pełnej detekcji oszustw.
 
@@ -178,11 +178,11 @@ Bieżąca realizacja pozostałego zakresu: `specs/SPEC.md`, `specs/PLAN.md` (kro
 2. Migracje Identity, konta demo, logowanie, sesja i role. Test izolacji dwóch użytkowników.
 3. Rola Cashier, karta lojalnościowa, saldo, ledger i tankowanie przez symulator kasy. Kolejność: 3.1 rola Cashier i stanowisko (zrobione) → 3.3 infrastruktura Idempotency-Key (zrobione) → 3.2 karta (zrobione) → 3.4 zakup przez kasę (zrobione) → 3.5 odczyt salda i historii (zrobione). Testy uprawnień, rozpoznania karty, ponowień i paragonu.
 4. Oferty i wymiana punktów z transakcją oraz idempotencją. Test równoległego wydawania. (zrobione)
-5. Aktywacja, skan kodu i realizacja przez kasjera. Test jednorazowego rabatu przy różnych kluczach. (API zrobione; UI w etapie 6)
-6. Interfejs: konto i karta, saldo/historia, katalog, moje kupony, panel kasjera i osobny panel administratora. (konto, karta, saldo, historia i zakup w kasie zrobione; reszta: `specs/PLAN.md` P1-P4)
-7. Lokalny agent, SSE, narzędzia i potwierdzenie aktywacji.
-8. Evals, logi, anomalie, scenariusz demonstracji i test E2E.
-9. Opcjonalny adapter Gemini, bez blokowania lokalnego uruchomienia.
+5. Aktywacja, skan kodu i realizacja przez kasjera. Test jednorazowego rabatu przy różnych kluczach. (zrobione, API i UI)
+6. Interfejs: konto i karta, saldo/historia, katalog, moje kupony, panel kasjera i osobny panel administratora. (zrobione, P1-P4)
+7. Lokalny agent, SSE, narzędzia i potwierdzenie aktywacji. (zrobione, P5-P6)
+8. Evals, logi, anomalie, scenariusz demonstracji i test E2E. (zrobione, P7a-P8; judge na próbkach - P7c - otwarte)
+9. Opcjonalny adapter Gemini, bez blokowania lokalnego uruchomienia. (zrobione, P10; sprawdzony ręcznie z kluczem właściciela, test na żywo tylko z `FUELCLUB_GEMINI_API_KEY`)
 
 Po każdym etapie: uruchomienie, krótki test zachowania, dopiero potem kolejny etap. Typy API (`npm run api:types`) regenerujemy przy każdej zmianie kontraktu, nie na końcu etapu.
 

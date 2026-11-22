@@ -45,7 +45,7 @@ Pozostałe wymagania obowiązkowe opisano poniżej. Gemini, RAG, voice, Slack, V
 - Współdziel checki lokalne i produkcyjne, gdy mają potrzebne dane. Rzeczywiste rozmowy zwykle nie mają odpowiedzi wzorcowej: oceniaj zgodność z wynikami narzędzi i regułami. Nigdy nie odtwarzaj mutujących narzędzi na produkcji w ramach evala.
 - Podejrzane trace’y trafiają do kolejki admina: negatywny feedback, powtarzane błędy, naruszenia reguł, niska ocena. Porzucenie rozmowy jest sygnałem do analizy, nie dowodem porażki.
 - Alerty mają konfigurowalne okno, minimalną próbkę i ograniczenie powtórzeń. Naruszenia izolacji lub mutacje bez zgody są krytyczne niezależnie od średniej ocen. Slack pozostaje opcjonalny, wyłączony bez konfiguracji.
-- Potwierdzony problem staje się zanonimizowanym lub syntetycznym przypadkiem regresyjnym w tests/evals, nie surową rozmową w Git. Oceny człowieka służą kalibracji judge’a. Zmiany promptu/modelu przechodzą evals i review; canary dopiero przy gotowym wdrożeniu, metrykach i możliwości rollbacku.
+- Potwierdzony problem staje się zanonimizowanym lub syntetycznym przypadkiem regresyjnym w `apps/api.tests/Evals/` (zestaw `assistant-evals-v1`), nie surową rozmową w Git. Oceny człowieka służą kalibracji judge’a. Zmiany promptu/modelu przechodzą evals i review; canary dopiero przy gotowym wdrożeniu, metrykach i możliwości rollbacku.
 - Dostęp do trace’ów ograniczony rolą; automatyczne usuwanie według jawnej retencji. Te mechanizmy nie są deklaracją pełnej zgodności prawnej.
 - Testy: redakcja przed eksportem, brak sekretów w błędach eksportera, izolacja użytkowników, awaria odbiorcy, sampling i budżet, progi alertów, usuwanie starych danych oraz brak skutków domenowych oceny.
 

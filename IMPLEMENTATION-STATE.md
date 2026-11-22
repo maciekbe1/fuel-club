@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - done; P6 - done; P7a - done; P7b - pending
+Etap i status: P0-P6 - done; P7a - done; P7b - done; P7c - otwarte (judge, wymaga klucza i próbek); P8 - done; P9 - done lokalnie (wdrożenie wymaga konta); P10 - done; poprawki review - done
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -258,8 +258,33 @@ Testy: `dotnet test` passed 484/484, 1 pominięty (na żywo, wymaga `FUELCLUB_GE
 - Podstawione API Gemini: pełna tura z narzędziem, podpis i wynik w drugim żądaniu, brak tożsamości, tokeny w śladzie, odrzucone narzędzie spoza listy, `500` → `provider_error` bez zmiany salda, parsowanie, walidacja klucza.
 - Próba negatywna: bez odsyłania podpisu pada test tury.
 
-Nie sprawdzone z prawdziwym API (brak klucza w środowisku).
+Prawdziwe API: właściciel sprawdził ręcznie w aplikacji (pytanie o saldo, narzędzie użyte). Test na żywo nie był uruchamiany.
+
+Dodatkowo: Scalar pod `/scalar` (Development).
+
+## Poprawki po review właściciela (2026-11-22, f2f5cba)
+
+1. Klucz nierozstrzygniętej operacji przypisany do konta: przeżywa wylogowanie i wygaśnięcie sesji, a inne konto go nie widzi.
+2. Ponowienie po przywróconym, znowu nieudanym tworzeniu oferty wysyła zachowaną ofertę.
+3. Gemini: wszystkie `functionCall` z odpowiedzi; odsyłane razem z podziałem na kroki; krok ponad limit nic nie wykonuje.
+4. Demo: odpowiedź na „Który kupon aktywować?” kontynuuje aktywację.
+5. Nieudane wywołanie modelu → tokeny tury nieznane (`null`), nie częściowe.
+
+Przy okazji: testy API i E2E wymuszają adapter demo (klucz w user-secrets wcześniej wpływał na evale i E2E).
+
+Testy:
+- `dotnet test` passed 488/488 (1 pominięty na żywo);
+- `npm run e2e` passed 128/128;
+- typecheck, lint, CSharpier, Prettier, build docs - passed.
+
+Próby negatywne: regresje 1, 2, 4 i 5 padają bez poprawek.
 
 ## Następny krok
 
-Plan P0-P9 zrealizowany w dostępnym zakresie. Otwarte: wdrożenie (konto hostingu), P7c judge (klucz dostawcy), P10 Gemini (opcjonalny), push (decyzja właściciela).
+Otwarte:
+- P7c judge na próbkach;
+- publiczny hosting i telefon (konto Railway);
+- test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
+- CI na GitHubie (push - decyzja właściciela).
+
+Uzgodnione dalej: P11 przekazanie rozmowy do konsultanta (rola Support). Najpierw ADR i kontrakt, potem implementacja.
