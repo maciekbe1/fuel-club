@@ -247,6 +247,19 @@ Review (`/code-review high`, 7 uwag, wszystkie przyjęte):
 
 Niewykonane (wymaga konta): wdrożenie Railway, HTTPS na domenie, SSE przez brzeg hostingu, kamera na telefonie. Punkty „sprawdź” w instrukcji.
 
+## P10 - adapter Gemini (2026-11-22, na prośbę właściciela)
+
+ADR 0011.
+- `Assistant:Provider=gemini` + `Assistant:Gemini:ApiKey` (user-secrets).
+- `GeminiChatModel` (REST `generateContent`, function calling): klucz w nagłówku, odsyłanie `thoughtSignature`, tokeny z rozumowaniem.
+- Do Google nie idą id, e-mail, kody ani token potwierdzenia.
+
+Testy: `dotnet test` passed 484/484, 1 pominięty (na żywo, wymaga `FUELCLUB_GEMINI_API_KEY`).
+- Podstawione API Gemini: pełna tura z narzędziem, podpis i wynik w drugim żądaniu, brak tożsamości, tokeny w śladzie, odrzucone narzędzie spoza listy, `500` → `provider_error` bez zmiany salda, parsowanie, walidacja klucza.
+- Próba negatywna: bez odsyłania podpisu pada test tury.
+
+Nie sprawdzone z prawdziwym API (brak klucza w środowisku).
+
 ## Następny krok
 
 Plan P0-P9 zrealizowany w dostępnym zakresie. Otwarte: wdrożenie (konto hostingu), P7c judge (klucz dostawcy), P10 Gemini (opcjonalny), push (decyzja właściciela).

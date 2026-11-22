@@ -79,6 +79,7 @@ public sealed class ChatService(
         }
 
         var results = new List<ToolResult>();
+        var calls = new List<ToolCall>();
         var history = request.History ?? [];
         try
         {
@@ -100,7 +101,10 @@ public sealed class ChatService(
                 // The model sees results without the confirmation token: only the client gets it.
                 var seen = results.Select(r => r with { Confirmation = null }).ToList();
                 var step = await model.NextAsync(
-                    new ChatModelContext(request.Message!.Trim(), history, seen),
+                    new ChatModelContext(request.Message!.Trim(), history, seen)
+                    {
+                        ToolCalls = calls,
+                    },
                     turn.Token
                 );
                 recorder.Usage(step.Usage);
@@ -129,6 +133,7 @@ public sealed class ChatService(
 
                 var result = await RunToolAsync(call, context, correlationId, recorder, turn.Token);
                 results.Add(result);
+                calls.Add(call);
                 await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
                 if (result.Confirmation is { } confirmation)
                     await Send("confirmation", confirmation, turn.Token);

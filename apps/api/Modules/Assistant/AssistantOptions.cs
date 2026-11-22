@@ -22,6 +22,30 @@ public sealed class AssistantOptions
 
     /// <summary>How long the end of a turn may wait for its trace row.</summary>
     public TimeSpan TraceSaveTimeout { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>"demo" (default, no network) or "gemini" (needs Gemini:ApiKey).</summary>
+    public string Provider { get; set; } = Providers.Demo;
+
+    public GeminiOptions Gemini { get; set; } = new();
+}
+
+public static class Providers
+{
+    public const string Demo = "demo";
+    public const string Gemini = "gemini";
+}
+
+public sealed class GeminiOptions
+{
+    /// <summary>A secret: user-secrets or the environment (Assistant__Gemini__ApiKey), never the repo.</summary>
+    public string? ApiKey { get; set; }
+
+    /// <summary>Model code from the Gemini models page; check it before switching.</summary>
+    public string Model { get; set; } = "gemini-3.5-flash-lite";
+    public Uri Endpoint { get; set; } = new("https://generativelanguage.googleapis.com/v1beta/");
+
+    /// <summary>One model call; the whole turn is still bounded by TurnTimeout.</summary>
+    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(20);
 }
 
 public sealed class AssistantOptionsValidator(IHostEnvironment environment)
@@ -60,6 +84,19 @@ public sealed class AssistantOptionsValidator(IHostEnvironment environment)
             errors.Add("Assistant:PseudonymKey is required outside Development.");
         if (o.TraceSaveTimeout <= TimeSpan.Zero || o.TraceSaveTimeout > TimeSpan.FromSeconds(30))
             errors.Add("Assistant:TraceSaveTimeout must be > 0 and <= 30 s.");
+        if (o.Provider is not (Providers.Demo or Providers.Gemini))
+            errors.Add("Assistant:Provider must be demo or gemini.");
+        if (o.Provider == Providers.Gemini)
+        {
+            if (string.IsNullOrWhiteSpace(o.Gemini.ApiKey))
+                errors.Add(
+                    "Assistant:Gemini:ApiKey is required when Assistant:Provider is gemini."
+                );
+            if (string.IsNullOrWhiteSpace(o.Gemini.Model))
+                errors.Add("Assistant:Gemini:Model is required.");
+            if (o.Gemini.RequestTimeout <= TimeSpan.Zero || o.Gemini.RequestTimeout > o.TurnTimeout)
+                errors.Add("Assistant:Gemini:RequestTimeout must be > 0 and <= TurnTimeout.");
+        }
         return errors.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(errors);

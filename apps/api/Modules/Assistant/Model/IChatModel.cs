@@ -3,12 +3,18 @@ using FuelClub.Api.Modules.Assistant.Tools;
 
 namespace FuelClub.Api.Modules.Assistant.Model;
 
-/// <summary>What the model sees: the turn and the results of tools it asked for in this turn.</summary>
+/// <summary>
+/// What the model sees: the turn and the results of tools it asked for in this turn. ToolCalls are
+/// the calls behind ToolResults, in the same order (a provider replays them, e.g. with signatures).
+/// </summary>
 public sealed record ChatModelContext(
     string Message,
     IReadOnlyList<ChatHistoryItem> History,
     IReadOnlyList<ToolResult> ToolResults
-);
+)
+{
+    public IReadOnlyList<ToolCall> ToolCalls { get; init; } = [];
+}
 
 /// <summary>Tokens as reported by the provider for one model call.</summary>
 public sealed record TokenUsage(int InputTokens, int OutputTokens);

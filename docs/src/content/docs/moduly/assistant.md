@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie]
-Zrealizowane: `POST /api/chat` (SSE), cztery narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Metryki, anomalie, kolejka admina i retencja: [Observability](/moduly/observability/) (P7b). Planowane: ocena przez judge (P7c), adapter dostawcy (opcjonalnie).
+Zrealizowane: `POST /api/chat` (SSE), cztery narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Metryki, anomalie, kolejka admina i retencja: [Observability](/moduly/observability/) (P7b). Adapter Gemini: [ADR 0011](/decyzje/0011-adapter-gemini/) (`Model/GeminiChatModel.cs`, testy `GeminiTests`). Planowane: ocena przez judge (P7c).
 :::
 
 ## Co robi

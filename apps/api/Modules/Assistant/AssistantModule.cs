@@ -29,8 +29,11 @@ public static class AssistantModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ConfirmationTokens>();
         services.AddSingleton<TracePseudonyms>();
-        // The demo model is the default; a provider adapter replaces this registration.
-        services.AddSingleton<IChatModel, DemoChatModel>();
+        // The demo model is the default; Assistant:Provider=gemini switches to the Gemini adapter.
+        if (configuration[$"{AssistantOptions.Section}:Provider"] == Providers.Gemini)
+            services.AddHttpClient<IChatModel, GeminiChatModel>(GeminiChatModel.ClientName);
+        else
+            services.AddSingleton<IChatModel, DemoChatModel>();
         services.AddScoped<AssistantTools>();
         services.AddScoped<ChatService>();
         services.AddRateLimiter(options =>

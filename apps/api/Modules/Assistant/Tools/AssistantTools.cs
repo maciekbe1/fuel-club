@@ -11,7 +11,11 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelClub.Api.Modules.Assistant.Tools;
 
 /// <summary>A request from the model. Arguments are untrusted JSON.</summary>
-public sealed record ToolCall(string Name, JsonElement Arguments);
+public sealed record ToolCall(string Name, JsonElement Arguments)
+{
+    /// <summary>The provider's own form of this call (e.g. a Gemini part with its thought signature).</summary>
+    public JsonElement? ProviderPart { get; init; }
+}
 
 /// <summary>Who is asking: always the session user, never a model argument.</summary>
 public sealed record ToolContext(string UserId);

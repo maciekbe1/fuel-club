@@ -13,7 +13,13 @@ Stos:
 - Web: Next.js 16.
 - Dokumentacja: Astro Starlight (`docs/`).
 
-Czat działa lokalnie na deterministycznym adapterze demo - bez kluczy i bez chmury.
+Czat działa lokalnie na deterministycznym adapterze demo - bez kluczy i bez chmury. Opcjonalnie Gemini:
+
+```sh
+dotnet user-secrets set "Assistant:Provider" "gemini" --project apps/api
+dotnet user-secrets set "Assistant:Gemini:ApiKey" "<klucz>" --project apps/api
+# powrót do demo: dotnet user-secrets remove "Assistant:Provider" --project apps/api
+```
 
 ## Wymagania
 
@@ -114,5 +120,4 @@ Zawiera moduły, referencję (endpointy, kody błędów, konfiguracja, baza), in
 
 - wdrożenie na hosting (wymaga konta);
 - ocena tur przez judge (P7c - wymaga klucza dostawcy);
-- adapter Gemini (opcjonalny);
 - alerty Slack.
