@@ -31,7 +31,8 @@ public static class RewardHandoverEndpoint
     public const string Description =
         "Hands over an active product reward of the scanned card's owner. Records the cashier, station, register "
         + "and time; registers no purchase and awards no points. A fuel discount coupon returns 409 "
-        + "rewards.coupon_wrong_kind. Retry with the same Idempotency-Key replays the result.";
+        + "rewards.coupon_wrong_kind. An already handed-over reward returns 409 rewards.coupon_redeemed with "
+        + "handedOverAt and stationCode. Retry with the same Idempotency-Key replays the result.";
 
     public static async Task<Results<Ok<RewardHandoverResponse>, ProblemHttpResult>> Handle(
         RewardHandoverRequest request,
@@ -107,7 +108,14 @@ public static class RewardHandoverEndpoint
         if (coupon.Kind != RewardKind.Product)
             return RewardsProblems.CouponWrongKind();
         if (coupon.Status == CouponStatus.Redeemed)
-            return RewardsProblems.CouponRedeemed();
+            return RewardsProblems.RewardHandedOver(
+                await db
+                    .RewardHandovers.AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        h => h.CouponId == coupon.Id && h.UserId == card.UserId,
+                        cancellationToken
+                    )
+            );
         if (coupon.Status != CouponStatus.Active)
             return RewardsProblems.CouponNotFound();
 

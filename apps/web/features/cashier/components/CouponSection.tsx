@@ -1,6 +1,5 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useWatch } from "react-hook-form";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
@@ -9,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { ApiError, NetworkError } from "@/lib/api/problem";
 import { benefitTerms, isProduct } from "@/lib/format";
 import { keepsIdempotencyKey, keepsPendingOperation } from "@/lib/idempotency";
-import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import {
   useCouponCalculation,
@@ -38,7 +36,7 @@ function previewError(error: unknown) {
   if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
     return "Nie znaleziono aktywnego kuponu tego klienta o tym kodzie. Kupon musi być aktywowany w telefonie klienta.";
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
-    return "Ten kupon został już wykorzystany.";
+    return handedOverMessage(error) ?? "Ten kupon został już wykorzystany.";
   if (error instanceof ApiError && error.code === "rewards.coupon_wrong_kind")
     return "To kod nagrody - rabatu nie da się przeliczyć. Wydaj nagrodę przyciskiem.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
@@ -269,9 +267,25 @@ function busyMessage(error: unknown) {
   return null;
 }
 
+const clock = new Intl.DateTimeFormat("pl-PL", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: "Europe/Warsaw",
+});
+
+/**
+ * A handed-over product reward: the server says when and where, so a lost answer of this till's own
+ * attempt (a moment ago, this station) is told apart from an earlier handover.
+ */
+function handedOverMessage(error: ApiError) {
+  const { handedOverAt, stationCode } = error.problem;
+  if (!handedOverAt) return null;
+  return `Nagroda została już wydana ${clock.format(new Date(handedOverAt))}${stationCode ? ` na stanowisku ${stationCode}` : ""}. Jeśli to przed chwilą na tej kasie, odpowiedź poprzedniej próby nie dotarła - sprawdź, czy klient ją otrzymał.`;
+}
+
 function handoverError(error: unknown) {
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
-    return "Ta nagroda została już wydana.";
+    return handedOverMessage(error) ?? "Ta nagroda została już wydana.";
   if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
     return "Nie znaleziono aktywnej nagrody tego klienta o tym kodzie.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
@@ -300,53 +314,28 @@ function RewardHandover({
 }) {
   const handOver = useHandOverReward();
   const forgetPreviews = useForgetCouponPreviews();
-  const queryClient = useQueryClient();
-  const uncertainKey = queryKeys.cashier.handoverUncertain(
-    cardCode,
-    couponCode,
-  );
-  // An attempt for this pair ended without a known outcome. Kept in the query cache (memory), so
-  // it survives a remount after the cashier edits and retypes a code; the codes are never stored.
-  const [uncertain, setUncertainState] = useState(
-    () => queryClient.getQueryData<boolean>(uncertainKey) === true,
-  );
-  const setUncertain = (value: boolean) => {
-    setUncertainState(value);
-    queryClient.setQueryData(uncertainKey, value);
-  };
-  // "Already handed over" right after an unknown outcome: most likely by that lost attempt.
-  const [redeemedAfterUnknown, setRedeemedAfterUnknown] = useState(false);
+  // An attempt in this panel ended without a known outcome: until a final answer, any non-final one
+  // (429, 503, 401) leaves it unknown. Nothing outlives the panel - after a remount the server's
+  // 409 says when and where the reward was handed over (handedOverMessage).
+  const [uncertain, setUncertain] = useState(false);
 
   const error = handOver.isError ? handOver.error : null;
   const busy = error ? busyMessage(error) : null;
   const expired = error instanceof ApiError && error.status === 401;
-  // After an unknown outcome every non-final answer (429, 503, 401) leaves it unknown.
-  // Also with no error yet: after a remount the earlier unknown outcome is still shown.
-  const unknown = error
-    ? uncertain || (keepsIdempotencyKey(error) && !busy)
-    : uncertain;
+  const unknown =
+    error !== null && (uncertain || (keepsIdempotencyKey(error) && !busy));
   const refusal = unknown ? null : busy;
 
   const send = async () => {
     try {
       await handOver.mutateAsync({ cardCode, couponCode });
-      setUncertain(false);
       forgetPreviews();
       onDone();
     } catch (failure) {
       // Shown below from the mutation state.
-      if (keepsPendingOperation(failure)) {
-        if (keepsIdempotencyKey(failure) && !busyMessage(failure))
-          setUncertain(true);
-        return;
-      }
-      // A final answer ends the operation: the next attempt has a new key.
-      setRedeemedAfterUnknown(
-        uncertain &&
-          failure instanceof ApiError &&
-          failure.code === "rewards.coupon_redeemed",
-      );
-      setUncertain(false);
+      if (!keepsPendingOperation(failure)) setUncertain(false);
+      else if (keepsIdempotencyKey(failure) && !busyMessage(failure))
+        setUncertain(true);
     }
   };
 
@@ -366,9 +355,7 @@ function RewardHandover({
       )}
       {error && !unknown && !refusal && (
         <p role="alert" className="text-destructive">
-          {redeemedAfterUnknown
-            ? "Nagroda jest już oznaczona jako wydana - najpewniej przy poprzedniej próbie, której odpowiedź nie dotarła. Sprawdź, czy klient ją otrzymał."
-            : handoverError(error)}
+          {handoverError(error)}
         </p>
       )}
       {unknown && (

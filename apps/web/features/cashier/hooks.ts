@@ -30,6 +30,7 @@ export function useRegisterPurchase() {
 /** Same card and code → same Idempotency-Key until a final answer: a lost response is retried safely. */
 export function useHandOverReward() {
   return useIdempotentMutation<RewardHandoverResult, RewardHandoverBody>({
+    mutationKey: queryKeys.cashier.rewardHandover,
     mutationFn: (body, key) => cashierService.handOverReward(body, key),
   });
 }

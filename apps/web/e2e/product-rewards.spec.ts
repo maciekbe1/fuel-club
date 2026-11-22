@@ -121,7 +121,8 @@ test("a product reward: exchange, activate pickup, the cashier hands it over onc
   await expect(
     register
       .getByRole("alert")
-      .filter({ hasText: "Ten kupon został już wykorzystany" }),
+      .filter({ hasText: `Nagroda została już wydana` })
+      .filter({ hasText: `na stanowisku ${CASHIER.station}` }),
   ).toBeVisible();
   await context.close();
 
@@ -238,7 +239,7 @@ test("the state of one reward code does not carry over to another, the banner be
   await context.close();
 });
 
-test("an unknown handover outcome survives a retyped code and a 401; the banner does not come back for the card", async ({
+test("after an unknown outcome and a 401, a retyped code gets the server's when-and-where; the banner does not come back", async ({
   page,
   browser,
   customer,
@@ -282,23 +283,38 @@ test("an unknown handover outcome survives a retyped code and a 401; the banner 
   await expect(handover.getByRole("alert")).toContainText("Sesja wygasła");
   await expect(handover.getByRole("alert")).toContainText("Nie wiadomo");
 
-  // A typo fix remounts the panel: the warning stays; the server says it was handed over.
+  // A typo fix remounts the panel (nothing remembered on the client); the new attempt's 409 says
+  // when and where - this station, a moment ago - so the cashier recognises the lost attempt.
   await coupon.fill(codes[0].slice(0, -1));
   await coupon.fill(codes[0]);
-  await expect(handover.getByRole("alert")).toContainText("Nie wiadomo");
-  await handover.getByRole("button", { name: "Ponów wydanie" }).click();
+  await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
   await expect(handover.getByRole("alert")).toContainText(
-    "najpewniej przy poprzedniej próbie",
+    `Nagroda została już wydana`,
+  );
+  await expect(handover.getByRole("alert")).toContainText(
+    `na stanowisku ${CASHIER.station}`,
   );
   await register.unroute(HANDOVERS);
+
+  // While a handover runs the form is locked: its late success cannot clear the next code.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await register.route(HANDOVERS, async (route) => {
+    await held;
+    await route.continue();
+  });
 
   // The banner is cleared with the card, not just hidden.
   await coupon.fill(codes[1]);
   await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
+  await expect(coupon).toBeDisabled();
+  await expect(cardField).toBeDisabled();
+  release();
   const banner = register
     .getByRole("status")
     .filter({ hasText: `Wydano nagrodę „${second}”` });
   await expect(banner).toBeVisible();
+  await register.unroute(HANDOVERS);
   await cardField.fill("");
   await cardField.fill(card);
   await expect(register.getByLabel("Kod karty klienta")).toHaveValue(card);

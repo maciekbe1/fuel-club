@@ -336,7 +336,7 @@ Cofnięcie migracji na tymczasowej bazie (`fuelclub_rollback_*` na 5434, usunię
 Ponowne review (`/code-review high`, 6 uwag, wszystkie przyjęte):
 - ważne: `429` na ponowieniu po zgubionej odpowiedzi pokazywał „nie została wydana” (limit działa przed idempotencją) - teraz zostaje nieznany wynik; stan wydania przechodził na inny kod z podglądem w pamięci - komponent kluczowany parą kodów;
 - drobne: „Nagroda wydana w kasie”; komunikat wydania tylko dla tej karty; nieznany rodzaj przy tworzeniu bez błędów stawki i limitu;
-- wynik: E2E 64/64 w plikach nagród, admina, kuponów i kasy (po trzecim review 66/66);
+- wynik: E2E 64/64 w plikach nagród, admina, kuponów i kasy (po trzecim i czwartym review 66/66);
 - testy: E2E zgubiona odpowiedź → `429` → ponowienie (jeden klucz, jedno wydanie), zmiana kodu; `ProductRewardsMigrationTests` (baza tymczasowa) zamiast ręcznego sprawdzenia. Mutacje: bez stanu niepewności, bez klucza komponentu, bez strażnika `Down`, z `DEFAULT 0` - każda wywraca test.
 
 Trzecie review (`/code-review high`, 5 uwag, wszystkie przyjęte):
@@ -344,6 +344,12 @@ Trzecie review (`/code-review high`, 5 uwag, wszystkie przyjęte):
 - przemontowanie po poprawieniu kodu gubiło klucz (było już przed kluczowaniem komponentu) - bez `persist`, żeby kody nie trafiały do `sessionStorage`. Niepewność pary trzymana w pamięci cache zapytań; `409 coupon_redeemed` po niej pokazany jako „najpewniej wydana przy poprzedniej próbie - sprawdź”;
 - drobne: ostateczna odpowiedź kasuje ostrzeżenie; komunikat wydania kasowany przy zmianie karty, nie tylko ukrywany; przy nieznanym rodzaju usuwane tylko „wymagane” błędy stawki i limitu;
 - testy: E2E `401` + przemontowanie + komunikat, API literówki rodzaju z błędem precyzji. Mutacje (bez cache, `401` kasuje, filtrowanie komunikatu) wywracają test.
+
+Czwarte review (`/code-review high`, 5 uwag, wszystkie przyjęte). Pamięć niepewności po stronie klienta ginęła po ponownym logowaniu, po 5 min i po obsłużeniu innego klienta, a do tego trzymała kody w cache. Zamiast łatać dalej, właściciel zatwierdził zmianę kontraktu:
+- `409 coupon_redeemed` nagrody (wydanie, podgląd) niesie `handedOverAt` i `stationCode`;
+- klient nic nie pamięta: nieznany wynik tylko w panelu, potem rozstrzyga serwer (czas + stanowisko);
+- formularz kasy zablokowany w trakcie wydania (spóźniony sukces czyścił kod następnego klienta);
+- usunięte: klucz cache, `redeemedAfterUnknown`. Mutacje (bez blokady, bez czasu i stanowiska) wywracają E2E.
 
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 

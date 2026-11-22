@@ -75,7 +75,7 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.offer_changed` | - | `409`: oferta zmieniła się od wyświetlenia (inna `version`); nic nie pobrano, pokaż nowe warunki |
 | `rewards.insufficient_points` | - | `409`: saldo mniejsze niż koszt (także brak konta); nic nie pobrano |
 | `rewards.coupon_not_found` | - | `404`: brak kuponu albo cudzy kupon (także kupon innego klienta przy zakupie) |
-| `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd, zakup) |
+| `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd, zakup, wydanie); przy nagrodzie w wydaniu i podglądzie także `handedOverAt` i `stationCode` |
 | `rewards.coupon_busy` | - | `503` + `Retry-After`: wiersz kuponu zablokowany dłużej niż `Rewards:CouponLockTimeout` przez inną transakcję (nie przez aktywację - kod trwającej aktywacji nie jest jeszcze widoczny, więc zakup dostaje `404`); ponów zakup z tym samym kluczem (niezapisywany) |
 | `rewards.not_for_product` | `discountPerLiter`, `maxLiters` | nagroda produktowa nie ma stawki ani limitu |
 | `rewards.kind_immutable` | `kind` | `PUT` z innym rodzajem niż zapisany |

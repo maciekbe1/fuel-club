@@ -7,6 +7,9 @@ export type ProblemDetails = {
   title?: string;
   code?: string;
   errors?: Record<string, FieldError[]>;
+  /** 409 rewards.coupon_redeemed of a product reward: when and where it was handed over. */
+  handedOverAt?: string;
+  stationCode?: string;
 };
 
 export class ApiError extends Error {

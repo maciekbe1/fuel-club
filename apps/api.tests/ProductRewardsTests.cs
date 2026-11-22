@@ -30,7 +30,12 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
         );
     }
 
-    private sealed record ProblemBody(string? Code, Dictionary<string, FieldError[]>? Errors);
+    private sealed record ProblemBody(
+        string? Code,
+        Dictionary<string, FieldError[]>? Errors,
+        DateTimeOffset? HandedOverAt = null,
+        string? StationCode = null
+    );
 
     private sealed record FieldError(string Field, string Code);
 
@@ -363,7 +368,8 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
         var again = await HandOverAsync(cashier, customer.CardCode, coupon.Code!);
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
-        Assert.Equal("rewards.coupon_redeemed", await CodeOf(again));
+        var againBody = (await again.Content.ReadFromJsonAsync<ProblemBody>())!;
+        Assert.Equal("rewards.coupon_redeemed", againBody.Code);
 
         var stored = await DbAsync(db =>
             db.Coupons.AsNoTracking().SingleAsync(c => c.Id == coupon.Id)
@@ -381,6 +387,12 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal((customer.UserId, cashierId), (handover.UserId, handover.CashierUserId));
         Assert.False(string.IsNullOrEmpty(handover.StationCode));
         Assert.False(string.IsNullOrEmpty(handover.RegisterCode));
+        // The 409 says when and where, so the till can recognise its own lost attempt.
+        Assert.Equal(handover.StationCode, againBody.StationCode);
+        Assert.Equal(
+            handover.HandedOverAt.ToUnixTimeMilliseconds(),
+            againBody.HandedOverAt!.Value.ToUnixTimeMilliseconds()
+        );
         // No purchase, no points.
         Assert.Equal(
             0,
@@ -462,7 +474,10 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
             "/api/cashier/coupons/preview",
             new { cardCode = customer.CardCode, couponCode = product.Code }
         );
-        Assert.Equal("rewards.coupon_redeemed", await CodeOf(redeemed));
+        var redeemedBody = (await redeemed.Content.ReadFromJsonAsync<ProblemBody>())!;
+        Assert.Equal("rewards.coupon_redeemed", redeemedBody.Code);
+        Assert.NotNull(redeemedBody.HandedOverAt);
+        Assert.False(string.IsNullOrEmpty(redeemedBody.StationCode));
         var redeemedPriced = await SendAsync(
             cashier,
             HttpMethod.Post,

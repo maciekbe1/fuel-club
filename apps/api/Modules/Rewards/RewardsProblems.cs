@@ -35,6 +35,24 @@ internal static class RewardsProblems
         );
 
     /// <summary>
+    /// A handed-over product reward, for the owner's card only: when and where, so the till can tell
+    /// a lost answer of its own attempt from an earlier handover without remembering anything.
+    /// </summary>
+    public static ProblemHttpResult RewardHandedOver(RewardHandover? handover) =>
+        handover is null
+            ? CouponRedeemed()
+            : TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Coupon was already redeemed",
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = RewardsErrorCodes.CouponRedeemed,
+                    ["handedOverAt"] = handover.HandedOverAt,
+                    ["stationCode"] = handover.StationCode,
+                }
+            );
+
+    /// <summary>
     /// A product at the fuel purchase or a fuel discount at the handover. Checked only after the
     /// owner, so it never reveals someone else's coupon.
     /// </summary>

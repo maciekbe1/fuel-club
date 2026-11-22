@@ -939,7 +939,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind. Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429). */
+        /** @description Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind; a handed-over one gives 409 rewards.coupon_redeemed with handedOverAt and stationCode. Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429). */
         post: {
             parameters: {
                 query?: never;
@@ -1015,7 +1015,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Hands over an active product reward of the scanned card's owner. Records the cashier, station, register and time; registers no purchase and awards no points. A fuel discount coupon returns 409 rewards.coupon_wrong_kind. Retry with the same Idempotency-Key replays the result. */
+        /** @description Hands over an active product reward of the scanned card's owner. Records the cashier, station, register and time; registers no purchase and awards no points. A fuel discount coupon returns 409 rewards.coupon_wrong_kind. An already handed-over reward returns 409 rewards.coupon_redeemed with handedOverAt and stationCode. Retry with the same Idempotency-Key replays the result. */
         post: {
             parameters: {
                 query?: never;

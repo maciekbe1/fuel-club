@@ -1,10 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useIsMutating } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
+import { queryKeys } from "@/lib/query-keys";
 import { useForgetCouponPreviews, useRegisterPurchase } from "../hooks";
 import {
   purchaseMessages,
@@ -60,7 +62,11 @@ export function usePurchaseFlow() {
     purchase.isError && keepsIdempotencyKey(purchase.error)
       ? purchase.error
       : null;
-  const locked = purchase.isPending || unknown !== null;
+  // A reward handover in flight locks the form too: a changed code would drop its panel, and its
+  // late success would clear the next customer's code.
+  const handingOver =
+    useIsMutating({ mutationKey: queryKeys.cashier.rewardHandover }) > 0;
+  const locked = purchase.isPending || unknown !== null || handingOver;
 
   const send = async (body: FuelPurchaseBody) => {
     setPending(body);

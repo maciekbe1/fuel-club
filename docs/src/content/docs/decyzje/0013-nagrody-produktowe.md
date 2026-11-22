@@ -45,7 +45,7 @@ Drugi, równoległy system (osobne nagrody, wymiany, kody) powieliłby wymianę,
 - Sama karta nie jest dodatkowym uwierzytelnieniem: zachowuje spójny proces z rabatem i pozwala backendowi sprawdzić właściciela.
 - Błędy:
   - cudzy albo nieistniejący kod → `404`, ten sam co przy rabacie;
-  - kupon odebrany → `409 rewards.coupon_redeemed`; nieaktywowany nie ma kodu, więc → `404`, jak przy rabacie;
+  - kupon odebrany → `409 rewards.coupon_redeemed` z `handedOverAt` i `stationCode` wydania (decyzja właściciela po review: kasa rozpoznaje własną zgubioną próbę bez pamięci po stronie klienta); nieaktywowany nie ma kodu, więc → `404`, jak przy rabacie;
   - kupon rabatowy w tym endpoincie albo nagroda w zakupie paliwa → `409 rewards.coupon_wrong_kind`.
 - Ponowienie z tym samym kluczem odtwarza wynik. Inny klucz po odbiorze → `409` (warunkowy UPDATE pilnuje jednorazowości).
 - Ograniczenia bazy rozróżniają oba odbiory:

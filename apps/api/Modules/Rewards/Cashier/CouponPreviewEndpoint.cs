@@ -46,7 +46,8 @@ public static class CouponPreviewEndpoint
 
     public const string Description =
         "Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; "
-        + "a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind. "
+        + "a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind; "
+        + "a handed-over one gives 409 rewards.coupon_redeemed with handedOverAt and stationCode. "
         + "Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429).";
 
     public static async Task<Results<Ok<CouponPreviewResponse>, ProblemHttpResult>> Handle(
@@ -108,7 +109,16 @@ public static class CouponPreviewEndpoint
         if (priced && coupon.Kind != RewardKind.FuelDiscount)
             return RewardsProblems.CouponWrongKind();
         if (coupon.Status == CouponStatus.Redeemed)
-            return RewardsProblems.CouponRedeemed();
+            return coupon.Kind == RewardKind.Product
+                ? RewardsProblems.RewardHandedOver(
+                    await db
+                        .RewardHandovers.AsNoTracking()
+                        .SingleOrDefaultAsync(
+                            h => h.CouponId == coupon.Id && h.UserId == ownerId,
+                            cancellationToken
+                        )
+                )
+                : RewardsProblems.CouponRedeemed();
 
         CouponPreviewCalculation? calculation = null;
         if (request is { Amount: { } gross, Liters: { } litres })
