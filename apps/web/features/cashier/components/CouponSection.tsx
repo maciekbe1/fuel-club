@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWatch } from "react-hook-form";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { benefitTerms, isProduct } from "@/lib/format";
 import { keepsIdempotencyKey, keepsPendingOperation } from "@/lib/idempotency";
 import { cn } from "@/lib/utils";
 import {
+  useCashierStation,
   useCouponCalculation,
   useCouponTerms,
   useForgetCouponPreviews,
@@ -21,6 +22,7 @@ import {
   normalizeCode,
   parseDecimal,
 } from "../schemas";
+import type { CashierStation, RewardsConflictProblem } from "../services";
 import { QrScanner } from "./QrScanner";
 import type { PurchaseFlow } from "./usePurchaseFlow";
 
@@ -30,13 +32,15 @@ const money = new Intl.NumberFormat("pl-PL", {
 });
 const plain = new Intl.NumberFormat("pl-PL");
 
-function previewError(error: unknown) {
+function previewError(error: unknown, own: CashierStation | undefined) {
   if (error instanceof ApiError && error.status === 429)
     return "Limit podglądów kuponów na tej kasie został wyczerpany. Spróbuj za chwilę - zakup z kuponem można zapisać bez podglądu.";
   if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
     return "Nie znaleziono aktywnego kuponu tego klienta o tym kodzie. Kupon musi być aktywowany w telefonie klienta.";
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
-    return handedOverMessage(error) ?? "Ten kupon został już wykorzystany.";
+    return (
+      handedOverMessage(error, own) ?? "Ten kupon został już wykorzystany."
+    );
   if (error instanceof ApiError && error.code === "rewards.coupon_wrong_kind")
     return "To kod nagrody - rabatu nie da się przeliczyć. Wydaj nagrodę przyciskiem.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
@@ -56,6 +60,7 @@ function previewError(error: unknown) {
  */
 export function CouponSection({ flow }: { flow: PurchaseFlow }) {
   const { form, locked, scanner, setScanner } = flow;
+  const station = useCashierStation();
   const { errors } = form.formState;
   const [cardText, couponText, amountText, litersText] = useWatch({
     control: form.control,
@@ -116,6 +121,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           className={cn(fieldClass, "font-mono")}
           {...fieldA11y("couponCode", errors.couponCode)}
           {...couponField}
+          disabled={locked}
           onChange={(event) => {
             forget();
             setHandedOver(null);
@@ -152,7 +158,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
 
       {terms.isError && couponCode && cardCode && (
         <p role="alert" className="text-sm text-destructive">
-          {previewError(terms.error)}
+          {previewError(terms.error, station.data)}
         </p>
       )}
 
@@ -163,7 +169,9 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           offerName={terms.data.offerName}
           cardCode={cardCode}
           couponCode={couponCode}
-          locked={locked}
+          locked={flow.purchaseLocked}
+          station={station.data}
+          onUnresolvedChange={flow.setHandoverUnresolved}
           onDone={() => {
             setHandedOver({ offerName: terms.data.offerName, cardCode });
             form.setValue("couponCode", "", { shouldDirty: true });
@@ -227,7 +235,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           )}
           {sameCodes && computed?.error != null && (
             <p role="alert" className="text-sm text-destructive">
-              {previewError(computed.error)}
+              {previewError(computed.error, station.data)}
             </p>
           )}
 
@@ -274,18 +282,30 @@ const clock = new Intl.DateTimeFormat("pl-PL", {
 });
 
 /**
- * A handed-over product reward: the server says when and where, so a lost answer of this till's own
- * attempt (a moment ago, this station) is told apart from an earlier handover.
+ * A handed-over product reward: the server says when and where (station and till), so a lost answer
+ * of this till's own attempt is told apart from a handover elsewhere. Null without a usable time.
  */
-function handedOverMessage(error: ApiError) {
-  const { handedOverAt, stationCode } = error.problem;
-  if (!handedOverAt) return null;
-  return `Nagroda została już wydana ${clock.format(new Date(handedOverAt))}${stationCode ? ` na stanowisku ${stationCode}` : ""}. Jeśli to przed chwilą na tej kasie, odpowiedź poprzedniej próby nie dotarła - sprawdź, czy klient ją otrzymał.`;
+function handedOverMessage(error: ApiError, own: CashierStation | undefined) {
+  const problem = error.problem as Partial<RewardsConflictProblem>;
+  if (!problem.handedOverAt) return null;
+  const at = new Date(problem.handedOverAt);
+  if (Number.isNaN(at.getTime())) return null;
+  const when = clock.format(at);
+  const here =
+    own !== undefined &&
+    problem.stationCode === own.stationCode &&
+    problem.registerCode === own.registerCode;
+  if (here)
+    return `Nagroda została już wydana ${when} na tej kasie. Jeśli to przed chwilą, odpowiedź poprzedniej próby nie dotarła - sprawdź, czy klient ją otrzymał.`;
+  const where = problem.stationCode
+    ? ` na stanowisku ${problem.stationCode}${problem.registerCode ? `, kasa ${problem.registerCode}` : ""}`
+    : "";
+  return `Nagroda została już wydana ${when}${where}.`;
 }
 
-function handoverError(error: unknown) {
+function handoverError(error: unknown, own: CashierStation | undefined) {
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
-    return handedOverMessage(error) ?? "Ta nagroda została już wydana.";
+    return handedOverMessage(error, own) ?? "Ta nagroda została już wydana.";
   if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
     return "Nie znaleziono aktywnej nagrody tego klienta o tym kodzie.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
@@ -304,12 +324,18 @@ function RewardHandover({
   cardCode,
   couponCode,
   locked,
+  station,
+  onUnresolvedChange,
   onDone,
 }: {
   offerName: string;
   cardCode: string;
   couponCode: string;
+  /** Locked by the purchase; this panel's own unknown outcome keeps its retry enabled. */
   locked: boolean;
+  station: CashierStation | undefined;
+  /** An unknown outcome locks the purchase form until it is resolved. */
+  onUnresolvedChange: (unresolved: boolean) => void;
   onDone: () => void;
 }) {
   const handOver = useHandOverReward();
@@ -317,13 +343,19 @@ function RewardHandover({
   // An attempt in this panel ended without a known outcome: until a final answer, any non-final one
   // (429, 503, 401) leaves it unknown. Nothing outlives the panel - after a remount the server's
   // 409 says when and where the reward was handed over (handedOverMessage).
-  const [uncertain, setUncertain] = useState(false);
+  const [uncertain, setUncertainState] = useState(false);
+  const setUncertain = (value: boolean) => {
+    setUncertainState(value);
+    onUnresolvedChange(value);
+  };
 
   const error = handOver.isError ? handOver.error : null;
   const busy = error ? busyMessage(error) : null;
   const expired = error instanceof ApiError && error.status === 401;
   const unknown =
     error !== null && (uncertain || (keepsIdempotencyKey(error) && !busy));
+  // Unmounted (e.g. after signing in again): the lock goes, the server's 409 resolves it.
+  useEffect(() => () => onUnresolvedChange(false), [onUnresolvedChange]);
   const refusal = unknown ? null : busy;
 
   const send = async () => {
@@ -333,8 +365,11 @@ function RewardHandover({
       onDone();
     } catch (failure) {
       // Shown below from the mutation state.
-      if (!keepsPendingOperation(failure)) setUncertain(false);
-      else if (keepsIdempotencyKey(failure) && !busyMessage(failure))
+      if (!keepsPendingOperation(failure)) {
+        setUncertain(false);
+        // A final answer: the cached terms are outdated (e.g. already handed over).
+        forgetPreviews();
+      } else if (keepsIdempotencyKey(failure) && !busyMessage(failure))
         setUncertain(true);
     }
   };
@@ -355,7 +390,7 @@ function RewardHandover({
       )}
       {error && !unknown && !refusal && (
         <p role="alert" className="text-destructive">
-          {handoverError(error)}
+          {handoverError(error, station)}
         </p>
       )}
       {unknown && (

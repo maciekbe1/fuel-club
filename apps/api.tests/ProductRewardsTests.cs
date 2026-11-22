@@ -34,7 +34,8 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
         string? Code,
         Dictionary<string, FieldError[]>? Errors,
         DateTimeOffset? HandedOverAt = null,
-        string? StationCode = null
+        string? StationCode = null,
+        string? RegisterCode = null
     );
 
     private sealed record FieldError(string Field, string Code);
@@ -388,7 +389,10 @@ public sealed class ProductRewardsTests(ApiFactory factory) : IAsyncLifetime
         Assert.False(string.IsNullOrEmpty(handover.StationCode));
         Assert.False(string.IsNullOrEmpty(handover.RegisterCode));
         // The 409 says when and where, so the till can recognise its own lost attempt.
-        Assert.Equal(handover.StationCode, againBody.StationCode);
+        Assert.Equal(
+            (handover.StationCode, handover.RegisterCode),
+            (againBody.StationCode, againBody.RegisterCode)
+        );
         Assert.Equal(
             handover.HandedOverAt.ToUnixTimeMilliseconds(),
             againBody.HandedOverAt!.Value.ToUnixTimeMilliseconds()

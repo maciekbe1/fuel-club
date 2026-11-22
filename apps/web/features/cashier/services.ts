@@ -9,6 +9,9 @@ export type CouponPreview = components["schemas"]["CouponPreviewResponse"];
 export type RewardHandoverBody = components["schemas"]["RewardHandoverRequest"];
 export type RewardHandoverResult =
   components["schemas"]["RewardHandoverResponse"];
+/** The 409 of preview and handover; for a handed-over reward also when and where. */
+export type RewardsConflictProblem =
+  components["schemas"]["RewardsConflictProblem"];
 
 export const cashierService = {
   station: () => unwrap(api.GET("/api/cashier/station")),

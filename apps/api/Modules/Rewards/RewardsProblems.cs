@@ -4,6 +4,21 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace FuelClub.Api.Modules.Rewards;
 
+/// <summary>
+/// The 409 of the cashier's coupon endpoints in OpenAPI: a problem with a code, plus, for a
+/// handed-over product reward (rewards.coupon_redeemed), when and where it was handed over.
+/// Documentation only - the responses are ProblemDetails with these extensions.
+/// </summary>
+public sealed record RewardsConflictProblem(
+    string? Type,
+    string? Title,
+    int? Status,
+    string Code,
+    DateTimeOffset? HandedOverAt,
+    string? StationCode,
+    string? RegisterCode
+);
+
 /// <summary>Error responses shared by Rewards endpoints.</summary>
 internal static class RewardsProblems
 {
@@ -35,8 +50,9 @@ internal static class RewardsProblems
         );
 
     /// <summary>
-    /// A handed-over product reward, for the owner's card only: when and where, so the till can tell
-    /// a lost answer of its own attempt from an earlier handover without remembering anything.
+    /// A handed-over product reward, for the owner's card only: when and where (station and till),
+    /// so the till can tell a lost answer of its own attempt from an earlier handover without
+    /// remembering anything. Shape in OpenAPI: <see cref="RewardsConflictProblem"/>.
     /// </summary>
     public static ProblemHttpResult RewardHandedOver(RewardHandover? handover) =>
         handover is null
@@ -49,6 +65,7 @@ internal static class RewardsProblems
                     ["code"] = RewardsErrorCodes.CouponRedeemed,
                     ["handedOverAt"] = handover.HandedOverAt,
                     ["stationCode"] = handover.StationCode,
+                    ["registerCode"] = handover.RegisterCode,
                 }
             );
 

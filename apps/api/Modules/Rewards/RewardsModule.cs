@@ -89,7 +89,10 @@ public static class RewardsModule
             .WithDescription(CouponPreviewEndpoint.Description)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict)
+            .Produces<RewardsConflictProblem>(
+                StatusCodes.Status409Conflict,
+                "application/problem+json"
+            )
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         app.MapGroup("/api/cashier/reward-handovers")
@@ -103,7 +106,10 @@ public static class RewardsModule
             .WithDescription(RewardHandoverEndpoint.Description)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict)
+            .Produces<RewardsConflictProblem>(
+                StatusCodes.Status409Conflict,
+                "application/problem+json"
+            )
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         // Admin manages offers; Cashier has no access.

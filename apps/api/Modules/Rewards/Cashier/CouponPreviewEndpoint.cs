@@ -47,7 +47,7 @@ public static class CouponPreviewEndpoint
     public const string Description =
         "Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; "
         + "a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind; "
-        + "a handed-over one gives 409 rewards.coupon_redeemed with handedOverAt and stationCode. "
+        + "a handed-over one gives 409 rewards.coupon_redeemed with handedOverAt, stationCode and registerCode. "
         + "Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429).";
 
     public static async Task<Results<Ok<CouponPreviewResponse>, ProblemHttpResult>> Handle(

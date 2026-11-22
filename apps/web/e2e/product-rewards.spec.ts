@@ -122,7 +122,7 @@ test("a product reward: exchange, activate pickup, the cashier hands it over onc
     register
       .getByRole("alert")
       .filter({ hasText: `Nagroda została już wydana` })
-      .filter({ hasText: `na stanowisku ${CASHIER.station}` }),
+      .filter({ hasText: "na tej kasie" }),
   ).toBeVisible();
   await context.close();
 
@@ -219,14 +219,27 @@ test("the state of one reward code does not carry over to another, the banner be
   await expect(handover).toContainText(second);
   await coupon.fill(codes[0]);
   await expect(handover).toContainText(first);
+  // Fails before the server: unknown for the till. The next customer cannot be served meanwhile.
   await register.route(HANDOVERS, (route) => route.abort("failed"));
   await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
   await expect(handover.getByRole("alert")).toContainText("Nie dotarła");
+  await expect(coupon).toBeDisabled();
+  await expect(register.getByLabel("Kod karty klienta")).toBeDisabled();
+  await expect(
+    register.getByRole("button", { name: "Zapisz zakup" }),
+  ).toBeDisabled();
+  await register.unroute(HANDOVERS);
+  await handover.getByRole("button", { name: "Ponów wydanie" }).click();
+  await expect(
+    register
+      .getByRole("status")
+      .filter({ hasText: `Wydano nagrodę „${first}”` }),
+  ).toBeVisible();
 
+  // The second code (terms cached) starts clean.
   await coupon.fill(codes[1]);
   await expect(handover).toContainText(second);
   await expect(handover.getByRole("alert")).toHaveCount(0);
-  await register.unroute(HANDOVERS);
   await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
   const banner = register
     .getByRole("status")
@@ -239,7 +252,7 @@ test("the state of one reward code does not carry over to another, the banner be
   await context.close();
 });
 
-test("after an unknown outcome and a 401, a retyped code gets the server's when-and-where; the banner does not come back", async ({
+test("after an unknown outcome and a 401 the form stays locked, the retry resolves it; the banner does not come back", async ({
   page,
   browser,
   customer,
@@ -283,17 +296,15 @@ test("after an unknown outcome and a 401, a retyped code gets the server's when-
   await expect(handover.getByRole("alert")).toContainText("Sesja wygasła");
   await expect(handover.getByRole("alert")).toContainText("Nie wiadomo");
 
-  // A typo fix remounts the panel (nothing remembered on the client); the new attempt's 409 says
-  // when and where - this station, a moment ago - so the cashier recognises the lost attempt.
-  await coupon.fill(codes[0].slice(0, -1));
-  await coupon.fill(codes[0]);
-  await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
-  await expect(handover.getByRole("alert")).toContainText(
-    `Nagroda została już wydana`,
-  );
-  await expect(handover.getByRole("alert")).toContainText(
-    `na stanowisku ${CASHIER.station}`,
-  );
+  await expect(coupon).toBeDisabled();
+  // The retry with the same key replays the committed handover.
+  await handover.getByRole("button", { name: "Ponów wydanie" }).click();
+  await expect(
+    register
+      .getByRole("status")
+      .filter({ hasText: `Wydano nagrodę „${first}”` }),
+  ).toBeVisible();
+  await expect(coupon).toBeEnabled();
   await register.unroute(HANDOVERS);
 
   // While a handover runs the form is locked: its late success cannot clear the next code.
