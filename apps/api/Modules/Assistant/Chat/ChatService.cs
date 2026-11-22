@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using FuelClub.Api.Modules.Assistant.Model;
 using FuelClub.Api.Modules.Assistant.Tools;
+using FuelClub.Api.Modules.Assistant.Tracing;
 using Microsoft.Extensions.Options;
 
 namespace FuelClub.Api.Modules.Assistant.Chat;
@@ -8,11 +9,15 @@ namespace FuelClub.Api.Modules.Assistant.Chat;
 /// <summary>
 /// One chat turn: meta, then the model loop (tool calls within the limit), then exactly one of
 /// done or error. Tool calls run as the session user only. Logs carry the tool name, status and
-/// duration, never arguments, results or message text.
+/// duration, never arguments, results or message text. Every turn leaves a trace (metadata only):
+/// a row in assistant_turns and, when a listener is configured, an OpenTelemetry span.
 /// </summary>
 public sealed class ChatService(
     IChatModel model,
     AssistantTools tools,
+    TracePseudonyms pseudonyms,
+    IServiceScopeFactory scopes,
+    TimeProvider clock,
     IOptions<AssistantOptions> options,
     ILogger<ChatService> logger
 )
@@ -26,8 +31,52 @@ public sealed class ChatService(
     )
     {
         var settings = options.Value;
+        using var recorder = new TurnRecorder(
+            correlationId,
+            pseudonyms.For(context.UserId),
+            model,
+            clock.GetUtcNow()
+        );
+        try
+        {
+            await RunTurnAsync(request, context, correlationId, sse, recorder, settings, aborted);
+        }
+        finally
+        {
+            await recorder.SaveAsync(scopes, settings.TraceSaveTimeout, logger);
+        }
+    }
+
+    private async Task RunTurnAsync(
+        ChatRequest request,
+        ToolContext context,
+        string correlationId,
+        SseWriter sse,
+        TurnRecorder recorder,
+        AssistantOptions settings,
+        CancellationToken aborted
+    )
+    {
         using var turn = CancellationTokenSource.CreateLinkedTokenSource(aborted);
         turn.CancelAfter(settings.TurnTimeout);
+        // Until a turn ends otherwise, it was cancelled (the client left, or writing failed).
+        recorder.Finish(TurnOutcome.Cancelled);
+
+        async Task Send<T>(string name, T payload, CancellationToken token)
+        {
+            recorder.Event();
+            await sse.EventAsync(name, payload, token);
+        }
+
+        async Task Fail(string code, string message)
+        {
+            // The client already left: the turn is Cancelled, whatever broke after that.
+            if (aborted.IsCancellationRequested)
+                return;
+            recorder.Finish(TurnOutcome.Error, code);
+            recorder.Event();
+            await sse.EventAsync("error", new ChatErrorEvent(code, message), aborted);
+        }
 
         await sse.EventAsync(
             "meta",
@@ -53,10 +102,12 @@ public sealed class ChatService(
                     new ChatModelContext(request.Message!.Trim(), history, seen),
                     turn.Token
                 );
+                recorder.Usage(step.Usage);
                 if (step is ModelStep.Reply reply)
                 {
-                    await sse.EventAsync("delta", new ChatDeltaEvent(reply.Text), turn.Token);
-                    await sse.EventAsync("done", new ChatDoneEvent(results.Count), turn.Token);
+                    await Send("delta", new ChatDeltaEvent(reply.Text), turn.Token);
+                    await Send("done", new ChatDoneEvent(results.Count), turn.Token);
+                    recorder.Finish(TurnOutcome.Done);
                     return;
                 }
 
@@ -69,23 +120,17 @@ public sealed class ChatService(
                         settings.MaxToolCalls
                     );
                     await Fail(
-                        sse,
                         AssistantErrorCodes.ToolLimit,
-                        "Za dużo kroków w jednej odpowiedzi. Zadaj prostsze pytanie.",
-                        aborted
+                        "Za dużo kroków w jednej odpowiedzi. Zadaj prostsze pytanie."
                     );
                     return;
                 }
 
-                var result = await RunToolAsync(call, context, correlationId, turn.Token);
+                var result = await RunToolAsync(call, context, correlationId, recorder, turn.Token);
                 results.Add(result);
-                await sse.EventAsync(
-                    "tool",
-                    new ChatToolEvent(result.Name, result.Status),
-                    turn.Token
-                );
+                await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
                 if (result.Confirmation is { } confirmation)
-                    await sse.EventAsync("confirmation", confirmation, turn.Token);
+                    await Send("confirmation", confirmation, turn.Token);
             }
         }
         catch (OperationCanceledException) when (aborted.IsCancellationRequested)
@@ -96,12 +141,12 @@ public sealed class ChatService(
         catch (OperationCanceledException)
         {
             logger.LogWarning("Chat {CorrelationId} timed out", correlationId);
-            await Fail(
-                sse,
-                AssistantErrorCodes.Timeout,
-                "Odpowiedź trwała za długo. Spróbuj ponownie.",
-                aborted
-            );
+            await Fail(AssistantErrorCodes.Timeout, "Odpowiedź trwała za długo. Spróbuj ponownie.");
+        }
+        catch (Exception) when (aborted.IsCancellationRequested)
+        {
+            // A write to a closed connection (IOException and the like): the client left.
+            logger.LogInformation("Chat {CorrelationId} ended: the client left", correlationId);
         }
         catch (Exception error)
         {
@@ -111,10 +156,8 @@ public sealed class ChatService(
                 correlationId
             );
             await Fail(
-                sse,
                 AssistantErrorCodes.ProviderError,
-                "Asystent jest chwilowo niedostępny. Spróbuj ponownie.",
-                aborted
+                "Asystent jest chwilowo niedostępny. Spróbuj ponownie."
             );
         }
     }
@@ -123,35 +166,26 @@ public sealed class ChatService(
         ToolCall call,
         ToolContext context,
         string correlationId,
+        TurnRecorder recorder,
         CancellationToken turn
     )
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(turn);
         timeout.CancelAfter(options.Value.ToolTimeout);
+        // Names outside the closed list are not logged or traced verbatim (model output).
+        var name = AssistantTools.Names.Contains(call.Name) ? call.Name : "unknown";
         var started = Stopwatch.GetTimestamp();
-        var result = await tools.ExecuteAsync(call, context, timeout.Token);
+        var result = await recorder.ToolAsync(
+            name,
+            () => tools.ExecuteAsync(call, context, timeout.Token)
+        );
         logger.LogInformation(
             "Chat {CorrelationId} tool {Tool} {Status} in {ElapsedMs} ms",
             correlationId,
-            // Names outside the closed list are not logged verbatim (model output).
-            AssistantTools.Names.Contains(call.Name)
-                ? call.Name
-                : "unknown",
+            name,
             result.Status,
             Stopwatch.GetElapsedTime(started).TotalMilliseconds
         );
         return result;
-    }
-
-    private static async Task Fail(
-        SseWriter sse,
-        string code,
-        string message,
-        CancellationToken aborted
-    )
-    {
-        if (aborted.IsCancellationRequested)
-            return;
-        await sse.EventAsync("error", new ChatErrorEvent(code, message), aborted);
     }
 }

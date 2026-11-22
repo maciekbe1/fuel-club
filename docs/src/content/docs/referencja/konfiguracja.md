@@ -31,6 +31,9 @@ sidebar:
 | `Assistant:HeartbeatInterval` | nie | `00:00:15` (do 1 min); komentarz `: ping` w strumieniu |
 | `Assistant:ConfirmationLifetime` | nie | `00:10:00` (30 s - 1 h); ważność tokenu potwierdzenia aktywacji |
 | `Assistant:ChatPermitLimit` / `ChatWindow` | nie | `20` / `00:01:00`; tur czatu na użytkownika w oknie, potem `429` |
+| `Assistant:PseudonymKey` | poza `Development` tak (inaczej API nie startuje) | sekret (env / user-secrets), base64 ≥ 32 bajty; klucz HMAC pseudonimów w śladach. W `Development` bez niego: losowy na czas procesu |
+| `Assistant:TraceSaveTimeout` | nie | `00:00:02` (do 30 s); jak długo koniec tury czeka na zapis śladu |
+| `Telemetry:OtlpEndpoint` | nie | adres OTLP/HTTP (np. `http://localhost:6006/v1/traces` dla Phoenix); pusty = bez eksportu OpenTelemetry. Nagłówki eksportera tylko z `OTEL_EXPORTER_OTLP_HEADERS` |
 | `ASPNETCORE_ENVIRONMENT` | nie | `Development` włącza OpenAPI i `/health/db` |
 
 ## Frontend

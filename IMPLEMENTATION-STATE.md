@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - done; P6 - done; P7 - pending
+Etap i status: P0 - done; P1 - done; P2 - done; P3 - done; P4 - done; P5 - done; P6 - done; P7a - done; P7b - pending
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -123,6 +123,34 @@ Review (`/code-review high`, 10 uwag, wszystkie przyjęte):
 - brak testu `no-transform` w docs;
 - Enter przy IME i podpowiedź czyszcząca wpisany tekst.
 
+## P7a - ślady i evale (done, 2026-11-22)
+
+Zakres: ADR 0008.
+- Tabela `assistant_turns` (migracja `AssistantTurns`): tylko metadane tury - pseudonim HMAC, model, czasy, wynik, kod błędu, narzędzia, tokeny lub `null`.
+- Spany OpenTelemetry `chat.turn`/`chat.tool` z listą dozwolonych atrybutów. Eksport OTLP tylko przy `Telemetry:OtlpEndpoint`, tylko źródło asystenta.
+- Phoenix w `compose.yml`: profil `observability`, digest, 127.0.0.1, bez auth, port przez `PHOENIX_PORT`.
+- Evale `assistant-evals-v1`: 13 przypadków pokrywających wszystkie kategorie SPEC §3. Sprawdzają narzędzia, koniec tury, brak skutków w bazie i zgodność śladu.
+
+Błąd znaleziony testem eksportu: span tury pod nieeksportowaną aktywnością HTTP był odrzucany przez sampler `ParentBased`. Poprawka: korzeń z linkiem do żądania.
+
+Testy (2026-11-22): `dotnet test` passed 467/467; `chat.spec` passed 24/24; docs build passed.
+
+Próby negatywne, każda wywraca swój test:
+- tekst wiadomości w atrybucie → testy spanów i eksportu;
+- bez korzenia → brak eksportu;
+- zapis narzędzia tylko po sukcesie → test rejestratora.
+
+Przeglądarka (Chrome): własny Phoenix na :6016 (port 6006 zajmował osobny kontener Phoenix użytkownika, nieruszany). 3 tury `chat.turn` z potomnymi `chat.tool`, atrybuty `fuelclub.*` bez treści. Kontener usunięty po sprawdzeniu.
+
+Review (`/code-review high`, 7 uwag, wszystkie przyjęte):
+- narzędzie z timeoutem znikało ze śladu;
+- odejście klienta zapisywane jako `provider_error`;
+- zapis śladu bez limitu czasu trzymał strumień;
+- zapis we wspólnym `DbContext` z narzędziami;
+- częściowa suma tokenów;
+- brak klucza pseudonimu poza `Development` tylko ostrzegał;
+- logi bez powiązania z żądaniem (dodany link).
+
 ## Następny krok
 
-P7a - lokalne evals i metadane śladów, wg specs/PLAN.md (rozbicie P7) i SPEC.md §3.
+P7b - metryki, reguły anomalii, kolejka przeglądu, dostęp admina i retencja śladów, wg specs/PLAN.md i SPEC.md §3.

@@ -16,6 +16,8 @@ namespace FuelClub.Api.Infrastructure
         public DbSet<LoyaltyCard> LoyaltyCards => Set<LoyaltyCard>();
         public DbSet<RewardOffer> RewardOffers => Set<RewardOffer>();
         public DbSet<Coupon> Coupons => Set<Coupon>();
+        public DbSet<Modules.Assistant.Tracing.AssistantTurn> AssistantTurns =>
+            Set<Modules.Assistant.Tracing.AssistantTurn>();
         public DbSet<Idempotency.IdempotencyRecord> IdempotencyRecords =>
             Set<Idempotency.IdempotencyRecord>();
 

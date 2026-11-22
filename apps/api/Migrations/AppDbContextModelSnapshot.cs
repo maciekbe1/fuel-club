@@ -131,6 +131,84 @@ namespace FuelClub.Api.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("FuelClub.Api.Modules.Assistant.Tracing.AssistantTurn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("Demo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("FirstEventMs")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ToolCalls")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalMs")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserPseudonym")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId")
+                        .IsUnique();
+
+                    b.HasIndex("StartedAt");
+
+                    b.HasIndex("UserPseudonym", "StartedAt");
+
+                    b.ToTable("assistant_turns", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_assistant_turns_tool_calls", "\"ToolCalls\" >= 0");
+
+                            t.HasCheckConstraint("ck_assistant_turns_total_ms", "\"TotalMs\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelClub.Api.Modules.Loyalty.Domain.CashierStation", b =>
                 {
                     b.Property<string>("UserId")
@@ -655,6 +733,40 @@ namespace FuelClub.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelClub.Api.Modules.Assistant.Tracing.AssistantTurn", b =>
+                {
+                    b.OwnsMany("FuelClub.Api.Modules.Assistant.Tracing.TurnToolCall", "Tools", b1 =>
+                        {
+                            b1.Property<Guid>("AssistantTurnId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<int>("DurationMs");
+
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasMaxLength(50);
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasMaxLength(20);
+
+                            b1.HasKey("AssistantTurnId", "__synthesizedOrdinal");
+
+                            b1.ToTable("assistant_turns");
+
+                            b1
+                                .ToJson("Tools")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AssistantTurnId");
+                        });
+
+                    b.Navigation("Tools");
                 });
 
             modelBuilder.Entity("FuelClub.Api.Modules.Loyalty.Domain.CashierStation", b =>

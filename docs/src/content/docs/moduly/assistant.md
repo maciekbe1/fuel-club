@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie]
-Zrealizowane: `POST /api/chat` (SSE), cztery narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Planowane: evals i obserwowalność (P7), adapter dostawcy (opcjonalnie).
+Zrealizowane: `POST /api/chat` (SSE), cztery narzędzia, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Planowane: metryki, anomalie, kolejka admina i retencja śladów (P7b), ocena przez judge (P7c), adapter dostawcy (opcjonalnie).
 :::
 
 ## Co robi
@@ -27,6 +27,9 @@ Klient pyta o saldo, oferty i swoje kupony, może też poprosić o aktywację ku
 | Narzędzia (zamknięta lista) | `Tools/AssistantTools.cs` |
 | Kontrakt modelu, adapter demo | `Model/IChatModel.cs`, `Model/DemoChatModel.cs` |
 | Token potwierdzenia | `Confirmation/ConfirmationTokens.cs` |
+| Ślady tury (wiersz + span), pseudonim, lista atrybutów | `Tracing/TurnRecorder.cs`, `Tracing/TracePseudonyms.cs`, `Tracing/AssistantTelemetry.cs`, `Tracing/AssistantTurn.cs` |
+| Eksport OpenTelemetry | `apps/api/Infrastructure/Telemetry.cs` |
+| Evale | `apps/api.tests/Evals/assistant-cases.v1.json`, `AssistantEvals.cs` |
 | Wspólna aktywacja kuponu | `Modules/Rewards/Coupons/CouponActivation.cs` (używa jej też `POST /api/me/coupons/{id}/activate`) |
 | Ekran `/czat` | `apps/web/app/(app)/czat/page.tsx`, `apps/web/features/assistant/components/ChatScreen.tsx`, `ConfirmationCard.tsx` |
 | Strumień w przeglądarce (fetch + parser SSE) | `apps/web/features/assistant/services.ts` |
@@ -70,7 +73,20 @@ Next (`next dev`/`next start`) kompresował odpowiedź z rewrite, gdy przegląda
 
 ## Dane
 
-Moduł nie ma tabel. Potwierdzenie jest bezstanowym tokenem Data Protection (`proposalId`, `userId`, `couponId`, `expiresAt`). Rozmowy nie są zapisywane.
+Potwierdzenie jest bezstanowym tokenem Data Protection (`proposalId`, `userId`, `couponId`, `expiresAt`). Rozmowy nie są zapisywane.
+
+`assistant_turns` - jeden wiersz na turę, tylko metadane ([referencja](/referencja/baza-danych/), [ADR 0008](/decyzje/0008-slady-i-evale-czatu/)):
+
+- `correlationId` (ten z `meta`), pseudonim HMAC, dostawca, model, wersja promptu, demo;
+- czasy (`FirstEventMs` - pierwsze zdarzenie po `meta`, `TotalMs`);
+- wynik i kod błędu, narzędzia (nazwa, stan, czas);
+- tokeny tylko od dostawcy.
+
+Klient, który odszedł, zostawia turę `Cancelled`. Gdy tura skończyła się błędem, zanim klient odszedł, zostaje `Error`.
+
+:::caution[Planowane]
+Retencja (automatyczne usuwanie), metryki i dostęp admina do śladów - P7b.
+:::
 
 ## Zabezpieczenia
 
@@ -79,7 +95,7 @@ Moduł nie ma tabel. Potwierdzenie jest bezstanowym tokenem Data Protection (`pr
 - Żadne narzędzie nie zmienia danych. Aktywacja wymaga przycisku (`POST /api/chat/confirmations`), a token wiąże użytkownika, kupon i propozycję.
 - Kody kuponów nie przechodzą przez czat: `list_my_coupons` ich nie zwraca, zdarzenia ich nie zawierają. Kod dostaje tylko odpowiedź potwierdzenia (`no-store` na grupie, więc także przy odtworzeniu).
 - Token potwierdzenia trafia tylko do klienta: model dostaje wynik propozycji bez niego.
-- Logi: `correlationId`, nazwa narzędzia, stan, czas - bez wiadomości, argumentów i wyników. Szczegóły awarii modelu nie trafiają do strumienia.
+- Logi i ślady: `correlationId`, nazwa narzędzia, stan, czas - bez wiadomości, argumentów i wyników. Szczegóły awarii modelu nie trafiają do strumienia ani do śladu. Atrybuty spanów tylko z listy `AssistantTelemetry.Attributes`; eksport (opcjonalny) tylko źródła asystenta.
 - Limity: długość wiadomości i historii, liczba narzędzi, czas tury i narzędzia, tury na użytkownika ([konfiguracja](/referencja/konfiguracja/)).
 
 ## Testy
@@ -87,6 +103,9 @@ Moduł nie ma tabel. Potwierdzenie jest bezstanowym tokenem Data Protection (`pr
 | Plik | Sprawdza |
 | --- | --- |
 | `apps/web/e2e/chat.spec.ts` | saldo: odpowiedź, etykieta narzędzia, oznaczenie demo, Enter; **propozycja nic nie zmienia, przycisk aktywuje, kod nie pojawia się w czacie**; „Nie teraz” → kupon bez zmian; **utracona odpowiedź potwierdzenia → ponowienie z tym samym kluczem**; cudzy kupon → „odrzucono”, brak karty i nazwy; **strumień w 3-bajtowych kawałkach z przerwą przed odpowiedzią: narzędzie widoczne przed tekstem** (brak buforowania przez Next), polskie znaki całe; ucięty strumień → błąd, nie sukces; zdarzenie `error` po częściowym tekście → błąd; „Zatrzymaj” → `cancelled`, żądanie przerwane |
+| `apps/api.tests/Evals/AssistantEvals.cs` | 13 wersjonowanych przypadków (`assistant-evals-v1`): saldo, oferty, brak punktów, własny kupon (propozycja, lista bez kodów), cudzy kupon, naliczenie, dwa prompt injection, błędne argumenty (nieznane narzędzie, `userId`, zły status, dodatkowy argument przy cudzym kuponie), tekst „potwierdzam” ≠ zgoda, awaria dostawcy, limit narzędzi; każdy: narzędzia, jeden koniec tury, brak zmian salda/historii/kuponów, wiersz śladu zgodny ze strumieniem i bez treści; pokrycie wszystkich kategorii SPEC §3 |
+| `apps/api.tests/TurnRecorderTests.cs` | narzędzie z przekroczonym czasem / wyjątkiem zostaje w śladzie (`timeout`/`error`, span z błędem); brak danych o tokenach w jednym wywołaniu → `null`; span tury jako korzeń z linkiem do żądania, przywrócenie `Activity.Current`; klucz pseudonimu wymagany poza `Development`, min. 32 bajty |
+| `apps/api.tests/AssistantTracingTests.cs` | spany tylko z atrybutów z listy, bez treści wiadomości, kodu kuponu, e-maila i id użytkownika, narzędzia jako dzieci tury, brak tokenów = brak atrybutu; **eksport do lokalnego kolektora OTLP bez tych danych**, niedostępny kolektor nie blokuje czatu; pseudonim = HMAC z kluczem, stały dla użytkownika, różny dla innych; wiersz z metadanymi i czasami; tokeny sumowane; odejście klienta → `Cancelled` |
 | `apps/api.tests/AssistantTests.cs` | strumień `meta → tool → delta → done`, nagłówki SSE (`no-store`, `X-Accel-Buffering`; `no-transform` na hoście bez odnawiania ciasteczka przy każdym żądaniu), `correlationId` w `meta` i nagłówku, oznaczenie demo; oferty i kupony bez kodów w strumieniu; **tylko własne kupony, cudzy kupon (także w „zignoruj instrukcje”) → `rejected`, brak propozycji, kupon bez zmian**; **propozycja niczego nie zmienia, potwierdzenie aktywuje, ten sam klucz → odtworzenie, nowy klucz → ten sam kod, kod nie pojawia się w czacie**; `no-store` na potwierdzeniu i jego odtworzeniu (host bez odnawiania ciasteczka, kontrola: portfel bez nagłówka); model nie dostaje tokenu potwierdzenia; „pokaż aktywne kupony” → lista bez propozycji; kilka kuponów: nazwana oferta → jej kupon, nieznana → pytanie, który; token innego użytkownika, zmieniony i pusty → `404`, po terminie (`TimeProvider`) → `410`, kupon bez zmian; aktywny i nieistniejący kupon → brak propozycji; prośby o naliczenie, odbiór, administrację → odmowa bez narzędzi, saldo bez zmian; walidacja (pusta, 1001 znaków, 21 wpisów historii, zła rola, pusty wpis; 1000 znaków przechodzi); `401`, `403` kasjer, `403 csrf.invalid`; limit tur na użytkownika (`429` + `Retry-After`, inne konto działa); modele skryptowane: **5. narzędzie → `error assistant.tool_limit` bez `done`**, nieznane narzędzie i złe argumenty → `rejected` bez danych i bez zmiany salda, wyjątek modelu → `error assistant.provider_error` bez szczegółów, wolna tura → `assistant.timeout` i heartbeat `: ping`, **rozłączenie klienta anuluje turę** |
 
-Próby negatywne: kompresja Next włączona i bez `no-transform` → pada test podzielonego strumienia (sam `compress: false` wystarcza); token bez porównania użytkownika wywraca test wiązania tokenu; pętla bez limitu narzędzi wywraca test limitu (tura kończy się dopiero timeoutem); `no-store` na endpoincie zamiast na grupie (odtworzenie go pomija) wywraca test nagłówka odtworzenia.
+Próby negatywne: zapis narzędzia tylko po sukcesie → pada test narzędzia z przekroczonym czasem; tekst wiadomości jako atrybut spanu → padają testy spanów i eksportu; span tury pod aktywnością HTTP (bez korzenia) → nic nie jest eksportowane, pada test eksportu; kompresja Next włączona i bez `no-transform` → pada test podzielonego strumienia (sam `compress: false` wystarcza); token bez porównania użytkownika wywraca test wiązania tokenu; pętla bez limitu narzędzi wywraca test limitu (tura kończy się dopiero timeoutem); `no-store` na endpoincie zamiast na grupie (odtworzenie go pomija) wywraca test nagłówka odtworzenia.

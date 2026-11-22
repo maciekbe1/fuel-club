@@ -6,6 +6,7 @@ using FuelClub.Api.Modules.Assistant.Chat;
 using FuelClub.Api.Modules.Assistant.Confirmation;
 using FuelClub.Api.Modules.Assistant.Model;
 using FuelClub.Api.Modules.Assistant.Tools;
+using FuelClub.Api.Modules.Assistant.Tracing;
 using FuelClub.Api.Modules.Rewards.Coupons;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,7 @@ public static class AssistantModule
         services.AddSingleton<IValidateOptions<AssistantOptions>, AssistantOptionsValidator>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ConfirmationTokens>();
+        services.AddSingleton<TracePseudonyms>();
         // The demo model is the default; a provider adapter replaces this registration.
         services.AddSingleton<IChatModel, DemoChatModel>();
         services.AddScoped<AssistantTools>();

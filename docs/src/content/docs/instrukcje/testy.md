@@ -19,6 +19,8 @@ Przed testami fabryka stosuje migracje i usuwa konta testowe z poprzednich przeb
 
 Klasy testów, które używają bazy, należą do kolekcji `DatabaseCollection`. Mają jedną wspólną fabrykę i działają po kolei. Nowa klasa testów bazodanowych musi mieć `[Collection(DatabaseCollection.Name)]`, inaczej sprzątanie jednej fabryki może usunąć dane innej. Testy jednostkowe (bez bazy) nie potrzebują kolekcji.
 
+Evale asystenta i ślady w Phoenix: [ślady i evale](/instrukcje/slady-i-evale/).
+
 ## Frontend
 
 ```sh

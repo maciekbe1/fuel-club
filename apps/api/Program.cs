@@ -28,6 +28,7 @@ builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
 builder.Services.AddRewards(builder.Configuration);
 builder.Services.AddAssistant(builder.Configuration);
+builder.Services.AddTelemetry(builder.Configuration);
 builder.Services.AddHostedService<DemoAccountsSeeder>();
 
 var app = builder.Build();

@@ -10,9 +10,17 @@ public sealed record ChatModelContext(
     IReadOnlyList<ToolResult> ToolResults
 );
 
-/// <summary>The model's next step: call a tool, or answer and end the turn.</summary>
+/// <summary>Tokens as reported by the provider for one model call.</summary>
+public sealed record TokenUsage(int InputTokens, int OutputTokens);
+
+/// <summary>
+/// The model's next step: call a tool, or answer and end the turn. Usage is null when the provider
+/// does not report it (the demo model never does).
+/// </summary>
 public abstract record ModelStep
 {
+    public TokenUsage? Usage { get; init; }
+
     public sealed record Tool(ToolCall Call) : ModelStep;
 
     public sealed record Reply(string Text) : ModelStep;

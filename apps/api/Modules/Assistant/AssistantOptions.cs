@@ -16,9 +16,16 @@ public sealed class AssistantOptions
     public TimeSpan ConfirmationLifetime { get; set; } = TimeSpan.FromMinutes(10);
     public int ChatPermitLimit { get; set; } = 20;
     public TimeSpan ChatWindow { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>Base64, at least 32 bytes; a secret (environment / user-secrets), optional locally.</summary>
+    public string? PseudonymKey { get; set; }
+
+    /// <summary>How long the end of a turn may wait for its trace row.</summary>
+    public TimeSpan TraceSaveTimeout { get; set; } = TimeSpan.FromSeconds(2);
 }
 
-public sealed class AssistantOptionsValidator : IValidateOptions<AssistantOptions>
+public sealed class AssistantOptionsValidator(IHostEnvironment environment)
+    : IValidateOptions<AssistantOptions>
 {
     public ValidateOptionsResult Validate(string? name, AssistantOptions o)
     {
@@ -46,8 +53,21 @@ public sealed class AssistantOptionsValidator : IValidateOptions<AssistantOption
             errors.Add("Assistant:ChatPermitLimit must be 1-1000.");
         if (o.ChatWindow <= TimeSpan.Zero || o.ChatWindow > TimeSpan.FromHours(1))
             errors.Add("Assistant:ChatWindow must be > 0 and <= 1 h.");
+        if (!string.IsNullOrWhiteSpace(o.PseudonymKey) && !IsKey(o.PseudonymKey))
+            errors.Add("Assistant:PseudonymKey must be base64 of at least 32 bytes.");
+        // Outside local development pseudonyms must survive restarts and match across instances.
+        if (string.IsNullOrWhiteSpace(o.PseudonymKey) && !environment.IsDevelopment())
+            errors.Add("Assistant:PseudonymKey is required outside Development.");
+        if (o.TraceSaveTimeout <= TimeSpan.Zero || o.TraceSaveTimeout > TimeSpan.FromSeconds(30))
+            errors.Add("Assistant:TraceSaveTimeout must be > 0 and <= 30 s.");
         return errors.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(errors);
+    }
+
+    private static bool IsKey(string value)
+    {
+        var buffer = new byte[value.Length];
+        return Convert.TryFromBase64String(value, buffer, out var length) && length >= 32;
     }
 }
