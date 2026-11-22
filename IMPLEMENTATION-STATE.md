@@ -327,6 +327,14 @@ Review (`/code-review high`, 9 uwag, wszystkie przyjęte):
 - błąd `kind` w formularzu admina; `429`/`customer_busy` przy wydaniu jako odmowa;
 - `Down` migracji zatrzymuje się przy nagrodach; opis podglądu w OpenAPI; ADR zgodny z kodem.
 
+E2E po poprawkach: 68/68 w plikach objętych zmianami (nagrody, admin, kupony, kupon w kasie, czat). Pełne 134/134 to wynik sprzed poprawek.
+
+Cofnięcie migracji na tymczasowej bazie (`fuelclub_rollback_*` na 5434, usunięta po teście):
+1. `Up` → `Down` bez nagród → `Up`: działa;
+2. z ofertą „Kawa” i jej kuponem `Down` kończy się `P0001`, historia nadal na `ProductRewards`, oferta i kupon bez zmian.
+
+Wyszło przy tym: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
+
 ## Następny krok
 
 Otwarte:
