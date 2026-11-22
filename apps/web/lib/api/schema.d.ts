@@ -327,6 +327,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Registers a fuel purchase for the scanned card. An optional couponCode (omitted or null = no coupon) redeems the card owner's active coupon on this purchase: the server computes the discount, points are awarded on the paid amount. */
         post: {
             parameters: {
                 query?: never;
@@ -438,7 +439,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description History of points changes (ledger), newest first. Purchases that awarded 0 points (below 1 zł) have no ledger entry and do not appear here. Pages follow the ledger sequence: the next page returns entries older than the cursor; entries added later show up after reloading the first page. */
+        /** @description History of points changes (ledger), newest first. Purchases that awarded 0 points (below 1 zł) have no ledger entry and do not appear here, including a purchase fully paid with a coupon. A purchase shows amount (gross, kept for compatibility), grossAmount, discount and paidAmount. Pages follow the ledger sequence: the next page returns entries older than the cursor; entries added later show up after reloading the first page. */
         get: {
             parameters: {
                 query?: {
@@ -1266,12 +1267,17 @@ export interface components {
             /** Format: date */
             saleDate: string;
             receiptNumber: null | string;
+            couponCode?: null | string;
         };
         FuelPurchaseResponse: {
             /** Format: uuid */
             purchaseId: string;
             /** Format: int32 */
             pointsAwarded: number;
+            /** Format: double */
+            discount: number;
+            /** Format: double */
+            paidAmount: number;
         };
         LoginRequest: {
             email: string;
@@ -1333,6 +1339,12 @@ export interface components {
             amount: number;
             /** Format: double */
             liters: number;
+            /** Format: double */
+            grossAmount: number;
+            /** Format: double */
+            discount: number;
+            /** Format: double */
+            paidAmount: number;
         };
         TransactionItem: {
             /** Format: uuid */

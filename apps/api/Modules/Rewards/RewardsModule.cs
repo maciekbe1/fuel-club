@@ -2,6 +2,7 @@ using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Csrf;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
+using FuelClub.Api.Modules.Loyalty.Cashier;
 using FuelClub.Api.Modules.Rewards.Admin;
 using FuelClub.Api.Modules.Rewards.Cashier;
 using FuelClub.Api.Modules.Rewards.Catalog;
@@ -24,6 +25,7 @@ public static class RewardsModule
             .Bind(configuration.GetSection(RewardsOptions.Section))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<RewardsOptions>, RewardsOptionsValidator>();
+        services.AddScoped<ICouponRedemption, CouponRedemption>();
         services.AddRateLimiter(options =>
             options.AddPolicy(
                 CouponPreviewEndpoint.RateLimitPolicy,

@@ -71,18 +71,20 @@ Dozwolone znaki to założenie MVP. Wykluczają spacje w środku i znaki Unicode
 
 ## Przepływ
 
-`POST /api/cashier/fuel-purchases` (`Cashier/FuelPurchaseEndpoint.cs`), rola `Cashier`, CSRF, `Idempotency-Key`. Treść: `cardCode`, `amount`, `liters`, `saleDate`, `receiptNumber`. Stacji i kasy nie ma w treści - backend bierze je z `CashierStations`; pola o tych nazwach w treści są ignorowane.
+`POST /api/cashier/fuel-purchases` (`Cashier/FuelPurchaseEndpoint.cs`), rola `Cashier`, CSRF, `Idempotency-Key`. Treść: `cardCode`, `amount`, `liters`, `saleDate`, `receiptNumber`, opcjonalnie `couponCode` (odbiór kuponu: [Rewards](/moduly/rewards/#odbiór-razem-z-zakupem)). Stacji i kasy nie ma w treści - backend bierze je z `CashierStations`; pola o tych nazwach w treści są ignorowane.
 
 Kolejność w jednej transakcji (otwiera ją idempotencja):
 
 1. **Rezerwacja klucza idempotencji** (filtr) i savepoint.
-2. **Walidacja** bez zmian w bazie: kod karty (`LoyaltyCardCode.Normalize` + format), `FuelPurchaseRules.Normalize`/`Validate` ze stacją i kasą kasjera. Błąd → `400 loyalty.validation_failed` z `errors[field][]`; niezapisywany, więc poprawione żądanie może użyć tego samego klucza. Kasjer bez stanowiska → `404 loyalty.cashier_station_missing`.
+2. **Walidacja** bez zmian w bazie: kod karty (`LoyaltyCardCode.Normalize` + format), `FuelPurchaseRules.Normalize`/`Validate` ze stacją i kasą kasjera, `couponCode` (jeśli jest w treści i nie jest `null`) przez `ICouponRedemption.Validate`. Błąd → `400 loyalty.validation_failed` z `errors[field][]`; niezapisywany, więc poprawione żądanie może użyć tego samego klucza. Kasjer bez stanowiska → `404 loyalty.cashier_station_missing`.
 3. **Wyszukanie aktywnej karty** po kodzie → właściciel. Brak albo karta unieważniona → `404 loyalty.card_not_found` (bez rozróżnienia, który przypadek).
 4. **Blokada klienta** (właściciela karty). Limit → `503 loyalty.customer_busy` z `Retry-After`.
 5. **Ponowne sprawdzenie karty** po blokadzie. Unieważniona w międzyczasie → `404 loyalty.card_not_found`.
-6. **Zapis zakupu** (`FuelPurchase`, zakup przypisany do właściciela karty, `RegisteredByUserId` = kasjer). Paragon już zapisany (`UX_FuelPurchases_Receipt`) → `409 loyalty.receipt_already_registered`, bez informacji o właścicielu.
-7. Gdy punkty > 0: **saldo** jednym `INSERT ... ON CONFLICT (UserId) DO UPDATE SET Balance = Balance + EXCLUDED.Balance RETURNING Balance` i **wpis historii** z `BalanceAfter` z tego wyniku. Zakup za mniej niż 1 zł (0 pkt) zostaje zapisany bez zmiany salda i bez wpisu (wpis musi mieć `Delta <> 0`).
-8. Odpowiedź `201 { purchaseId, pointsAwarded }` - bez salda klienta.
+6. **Sprawdzenie paragonu**: istniejący paragon → `409 loyalty.receipt_already_registered`, bez informacji o właścicielu - przed kuponem, więc błąd kuponu nie ukrywa duplikatu.
+7. **Kupon** (gdy podany): `ICouponRedemption.HoldAsync` blokuje kupon właściciela karty i liczy rabat; `404`/`409`/`503` jak w [Rewards](/moduly/rewards/#odbiór-razem-z-zakupem). Punkty od kwoty po rabacie.
+8. **Zapis zakupu** (`FuelPurchase` z `Discount` i `PaidAmount`, przypisany do właściciela karty, `RegisteredByUserId` = kasjer). Wyścig o ten sam paragon między klientami rozstrzyga `UX_FuelPurchases_Receipt` → ten sam `409`. Potem `MarkRedeemedAsync` (kupon `Active → Redeemed`).
+9. Gdy punkty > 0: **saldo** jednym `INSERT ... ON CONFLICT (UserId) DO UPDATE SET Balance = Balance + EXCLUDED.Balance RETURNING Balance` i **wpis historii** z `BalanceAfter` z tego wyniku. Zakup za mniej niż 1 zł (0 pkt) zostaje zapisany bez zmiany salda i bez wpisu (wpis musi mieć `Delta <> 0`).
+10. Odpowiedź `201 { purchaseId, pointsAwarded, discount, paidAmount }` - bez salda klienta; bez kuponu `discount` = 0, `paidAmount` = `amount`. Odtworzenie przez idempotencję zwraca treść zapisaną przy pierwszym wykonaniu: odpowiedź zapisana przed dodaniem tych pól ich nie ma.
 
 Błędy domenowe (`404`, `409`) są zapisywane przez idempotencję: ponowienie z tym samym kluczem dostaje ten sam wynik, a częściowe zmiany są wycofane do savepointu.
 
@@ -199,10 +201,10 @@ Kod jest też w treści zapisanej odpowiedzi w `IdempotencyRecords` (odtworzenie
 | `GET /api/me/wallet` | `200 { balance }`; brak konta lojalnościowego → `balance: 0` |
 | `GET /api/me/transactions?limit=&cursor=` | `200 { items, nextCursor }`, od najnowszych |
 
-Pozycja historii: `{ id, type, delta, balanceAfter, createdAt, fuelPurchase, couponExchange }`. `fuelPurchase` (`purchaseId`, `stationCode`, `saleDate`, `amount`, `liters`) jest wypełnione tylko dla `FuelPurchase`, `couponExchange` (`couponId`, `offerName`) tylko dla `CouponExchange`; drugie pole jest `null`. Zakup i kupon pokazują się tylko wtedy, gdy należą do zalogowanego klienta - samo dopasowanie `SourceId` nie wystarcza. Kupon jest czytany z tabeli Rewards (wspólna baza).
+Pozycja historii: `{ id, type, delta, balanceAfter, createdAt, fuelPurchase, couponExchange }`. `fuelPurchase` (`purchaseId`, `stationCode`, `saleDate`, `amount`, `liters`, `grossAmount`, `discount`, `paidAmount`; `amount` = `grossAmount`, zostawione dla zgodności) jest wypełnione tylko dla `FuelPurchase`, `couponExchange` (`couponId`, `offerName`) tylko dla `CouponExchange`; drugie pole jest `null`. Zakup i kupon pokazują się tylko wtedy, gdy należą do zalogowanego klienta - samo dopasowanie `SourceId` nie wystarcza. Kupon jest czytany z tabeli Rewards (wspólna baza).
 
 :::note[Zakupy bez punktów]
-Historia to zmiany punktów, nie lista zakupów. Zakup za mniej niż 1 zł (np. 0,99 zł, 0 pkt) nie ma wpisu w historii i **nie pojawia się** w `GET /api/me/transactions`. Saldo zawsze równa się sumie `delta` z historii. Osobna lista zakupów nie jest częścią MVP.
+Historia to zmiany punktów, nie lista zakupów. Zakup za mniej niż 1 zł (np. 0,99 zł, 0 pkt), także po rabacie z kuponu, nie ma wpisu w historii i **nie pojawia się** w `GET /api/me/transactions`. Saldo zawsze równa się sumie `delta` z historii. Osobna lista zakupów nie jest częścią MVP.
 :::
 
 Stronicowanie:

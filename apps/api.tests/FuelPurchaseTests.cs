@@ -200,7 +200,7 @@ public sealed class FuelPurchaseTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Response_contains_only_the_purchase_id_and_points()
+    public async Task Response_contains_only_the_purchase_points_and_amounts()
     {
         var customer = await CustomerWithCardAsync();
         var (cashier, _) = await CashierAsync();
@@ -209,7 +209,7 @@ public sealed class FuelPurchaseTests(ApiFactory factory) : IAsyncLifetime
 
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(
-            ["pointsAwarded", "purchaseId"],
+            ["discount", "paidAmount", "pointsAwarded", "purchaseId"],
             json.RootElement.EnumerateObject().Select(p => p.Name).Order()
         );
     }

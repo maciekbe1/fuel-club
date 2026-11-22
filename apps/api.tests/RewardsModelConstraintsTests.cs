@@ -318,6 +318,80 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
     }
 
     [Fact]
+    public async Task A_coupon_cannot_be_redeemed_on_another_customers_purchase()
+    {
+        var otherEmail = $"rewards-other-{Guid.NewGuid():N}@example.test";
+        await factory.CreateTestUserAsync(otherEmail, Password, "User");
+        try
+        {
+            var otherId = await DbAsync(db =>
+                db.Users.Where(user => user.Email == otherEmail)
+                    .Select(user => user.Id)
+                    .SingleAsync()
+            );
+            var offer = Offer();
+            var purchase = Purchase();
+            purchase.UserId = otherId;
+            await SaveAsync(offer, purchase);
+
+            await AssertRejectedAsync(
+                PostgresErrorCodes.ForeignKeyViolation,
+                "FK_Coupons_FuelPurchases_RedeemedPurchaseOwner",
+                Redeemed(offer, purchase.Id)
+            );
+        }
+        finally
+        {
+            await factory.DeleteTestUserAsync(otherEmail);
+        }
+    }
+
+    [Fact]
+    public async Task The_owner_migration_stops_on_existing_mismatches_without_changing_data()
+    {
+        var otherEmail = $"rewards-other-{Guid.NewGuid():N}@example.test";
+        await factory.CreateTestUserAsync(otherEmail, Password, "User");
+        try
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Consistent data passes.
+            await db.Database.ExecuteSqlRawAsync(
+                Migrations.CouponRedeemedPurchaseOwner.OwnerCheckSql
+            );
+
+            var otherId = await db
+                .Users.Where(user => user.Email == otherEmail)
+                .Select(user => user.Id)
+                .SingleAsync();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            // Recreate the state before the migration, then roll everything back.
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Coupons" DROP CONSTRAINT "FK_Coupons_FuelPurchases_RedeemedPurchaseOwner" """
+            );
+            var offer = Offer();
+            var purchase = Purchase();
+            purchase.UserId = otherId;
+            var coupon = Redeemed(offer, purchase.Id);
+            db.AddRange(offer, purchase, coupon);
+            await db.SaveChangesAsync();
+
+            var error = await Assert.ThrowsAsync<PostgresException>(() =>
+                db.Database.ExecuteSqlRawAsync(Migrations.CouponRedeemedPurchaseOwner.OwnerCheckSql)
+            );
+            Assert.Contains(
+                "1 coupon(s) redeemed on another customer's purchase",
+                error.MessageText
+            );
+            await transaction.RollbackAsync();
+        }
+        finally
+        {
+            await factory.DeleteTestUserAsync(otherEmail);
+        }
+    }
+
+    [Fact]
     public async Task An_offer_with_coupons_cannot_be_deleted()
     {
         var offer = Offer();

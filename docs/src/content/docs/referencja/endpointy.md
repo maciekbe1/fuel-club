@@ -29,7 +29,7 @@ Pełny, aktualny kontrakt: `GET /openapi/v1.json` (Development). Ta tabela opisu
 | `GET /api/me/loyalty-card` | rola `User` | - | `200 { code, issuedAt }` | `401`, `403`, `404 loyalty.card_missing` |
 | `POST /api/me/loyalty-card` | rola `User`, `Idempotency-Key` | tak | `201 { code, issuedAt }` | `400 idempotency.*`, `401`, `403`, `409 loyalty.card_already_issued`, `409 idempotency.*`, `503 loyalty.customer_busy` |
 | `POST /api/me/loyalty-card/rotate` | rola `User`, `Idempotency-Key` | tak | `200 { code, issuedAt }` | `400 idempotency.*`, `401`, `403`, `404 loyalty.card_missing`, `409 idempotency.*`, `503 loyalty.customer_busy` |
-| `POST /api/cashier/fuel-purchases` | rola `Cashier` (Admin nie dziedziczy), `Idempotency-Key` | tak | `201 { purchaseId, pointsAwarded }` | `400 loyalty.validation_failed`, `400 idempotency.*`, `401`, `403`, `404 loyalty.cashier_station_missing`, `404 loyalty.card_not_found`, `409 loyalty.receipt_already_registered`, `409 idempotency.*`, `503 loyalty.customer_busy` |
+| `POST /api/cashier/fuel-purchases` | rola `Cashier` (Admin nie dziedziczy), `Idempotency-Key` | tak; opcjonalne `couponCode` | `201 { purchaseId, pointsAwarded, discount, paidAmount }` | `400 loyalty.validation_failed`, `400 idempotency.*`, `401`, `403`, `404 loyalty.cashier_station_missing`, `404 loyalty.card_not_found`, `404 rewards.coupon_not_found`, `409 loyalty.receipt_already_registered`, `409 rewards.coupon_redeemed`, `409 idempotency.*`, `503 loyalty.customer_busy`, `503 rewards.coupon_busy` |
 | `POST /api/cashier/coupons/preview` | rola `Cashier` (Admin nie dziedziczy), limit prób na kasjera | `{ cardCode, couponCode, amount?, liters? }` | `200 { offerName, discountPerLiter, maxLiters, calculation }`; `calculation` `null` bez kwoty i litrów | `400 rewards.validation_failed`, `401`, `403`, `403 csrf.invalid`, `404 loyalty.card_not_found`, `404 rewards.coupon_not_found`, `409 rewards.coupon_redeemed`, `429 rate_limit.exceeded` |
 | `GET /api/cashier/station` | rola `Cashier` (Admin nie dziedziczy) | - | `200 { stationCode, registerCode }` | `401`, `403`, `404 loyalty.cashier_station_missing` |
 | `GET /health/db` | brak, tylko Development | - | `200 { database }` | `503` |
@@ -50,5 +50,5 @@ Liczby w JSON muszą być liczbami (`10`, nie `"10"`): API ma `JsonNumberHandlin
 Format błędów: [Kody błędów](/referencja/kody-bledow/).
 
 :::caution[Planowane]
-Realizacja kuponu w kasie, interfejs ofert i kuponów, czat SSE i obserwowalność - patrz `PLAN-MVP.md`, sekcja „API - proponowane granice”.
+Interfejs ofert, kuponów i kuponu w kasie, czat SSE i obserwowalność - patrz `PLAN-MVP.md`, sekcja „API - proponowane granice”.
 :::

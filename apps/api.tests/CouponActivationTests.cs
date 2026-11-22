@@ -158,38 +158,18 @@ public sealed class CouponActivationTests(ApiFactory factory) : IAsyncLifetime
     private Task<Coupon> StoredAsync(Guid couponId) =>
         DbAsync(db => db.Coupons.AsNoTracking().SingleAsync(c => c.Id == couponId));
 
-    /// <summary>Stands in for the cashier's redemption (part 4): Active -> Redeemed on a real purchase.</summary>
+    /// <summary>The cashier's redemption: a real purchase with the coupon's code.</summary>
     private async Task RedeemAsync(Customer customer, Guid couponId)
     {
-        var purchase = new FuelPurchase
-        {
-            Id = Guid.CreateVersion7(),
-            UserId = customer.UserId,
-            RegisteredByUserId = customer.UserId,
-            StationCode = "ST-001",
-            RegisterCode = "K1",
-            SaleDate = new DateOnly(2026, 11, 21),
-            ReceiptNumber = Guid.NewGuid().ToString("N").ToUpperInvariant(),
-            GrossAmount = 100m,
-            Discount = 8m,
-            PaidAmount = 92m,
-            Liters = 40m,
-            PointsAwarded = 92,
-        };
-        await DbAsync(async db =>
-        {
-            db.FuelPurchases.Add(purchase);
-            return await db.SaveChangesAsync();
-        });
-        var updated = await DbAsync(db =>
-            db.Coupons.Where(c => c.Id == couponId && c.Status == CouponStatus.Active)
-                .ExecuteUpdateAsync(set =>
-                    set.SetProperty(c => c.Status, CouponStatus.Redeemed)
-                        .SetProperty(c => c.RedeemedAt, DateTimeOffset.UtcNow.AddMinutes(1))
-                        .SetProperty(c => c.RedeemedPurchaseId, purchase.Id)
-                )
+        var email = $"activation-cashier-{Guid.NewGuid():N}@example.test";
+        _emails.Add(email);
+        var cashier = await factory.CreateCashierAsync(email);
+        var card = await customer.Client.IssueCardAsync();
+        var code = (await StoredAsync(couponId)).Code;
+        CashierTestHelpers.AssertCreated(
+            await cashier.PurchaseAsync(CashierTestHelpers.Sale(card, code))
         );
-        Assert.Equal(1, updated);
+        Assert.Equal(CouponStatus.Redeemed, (await StoredAsync(couponId)).Status);
     }
 
     [Fact]

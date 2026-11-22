@@ -433,6 +433,8 @@ namespace FuelClub.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_Coupons_RedeemedPurchase");
 
+                    b.HasIndex("RedeemedPurchaseId", "UserId");
+
                     b.HasIndex("UserId", "Status");
 
                     b.ToTable("Coupons", null, t =>
@@ -714,16 +716,18 @@ namespace FuelClub.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("FuelClub.Api.Modules.Loyalty.Domain.FuelPurchase", null)
-                        .WithMany()
-                        .HasForeignKey("RedeemedPurchaseId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("FuelClub.Api.Modules.Accounts.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("FuelClub.Api.Modules.Loyalty.Domain.FuelPurchase", null)
+                        .WithMany()
+                        .HasForeignKey("RedeemedPurchaseId", "UserId")
+                        .HasPrincipalKey("Id", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Coupons_FuelPurchases_RedeemedPurchaseOwner");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

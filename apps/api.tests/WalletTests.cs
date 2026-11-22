@@ -239,7 +239,10 @@ public sealed class WalletTests(ApiFactory factory) : IAsyncLifetime
                 "ST-09",
                 new DateOnly(2026, 11, 20),
                 40.5m,
-                12.345m
+                12.345m,
+                40.5m,
+                0m,
+                40.5m
             ),
             item.FuelPurchase
         );

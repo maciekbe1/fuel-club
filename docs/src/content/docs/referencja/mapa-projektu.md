@@ -9,10 +9,10 @@ sidebar:
 apps/
   api/                          ASP.NET Core 10, modularny monolit
     Program.cs                  rejestracja usług i endpointów
-    Infrastructure/             AppDbContext, kontrola migracji przy starcie, CSRF, health
+    Infrastructure/             AppDbContext, kontrola migracji przy starcie, CSRF, idempotencja, limit prób, no-store, health
     Modules/Accounts/           konta, sesja, role
-    Modules/Loyalty/            punkty: Domain/ (reguły, encje), Infrastructure/ (mapowanie EF)
-    Modules/Rewards/            oferty i kupony: Domain/ (encje, kod kuponu, rabat), Infrastructure/ (mapowanie EF)
+    Modules/Loyalty/            punkty: Card/, Cashier/ (zakup, stanowisko), Wallet/, Points/ (pobranie punktów), Domain/, Infrastructure/
+    Modules/Rewards/            oferty i kupony: Catalog/, Admin/, Exchange/, Coupons/ (moje, aktywacja), Cashier/ (podgląd, odbiór), Domain/, Infrastructure/
     Migrations/                 migracje EF Core
   api.tests/                    testy integracyjne (xUnit + PostgreSQL)
   web/                          Next.js 16 App Router
@@ -27,7 +27,7 @@ apps/
 docs/                           ta dokumentacja (Astro Starlight)
 tests/                          planowane: evals (E2E: apps/web/e2e)
 compose.yml                     postgres (5433), postgres-test (5434)
-dotnet-tools.json               dotnet-ef
+dotnet-tools.json               dotnet-ef, csharpier
 PLAN-MVP.md                     zakres i niezmienniki MVP
 CLAUDE.md                       zasady dla asystenta AI
 ```

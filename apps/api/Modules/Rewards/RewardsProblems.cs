@@ -34,6 +34,10 @@ internal static class RewardsProblems
             RewardsErrorCodes.CouponRedeemed
         );
 
+    /// <summary>The coupon row is locked (by another transaction); transient, retried with the same key.</summary>
+    public static ProblemHttpResult CouponBusy(HttpContext http) =>
+        ApiProblems.Busy(http, "The coupon is being changed", RewardsErrorCodes.CouponBusy);
+
     public static ProblemHttpResult OfferBusy(HttpContext http) =>
         ApiProblems.Busy(http, "The offer is being changed", RewardsErrorCodes.OfferBusy);
 }

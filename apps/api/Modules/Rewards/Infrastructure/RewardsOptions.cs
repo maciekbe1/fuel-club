@@ -14,6 +14,9 @@ public sealed class RewardsOptions
     /// <summary>How long an exchange waits for a conflicting lock on the offer row (an admin edit).</summary>
     public TimeSpan OfferLockTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>How long a purchase waits for a lock on the coupon row held by another transaction.</summary>
+    public TimeSpan CouponLockTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
     /// <summary>Coupon previews one cashier may make per <see cref="PreviewWindow"/>.</summary>
     public int PreviewPermitLimit { get; set; } = 30;
 
@@ -32,6 +35,13 @@ public sealed class RewardsOptionsValidator : IValidateOptions<RewardsOptions>
         )
             failures.Add(
                 $"{RewardsOptions.Section}:OfferLockTimeout must be between {RewardsOptions.MinLockTimeout} and {RewardsOptions.MaxLockTimeout}; got {options.OfferLockTimeout}."
+            );
+        if (
+            options.CouponLockTimeout < RewardsOptions.MinLockTimeout
+            || options.CouponLockTimeout > RewardsOptions.MaxLockTimeout
+        )
+            failures.Add(
+                $"{RewardsOptions.Section}:CouponLockTimeout must be between {RewardsOptions.MinLockTimeout} and {RewardsOptions.MaxLockTimeout}; got {options.CouponLockTimeout}."
             );
         if (
             options.PreviewPermitLimit < 1

@@ -11,13 +11,19 @@ namespace FuelClub.Api.Modules.Loyalty.Wallet;
 
 public sealed record WalletResponse(int Balance);
 
-/// <summary>Fuel purchase behind a history entry; null for entries of other types.</summary>
+/// <summary>
+/// Fuel purchase behind a history entry; null for entries of other types. <c>Amount</c> is the gross
+/// amount, kept for compatibility; <c>PaidAmount</c> = <c>GrossAmount</c> - <c>Discount</c>.
+/// </summary>
 public sealed record TransactionFuelPurchase(
     Guid PurchaseId,
     string StationCode,
     DateOnly SaleDate,
     decimal Amount,
-    decimal Liters
+    decimal Liters,
+    decimal GrossAmount,
+    decimal Discount,
+    decimal PaidAmount
 );
 
 /// <summary>Coupon bought by a CouponExchange entry; null for entries of other types.</summary>
@@ -44,7 +50,8 @@ public static class WalletEndpoints
 
     public const string TransactionsDescription =
         "History of points changes (ledger), newest first. Purchases that awarded 0 points (below 1 zł) "
-        + "have no ledger entry and do not appear here. Pages follow the ledger sequence: the next page "
+        + "have no ledger entry and do not appear here, including a purchase fully paid with a coupon. "
+        + "A purchase shows amount (gross, kept for compatibility), grossAmount, discount and paidAmount. Pages follow the ledger sequence: the next page "
         + "returns entries older than the cursor; entries added later show up after reloading the first page.";
 
     public static async Task<Ok<WalletResponse>> GetWallet(
@@ -119,6 +126,8 @@ public static class WalletEndpoints
                 SaleDate = (DateOnly?)purchase.SaleDate,
                 Amount = (decimal?)purchase.GrossAmount,
                 Liters = (decimal?)purchase.Liters,
+                Discount = (decimal?)purchase.Discount,
+                PaidAmount = (decimal?)purchase.PaidAmount,
                 CouponId = (Guid?)coupon.Id,
                 coupon.OfferName,
             }
@@ -140,7 +149,10 @@ public static class WalletEndpoints
                         row.StationCode!,
                         row.SaleDate!.Value,
                         row.Amount!.Value,
-                        row.Liters!.Value
+                        row.Liters!.Value,
+                        row.Amount!.Value,
+                        row.Discount!.Value,
+                        row.PaidAmount!.Value
                     )
                     : null,
                 row.Type == PointsLedgerEntryType.CouponExchange && row.CouponId is { } couponId

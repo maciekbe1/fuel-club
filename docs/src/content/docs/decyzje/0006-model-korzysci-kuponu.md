@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta. Zrealizowane: encje, ograniczenia w bazie, migracja, reguły obliczeń z testami, wymiana, aktywacja, podgląd z limitem prób. Planowane: odbiór razem z zakupem.
+Decyzja przyjęta. Zrealizowane: encje, ograniczenia w bazie, migracja, reguły obliczeń z testami, wymiana, aktywacja, podgląd z limitem prób, odbiór razem z zakupem (złożony FK właściciela: kupon tylko na zakup tego samego klienta).
 
 ## Problem
 

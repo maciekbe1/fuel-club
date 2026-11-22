@@ -46,7 +46,10 @@ public static class LoyaltyModule
         cashier
             .MapPost("/fuel-purchases", FuelPurchaseEndpoint.Handle)
             .RequireIdempotency()
+            .WithDescription(FuelPurchaseEndpoint.Description)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         // Customer data requires the User role; an account that also has Cashier or Admin still reads

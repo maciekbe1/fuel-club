@@ -25,6 +25,4 @@ Kod sprawdza reguły, ale równoległe żądania mogą je ominąć między odczy
 
 Transakcję operacji z `Idempotency-Key` otwiera `IdempotencyStore`, nie handler: rezerwacja klucza, savepoint, zmiana domenowa i zapis odpowiedzi to jedna transakcja. Handler pisze przez ten sam `AppDbContext` i nie otwiera własnej transakcji. Opis: [idempotencja](/wyjasnienia/idempotencja/).
 
-:::caution[Planowane]
-Zakup przez kasę (zakup + saldo + wpis historii) już działa w transakcji idempotencji - [Loyalty](/moduly/loyalty/#przepływ). Dopiero powstaną: wymiana punktów na kupon, jednorazowy odbiór. Projekt: `PLAN-MVP.md`, sekcja „Atomowość i Idempotency-Key”.
-:::
+W transakcji idempotencji działają: zakup przez kasę razem z odbiorem kuponu (zakup, kupon `Active → Redeemed`, saldo, wpis historii - [Loyalty](/moduly/loyalty/#przepływ), [Rewards](/moduly/rewards/#odbiór-razem-z-zakupem)), wydanie i wymiana karty, wymiana punktów na kupon, aktywacja kuponu. Błąd po częściowym zapisie wycofuje całość.

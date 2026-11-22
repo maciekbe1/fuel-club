@@ -20,6 +20,7 @@ Jeden `AppDbContext` (EF Core + Npgsql), dziedziczy po `IdentityDbContext<Applic
 | `*_RewardOfferVersion` | `RewardOffers.Version` (`integer`, `CHECK >= 1`) zamiast `xmin`; istniejące oferty dostają `1`, bez wartości domyślnej |
 | `*_LoyaltyCards` | `LoyaltyCards` - karty, jedna aktywna na użytkownika |
 | `*_IdempotencyRecords` | `IdempotencyRecords` - klucze idempotencji i zapisane odpowiedzi |
+| `*_CouponRedeemedPurchaseOwner` | złożony FK `Coupons (RedeemedPurchaseId, UserId)` → `FuelPurchases (Id, UserId)` zamiast FK po samym `Id`, `UNIQUE (Id, UserId)` w `FuelPurchases`; najpierw sprawdza dane - kupon odebrany na cudzy zakup zatrzymuje migrację, bez przepisywania |
 
 ## Tabele
 
@@ -32,20 +33,20 @@ Jeden `AppDbContext` (EF Core + Npgsql), dziedziczy po `IdentityDbContext<Applic
 
 `UserName` = e-mail. Unikalność e-maila wymusza Identity (`RequireUniqueEmail`).
 
-## Loyalty
+## Loyalty i Rewards
 
 | Tabela | Zawartość |
 | --- | --- |
 | `LoyaltyAccounts` | saldo użytkownika, `CHECK (Balance >= 0)`, `xmin` jako token współbieżności |
 | `FuelPurchases` | tankowania; `UNIQUE (StationCode, RegisterCode, SaleDate, ReceiptNumber)`; `GrossAmount`, `Discount`, `PaidAmount` |
 | `RewardOffers` | oferty (rabat na litr); bez usuwania, tylko wyłączanie - [Rewards](/moduly/rewards/) |
-| `Coupons` | kupony klientów ze snapshotem oferty; `CHECK` stanu, `UNIQUE (Code)`, `UNIQUE (RedeemedPurchaseId)` |
+| `Coupons` | kupony klientów ze snapshotem oferty; `CHECK` stanu, `UNIQUE (Code)`, `UNIQUE (RedeemedPurchaseId)`; odbiór tylko na zakup właściciela (złożony FK) - [Rewards](/moduly/rewards/#dane) |
 | `PointsLedgerEntries` | historia zmian salda, tylko dopisywana; `UNIQUE (Type, SourceId)`; kolejność po `Sequence` |
 | `LoyaltyCards` | karty; `UNIQUE (Code)`, `UNIQUE (UserId) WHERE RevokedAt IS NULL` |
 | `IdempotencyRecords` | PK `(UserId, IdempotencyKey)`; `Fingerprint bytea` (`CHECK` 32 bajty), `StatusCode` (`CHECK 200-499`), `ContentType`, `Location`, `Body bytea`; FK `AspNetUsers` RESTRICT. Bez retencji w MVP. Szczegóły: [idempotencja](/wyjasnienia/idempotencja/) |
 
-Kolumny i ograniczenia: [moduł Loyalty](/moduly/loyalty/#dane). Tabele Loyalty odwołują się do `AspNetUsers` z `ON DELETE RESTRICT`.
+Kolumny i ograniczenia: [moduł Loyalty](/moduly/loyalty/#dane), [moduł Rewards](/moduly/rewards/#dane). Tabele odwołują się do `AspNetUsers` z `ON DELETE RESTRICT`.
 
 :::caution[Planowane]
-`RewardDefinition`, `UserCoupon`, `ChatTrace` - opis w `PLAN-MVP.md`, sekcja „Dane i niezmienniki”.
+`ChatTrace` (czat) - opis w `PLAN-MVP.md`, sekcja „Dane i niezmienniki”.
 :::

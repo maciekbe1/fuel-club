@@ -74,9 +74,10 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.offer_busy` | - | `503` + `Retry-After`: edycja oferty trwa dłużej niż `Rewards:OfferLockTimeout`; ponów z tym samym kluczem (niezapisywany) |
 | `rewards.offer_changed` | - | `409`: oferta zmieniła się od wyświetlenia (inna `version`); nic nie pobrano, pokaż nowe warunki |
 | `rewards.insufficient_points` | - | `409`: saldo mniejsze niż koszt (także brak konta); nic nie pobrano |
-| `rewards.coupon_not_found` | - | `404`: brak kuponu albo cudzy kupon |
-| `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd) |
-| `rewards.invalid_format` | `couponCode` | kod nie jest kodem kuponu (`K` + 26 znaków; np. kod karty) |
+| `rewards.coupon_not_found` | - | `404`: brak kuponu albo cudzy kupon (także kupon innego klienta przy zakupie) |
+| `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd, zakup) |
+| `rewards.coupon_busy` | - | `503` + `Retry-After`: wiersz kuponu zablokowany dłużej niż `Rewards:CouponLockTimeout` przez inną transakcję (nie przez aktywację - kod trwającej aktywacji nie jest jeszcze widoczny, więc zakup dostaje `404`); ponów zakup z tym samym kluczem (niezapisywany) |
+| `rewards.invalid_format` | `couponCode` | kod nie jest kodem kuponu (`K` + 26 znaków; np. kod karty); przy zakupie także pusty tekst - brak kuponu to brak pola albo `null` |
 | `loyalty.card_not_found` | - | `404`: kod karty nieznany albo unieważniony - celowo bez rozróżnienia |
 | `loyalty.receipt_already_registered` | - | `409`: paragon (stacja, kasa, data, numer) już zapisany; bez informacji o właścicielu |
 | `loyalty.customer_busy` | - | `503` + `Retry-After`: inna operacja na tym kliencie trwa dłużej niż `Loyalty:CustomerLockTimeout`; ponów z tym samym kluczem (niezapisywany) |

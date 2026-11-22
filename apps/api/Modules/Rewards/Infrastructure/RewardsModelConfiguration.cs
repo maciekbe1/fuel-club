@@ -68,6 +68,9 @@ internal sealed class RewardOfferConfiguration : IEntityTypeConfiguration<Reward
 
 internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
 {
+    public const string RedeemedPurchaseOwnerConstraint =
+        "FK_Coupons_FuelPurchases_RedeemedPurchaseOwner";
+
     public void Configure(EntityTypeBuilder<Coupon> builder)
     {
         builder.ToTable(
@@ -133,10 +136,13 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
             .WithMany()
             .HasForeignKey(coupon => coupon.OfferId)
             .OnDelete(DeleteBehavior.Restrict);
+        // Composite: a coupon can only be redeemed on a purchase of its own owner.
         builder
             .HasOne<FuelPurchase>()
             .WithMany()
-            .HasForeignKey(coupon => coupon.RedeemedPurchaseId)
+            .HasForeignKey(coupon => new { coupon.RedeemedPurchaseId, coupon.UserId })
+            .HasPrincipalKey(purchase => new { purchase.Id, purchase.UserId })
+            .HasConstraintName(RedeemedPurchaseOwnerConstraint)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

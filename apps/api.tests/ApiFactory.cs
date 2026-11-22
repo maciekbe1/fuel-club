@@ -91,6 +91,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                             ["Idempotency:LockTimeout"] = "00:00:01",
                             ["Loyalty:CustomerLockTimeout"] = "00:00:01",
                             ["Rewards:OfferLockTimeout"] = "00:00:01",
+                            ["Rewards:CouponLockTimeout"] = "00:00:01",
                             ["Rewards:PreviewPermitLimit"] = "10",
                         }
                     )
