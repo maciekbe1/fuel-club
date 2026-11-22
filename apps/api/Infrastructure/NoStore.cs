@@ -8,10 +8,13 @@ public static class NoStore
     /// (which skips the endpoint and its own filters) carries it too. It does not affect the client's
     /// in-memory cache (TanStack Query).
     /// </summary>
-    public static TBuilder DisableResponseStoring<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder =>
-        builder.AddEndpointFilter(async (context, next) =>
-        {
-            context.HttpContext.Response.Headers.CacheControl = "no-store";
-            return await next(context);
-        });
+    public static TBuilder DisableResponseStoring<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder =>
+        builder.AddEndpointFilter(
+            async (context, next) =>
+            {
+                context.HttpContext.Response.Headers.CacheControl = "no-store";
+                return await next(context);
+            }
+        );
 }

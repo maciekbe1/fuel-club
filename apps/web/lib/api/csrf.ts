@@ -5,8 +5,12 @@ export const CSRF_INVALID_CODE = "csrf.invalid";
 let tokenPromise: Promise<string> | null = null;
 
 async function fetchToken(): Promise<string> {
-  const response = await fetch("/api/auth/csrf", { credentials: "same-origin", cache: "no-store" });
-  if (!response.ok) throw new Error(`CSRF token request failed: ${response.status}`);
+  const response = await fetch("/api/auth/csrf", {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!response.ok)
+    throw new Error(`CSRF token request failed: ${response.status}`);
   const body = (await response.json()) as { token: string };
   return body.token;
 }

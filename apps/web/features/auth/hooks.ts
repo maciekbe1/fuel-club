@@ -6,7 +6,11 @@ import { queryKeys } from "@/lib/query-keys";
 import { authService, type Me, type RegisterInput } from "./services";
 
 export function useMe(initialData?: Me) {
-  return useQuery({ queryKey: queryKeys.me, queryFn: authService.me, initialData });
+  return useQuery({
+    queryKey: queryKeys.me,
+    queryFn: authService.me,
+    initialData,
+  });
 }
 
 export function useLogin() {
@@ -37,9 +41,14 @@ export function useRegister() {
     mutationFn: async (input: RegisterInput) => {
       await authService.register(input);
       try {
-        await authService.login({ email: input.email, password: input.password });
+        await authService.login({
+          email: input.email,
+          password: input.password,
+        });
       } catch (error) {
-        throw new AutoLoginError("Account created, auto-login failed", { cause: error });
+        throw new AutoLoginError("Account created, auto-login failed", {
+          cause: error,
+        });
       }
     },
     onSuccess: () => queryClient.clear(),

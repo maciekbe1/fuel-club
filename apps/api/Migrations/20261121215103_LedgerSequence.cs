@@ -13,13 +13,15 @@ namespace FuelClub.Api.Migrations
         {
             migrationBuilder.DropIndex(
                 name: "IX_PointsLedgerEntries_UserId_CreatedAt",
-                table: "PointsLedgerEntries");
+                table: "PointsLedgerEntries"
+            );
 
             // Explicit backfill instead of an implicit identity fill (which would follow physical row
             // order). Existing rows are numbered by (CreatedAt, Id): an approximation only, because
             // CreatedAt is the transaction start, not the moment the entry was written. Rows written
             // after this migration get their number on insert, after the customer lock.
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(
+                """
                 ALTER TABLE "PointsLedgerEntries" ADD COLUMN "Sequence" bigint NULL;
 
                 UPDATE "PointsLedgerEntries" AS entry
@@ -37,18 +39,21 @@ namespace FuelClub.Api.Migrations
                     pg_get_serial_sequence('"PointsLedgerEntries"', 'Sequence'),
                     COALESCE((SELECT max("Sequence") FROM "PointsLedgerEntries"), 0) + 1,
                     false);
-                """);
+                """
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_PointsLedgerEntries_UserId_Sequence",
                 table: "PointsLedgerEntries",
-                columns: new[] { "UserId", "Sequence" });
+                columns: new[] { "UserId", "Sequence" }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "UX_PointsLedgerEntries_Sequence",
                 table: "PointsLedgerEntries",
                 column: "Sequence",
-                unique: true);
+                unique: true
+            );
         }
 
         /// <inheritdoc />
@@ -56,20 +61,21 @@ namespace FuelClub.Api.Migrations
         {
             migrationBuilder.DropIndex(
                 name: "IX_PointsLedgerEntries_UserId_Sequence",
-                table: "PointsLedgerEntries");
+                table: "PointsLedgerEntries"
+            );
 
             migrationBuilder.DropIndex(
                 name: "UX_PointsLedgerEntries_Sequence",
-                table: "PointsLedgerEntries");
+                table: "PointsLedgerEntries"
+            );
 
-            migrationBuilder.DropColumn(
-                name: "Sequence",
-                table: "PointsLedgerEntries");
+            migrationBuilder.DropColumn(name: "Sequence", table: "PointsLedgerEntries");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PointsLedgerEntries_UserId_CreatedAt",
                 table: "PointsLedgerEntries",
-                columns: new[] { "UserId", "CreatedAt" });
+                columns: new[] { "UserId", "CreatedAt" }
+            );
         }
     }
 }

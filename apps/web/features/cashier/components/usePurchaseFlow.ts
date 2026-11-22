@@ -6,10 +6,22 @@ import { useForm } from "react-hook-form";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { useRegisterPurchase } from "../hooks";
-import { purchaseMessages, purchaseSchema, warsawToday, toPurchaseBody, type PurchaseValues } from "../schemas";
+import {
+  purchaseMessages,
+  purchaseSchema,
+  warsawToday,
+  toPurchaseBody,
+  type PurchaseValues,
+} from "../schemas";
 import type { FuelPurchaseBody, FuelPurchaseResult } from "../services";
 
-const FIELDS = ["cardCode", "amount", "liters", "saleDate", "receiptNumber"] as const;
+const FIELDS = [
+  "cardCode",
+  "amount",
+  "liters",
+  "saleDate",
+  "receiptNumber",
+] as const;
 
 export type PurchaseFlow = ReturnType<typeof usePurchaseFlow>;
 
@@ -33,7 +45,10 @@ export function usePurchaseFlow() {
   });
 
   // While the outcome is unknown the form is locked: a retry must send the same body (same key).
-  const unknown = purchase.isError && keepsIdempotencyKey(purchase.error) ? purchase.error : null;
+  const unknown =
+    purchase.isError && keepsIdempotencyKey(purchase.error)
+      ? purchase.error
+      : null;
   const locked = purchase.isPending || unknown !== null;
 
   const send = async (body: FuelPurchaseBody) => {
@@ -53,7 +68,8 @@ export function usePurchaseFlow() {
     } catch (error) {
       if (keepsIdempotencyKey(error as Error)) return;
       setPending(null);
-      if (applyFieldErrors(error, form.setError, purchaseMessages, FIELDS)) return;
+      if (applyFieldErrors(error, form.setError, purchaseMessages, FIELDS))
+        return;
       const code = error instanceof ApiError ? error.code : undefined;
       form.setError("root", {
         message:

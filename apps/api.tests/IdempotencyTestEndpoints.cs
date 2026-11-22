@@ -36,7 +36,8 @@ public sealed class IdempotencyTestEndpoints : IAdditionalEndpoints
 
         group.MapPost("/items/{id}", HandleItem).RequireIdempotency();
 
-        group.MapPost("/cashier-items/{id}", HandleItem)
+        group
+            .MapPost("/cashier-items/{id}", HandleItem)
             .RequireAuthorization(policy => policy.RequireRole(RoleNames.Cashier))
             .RequireIdempotency();
     }
@@ -47,11 +48,13 @@ public sealed class IdempotencyTestEndpoints : IAdditionalEndpoints
         HttpContext http,
         UserManager<ApplicationUser> users,
         AppDbContext db,
-        TestFaults faults)
+        TestFaults faults
+    )
     {
         if (request.Amount <= 0)
             return TypedResults.ValidationProblem(
-                new Dictionary<string, string[]> { ["amount"] = ["test.amount_invalid"] });
+                new Dictionary<string, string[]> { ["amount"] = ["test.amount_invalid"] }
+            );
 
         if (request.Outcome == "conflict")
             return Problem(409, "test.conflict");
@@ -62,7 +65,8 @@ public sealed class IdempotencyTestEndpoints : IAdditionalEndpoints
             $"""
             INSERT INTO "LoyaltyAccounts" ("UserId", "Balance") VALUES ({userId}, {request.Amount})
             ON CONFLICT ("UserId") DO UPDATE SET "Balance" = "LoyaltyAccounts"."Balance" + EXCLUDED."Balance"
-            """);
+            """
+        );
 
         switch (request.Outcome)
         {
@@ -83,7 +87,10 @@ public sealed class IdempotencyTestEndpoints : IAdditionalEndpoints
         if (faults.ShouldCrash())
             throw new InvalidOperationException("Injected test failure after a partial write.");
 
-        return TypedResults.Created($"{Prefix}/items/{id}", new TestItemResponse(id, Guid.NewGuid()));
+        return TypedResults.Created(
+            $"{Prefix}/items/{id}",
+            new TestItemResponse(id, Guid.NewGuid())
+        );
     }
 
     /// <summary>
@@ -101,5 +108,8 @@ public sealed class IdempotencyTestEndpoints : IAdditionalEndpoints
     }
 
     private static IResult Problem(int status, string code) =>
-        TypedResults.Problem(statusCode: status, extensions: new Dictionary<string, object?> { ["code"] = code });
+        TypedResults.Problem(
+            statusCode: status,
+            extensions: new Dictionary<string, object?> { ["code"] = code }
+        );
 }

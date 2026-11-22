@@ -15,7 +15,12 @@ export function HomeScreen() {
   const isCustomer = me?.roles.includes("User") ?? false;
   const isCashier = me?.roles.includes("Cashier") ?? false;
   const cashierShortcut = isCashier && (
-    <Shortcut href="/kasa" icon={ScanLine} title="Kasa" description="Zarejestruj zakup paliwa" />
+    <Shortcut
+      href="/kasa"
+      icon={ScanLine}
+      title="Kasa"
+      description="Zarejestruj zakup paliwa"
+    />
   );
 
   if (me && !isCustomer) {
@@ -23,10 +28,14 @@ export function HomeScreen() {
       <div className="mx-auto flex w-full max-w-xl flex-col gap-3">
         <h1 className="text-2xl font-semibold">Cześć, {me.displayName}</h1>
         <p className="text-muted-foreground">
-          To konto obsługi stacji. Saldo, karta i historia punktów są dostępne na kontach klientów.
+          To konto obsługi stacji. Saldo, karta i historia punktów są dostępne
+          na kontach klientów.
         </p>
         {cashierShortcut && (
-          <nav aria-label="Na skróty" className="mt-3 grid gap-3 sm:grid-cols-2">
+          <nav
+            aria-label="Na skróty"
+            className="mt-3 grid gap-3 sm:grid-cols-2"
+          >
             {cashierShortcut}
           </nav>
         )}
@@ -36,11 +45,23 @@ export function HomeScreen() {
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold">{me ? `Cześć, ${me.displayName}` : "Twoje konto"}</h1>
+      <h1 className="text-2xl font-semibold">
+        {me ? `Cześć, ${me.displayName}` : "Twoje konto"}
+      </h1>
       {isCustomer && <BalanceCard />}
       <nav aria-label="Na skróty" className="grid gap-3 sm:grid-cols-2">
-        <Shortcut href="/karta" icon={CreditCard} title="Karta" description="Pokaż kod przy kasie" />
-        <Shortcut href="/historia" icon={History} title="Historia punktów" description="Ostatnie tankowania" />
+        <Shortcut
+          href="/karta"
+          icon={CreditCard}
+          title="Karta"
+          description="Pokaż kod przy kasie"
+        />
+        <Shortcut
+          href="/historia"
+          icon={History}
+          title="Historia punktów"
+          description="Ostatnie tankowania"
+        />
         {cashierShortcut}
       </nav>
     </div>
@@ -67,7 +88,10 @@ function Shortcut({
         <span className="font-medium">{title}</span>
         <span className="text-sm text-muted-foreground">{description}</span>
       </span>
-      <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+      <ChevronRight
+        className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+        aria-hidden
+      />
     </>
   );
 

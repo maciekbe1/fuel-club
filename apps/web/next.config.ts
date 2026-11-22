@@ -19,7 +19,9 @@ const nextConfig: NextConfig = {
     },
   },
   async rewrites() {
-    return [{ source: "/api/:path*", destination: `${apiInternalUrl}/api/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${apiInternalUrl}/api/:path*` },
+    ];
   },
 };
 

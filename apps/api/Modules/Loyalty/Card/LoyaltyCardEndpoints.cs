@@ -48,7 +48,11 @@ public static class LoyaltyCardEndpoints
             return LoyaltyProblems.CustomerBusy(http);
 
         if (await ActiveCard(db, userId).AnyAsync(cancellationToken))
-            return ApiProblems.Problem(StatusCodes.Status409Conflict, "Loyalty card already issued", LoyaltyErrorCodes.CardAlreadyIssued);
+            return ApiProblems.Problem(
+                StatusCodes.Status409Conflict,
+                "Loyalty card already issued",
+                LoyaltyErrorCodes.CardAlreadyIssued
+            );
 
         var card = await AddCardAsync(db, userId, cancellationToken);
         return TypedResults.Created(Path, new LoyaltyCardResponse(card.Code, card.IssuedAt));

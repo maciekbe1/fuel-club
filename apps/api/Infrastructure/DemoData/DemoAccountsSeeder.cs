@@ -39,7 +39,9 @@ public sealed class DemoAccountsSeeder(
 
         var password = configuration[PasswordKey];
         if (string.IsNullOrWhiteSpace(password))
-            throw new InvalidOperationException($"{PasswordKey} must be configured when {EnabledKey} is true.");
+            throw new InvalidOperationException(
+                $"{PasswordKey} must be configured when {EnabledKey} is true."
+            );
 
         using var scope = scopeFactory.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -50,9 +52,21 @@ public sealed class DemoAccountsSeeder(
         {
             if (role == RoleNames.Cashier)
                 await CashierProvisioning.EnsureCashierAsync(
-                    scope.ServiceProvider, email, password, displayName, CashierStationCode, CashierRegisterCode);
+                    scope.ServiceProvider,
+                    email,
+                    password,
+                    displayName,
+                    CashierStationCode,
+                    CashierRegisterCode
+                );
             else
-                await AccountProvisioning.EnsureAccountAsync(users, email, password, displayName, role);
+                await AccountProvisioning.EnsureAccountAsync(
+                    users,
+                    email,
+                    password,
+                    displayName,
+                    role
+                );
         }
 
         await transaction.CommitAsync(cancellationToken);

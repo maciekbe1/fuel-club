@@ -34,19 +34,28 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
     private sealed record ProblemCode(string? Code);
 
     private async Task<(HttpClient Client, string UserId)> LoggedInAsync(
-        string role = RoleNames.User, WebApplicationFactory<Program>? host = null)
+        string role = RoleNames.User,
+        WebApplicationFactory<Program>? host = null
+    )
     {
         var email = $"card-{Guid.NewGuid():N}@example.test";
         _emails.Add(email);
         await factory.CreateTestUserAsync(email, Password, role);
-        var client = (host ?? factory).CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var client = (host ?? factory).CreateClient(
+            new WebApplicationFactoryClientOptions { HandleCookies = true }
+        );
         await client.LoginAsync(email, Password);
         await using var scope = factory.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         return (client, (await users.FindByEmailAsync(email))!.Id);
     }
 
-    private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string url, string? key, bool csrf = true)
+    private static async Task<HttpResponseMessage> PostAsync(
+        HttpClient client,
+        string url,
+        string? key,
+        bool csrf = true
+    )
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         if (key is not null)
@@ -65,13 +74,17 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         (await response.Content.ReadFromJsonAsync<ProblemCode>())?.Code;
 
     private static bool IsReplayed(HttpResponseMessage response) =>
-        response.Headers.TryGetValues(Idempotency.ReplayedHeaderName, out var values) && values.Contains("true");
+        response.Headers.TryGetValues(Idempotency.ReplayedHeaderName, out var values)
+        && values.Contains("true");
 
     private async Task<List<LoyaltyCard>> CardsOfAsync(string userId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.LoyaltyCards.AsNoTracking().Where(card => card.UserId == userId).ToListAsync();
+        return await db
+            .LoyaltyCards.AsNoTracking()
+            .Where(card => card.UserId == userId)
+            .ToListAsync();
     }
 
     [Fact]
@@ -134,12 +147,15 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
     {
         var (client, userId) = await LoggedInAsync();
 
-        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => PostAsync(client, Card, NewKey())));
+        var responses = await Task.WhenAll(
+            Enumerable.Range(0, 6).Select(_ => PostAsync(client, Card, NewKey()))
+        );
 
         Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Created);
         Assert.All(
             responses.Where(response => response.StatusCode != HttpStatusCode.Created),
-            response => Assert.Equal(HttpStatusCode.Conflict, response.StatusCode));
+            response => Assert.Equal(HttpStatusCode.Conflict, response.StatusCode)
+        );
         Assert.Single(await CardsOfAsync(userId));
     }
 
@@ -200,7 +216,9 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         var (client, userId) = await LoggedInAsync();
         await PostAsync(client, Card, NewKey());
 
-        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => PostAsync(client, Rotate, NewKey())));
+        var responses = await Task.WhenAll(
+            Enumerable.Range(0, 5).Select(_ => PostAsync(client, Rotate, NewKey()))
+        );
 
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
         var codes = await Task.WhenAll(responses.Select(CodeOf));
@@ -218,7 +236,9 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         await PostAsync(client, Card, NewKey());
         var key = NewKey();
 
-        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => PostAsync(client, Rotate, key)));
+        var responses = await Task.WhenAll(
+            Enumerable.Range(0, 5).Select(_ => PostAsync(client, Rotate, key))
+        );
 
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
         Assert.Single((await Task.WhenAll(responses.Select(CodeOf))).Distinct());
@@ -255,7 +275,10 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         Assert.True(IsReplayed(replayed));
         foreach (var response in new[] { missing, issued, replayed, read })
-            Assert.True(response.Headers.CacheControl?.NoStore, $"{response.RequestMessage!.Method} {(int)response.StatusCode}");
+            Assert.True(
+                response.Headers.CacheControl?.NoStore,
+                $"{response.RequestMessage!.Method} {(int)response.StatusCode}"
+            );
         Assert.Null((await client.GetAsync("/api/me/wallet")).Headers.CacheControl);
     }
 
@@ -307,7 +330,10 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         var (client, userId) = await LoggedInAsync(role);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Card)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await PostAsync(client, Card, NewKey())).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await PostAsync(client, Card, NewKey())).StatusCode
+        );
         Assert.Empty(await CardsOfAsync(userId));
     }
 
@@ -325,15 +351,19 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         var (client, userId) = await LoggedInAsync();
         var code = await CodeOf(await PostAsync(client, Card, NewKey()));
 
-        var secondActive = await Assert.ThrowsAsync<PostgresException>(
-            () => InsertCardAsync(userId, LoyaltyCardCode.Generate(), revoked: false));
+        var secondActive = await Assert.ThrowsAsync<PostgresException>(() =>
+            InsertCardAsync(userId, LoyaltyCardCode.Generate(), revoked: false)
+        );
         Assert.Equal("UX_LoyaltyCards_ActivePerUser", secondActive.ConstraintName);
 
-        var duplicateCode = await Assert.ThrowsAsync<PostgresException>(() => InsertCardAsync(userId, code, revoked: true));
+        var duplicateCode = await Assert.ThrowsAsync<PostgresException>(() =>
+            InsertCardAsync(userId, code, revoked: true)
+        );
         Assert.Equal("UX_LoyaltyCards_Code", duplicateCode.ConstraintName);
 
-        var badFormat = await Assert.ThrowsAsync<PostgresException>(
-            () => InsertCardAsync(userId, "8" + new string('0', 25), revoked: true));
+        var badFormat = await Assert.ThrowsAsync<PostgresException>(() =>
+            InsertCardAsync(userId, "8" + new string('0', 25), revoked: true)
+        );
         Assert.Equal("CK_LoyaltyCards_Code_Format", badFormat.ConstraintName);
 
         await InsertCardAsync(userId, LoyaltyCardCode.Generate(), revoked: true);
@@ -346,7 +376,10 @@ public sealed class LoyaltyCardTests(ApiFactory factory) : IAsyncLifetime
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO "LoyaltyCards" ("Id", "UserId", "Code", "IssuedAt", "RevokedAt")
-            VALUES ({Guid.NewGuid()}, {userId}, {code}, now(), {(revoked ? DateTimeOffset.UtcNow.AddMinutes(1) : null)})
-            """);
+            VALUES ({Guid.NewGuid()}, {userId}, {code}, now(), {(
+                revoked ? DateTimeOffset.UtcNow.AddMinutes(1) : null
+            )})
+            """
+        );
     }
 }

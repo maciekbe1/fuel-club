@@ -24,6 +24,7 @@ FUELCLUB_TEST_DATABASE='Host=localhost;Port=5434;Database=fuelclub_test;Username
 cd apps/web && npm run dev                                   # :3000, /api/* -> API
 cd apps/web && npm run api:types                             # przy działającym API
 cd apps/web && npm run typecheck && npm run lint
+dotnet csharpier format apps && (cd apps/web && npm run format)   # jak formatowanie przy zapisie w IDE
 cd apps/web && npm run e2e                                   # Playwright: API :5281 + web :3100, baza fuelclub_e2e (5434)
 cd docs && npm run dev                                       # dokumentacja; npm run build sprawdza
 ```

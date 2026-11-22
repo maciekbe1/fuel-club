@@ -27,20 +27,32 @@ public sealed class CustomerLockGate : DbCommandInterceptor
 
     /// <summary>Pauses the command that has just acquired the customer lock with this key.</summary>
     public Gate Arm(string lockKey) =>
-        ArmWhen(command => command.CommandText.Contains("pg_advisory_xact_lock", StringComparison.Ordinal)
-            && command.Parameters.Cast<DbParameter>().Any(parameter => parameter.Value as string == lockKey));
+        ArmWhen(command =>
+            command.CommandText.Contains("pg_advisory_xact_lock", StringComparison.Ordinal)
+            && command
+                .Parameters.Cast<DbParameter>()
+                .Any(parameter => parameter.Value as string == lockKey)
+        );
 
     public Gate ArmWhen(Func<DbCommand, bool> matches)
     {
         Gate? gate = null;
-        gate = new Gate(() => { lock (_sync) _armed.RemoveAll(entry => entry.Gate == gate); });
+        gate = new Gate(() =>
+        {
+            lock (_sync)
+                _armed.RemoveAll(entry => entry.Gate == gate);
+        });
         lock (_sync)
             _armed.Add((matches, gate));
         return gate;
     }
 
     public override async ValueTask<int> NonQueryExecutedAsync(
-        DbCommand command, CommandExecutedEventData eventData, int result, CancellationToken cancellationToken = default)
+        DbCommand command,
+        CommandExecutedEventData eventData,
+        int result,
+        CancellationToken cancellationToken = default
+    )
     {
         Gate? hit = null;
         lock (_sync)
@@ -59,8 +71,12 @@ public sealed class CustomerLockGate : DbCommandInterceptor
 
     public sealed class Gate(Action disarm) : IDisposable
     {
-        private readonly TaskCompletionSource _acquired = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _acquired = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _released = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
 
         public Task Acquired => _acquired.Task;
 

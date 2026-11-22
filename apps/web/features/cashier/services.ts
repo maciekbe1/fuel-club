@@ -9,5 +9,10 @@ export const cashierService = {
   station: () => unwrap(api.GET("/api/cashier/station")),
 
   purchase: (body: FuelPurchaseBody, key: string) =>
-    unwrap(api.POST("/api/cashier/fuel-purchases", { body, params: { header: { "Idempotency-Key": key } } })),
+    unwrap(
+      api.POST("/api/cashier/fuel-purchases", {
+        body,
+        params: { header: { "Idempotency-Key": key } },
+      }),
+    ),
 };

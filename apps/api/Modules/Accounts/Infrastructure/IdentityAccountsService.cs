@@ -1,7 +1,7 @@
 using System.Security.Claims;
+using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Accounts.Application;
-using FuelClub.Api.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 

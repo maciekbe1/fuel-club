@@ -13,7 +13,11 @@ namespace FuelClub.Api.Modules.Accounts
             var result = await accountsService.RegisterAsync(request);
             if (!result.Succeeded)
             {
-                return ApiProblems.Validation("Registration failed", result.ErrorCode!, result.Errors);
+                return ApiProblems.Validation(
+                    "Registration failed",
+                    result.ErrorCode!,
+                    result.Errors
+                );
             }
 
             return Results.StatusCode(StatusCodes.Status201Created);

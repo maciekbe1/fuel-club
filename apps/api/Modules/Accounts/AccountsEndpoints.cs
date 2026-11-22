@@ -8,10 +8,12 @@ namespace FuelClub.Api.Modules.Accounts
         {
             var group = app.MapGroup("/api/auth").WithTags("Accounts").RequireCsrf();
 
-            group.MapPost("/register", RegisterEndpoint.Handle)
+            group
+                .MapPost("/register", RegisterEndpoint.Handle)
                 .Produces(StatusCodes.Status201Created)
                 .ProducesProblem(StatusCodes.Status400BadRequest);
-            group.MapPost("/login", LoginEndpoint.Handle)
+            group
+                .MapPost("/login", LoginEndpoint.Handle)
                 .Produces(StatusCodes.Status204NoContent)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status401Unauthorized);

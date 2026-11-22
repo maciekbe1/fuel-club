@@ -1,6 +1,10 @@
 import { cashier, expect, issueCard, newCustomer, test } from "./fixtures";
 
-test("pages through the history with 'Pokaż więcej' without gaps or duplicates", async ({ page, customer, baseURL }) => {
+test("pages through the history with 'Pokaż więcej' without gaps or duplicates", async ({
+  page,
+  customer,
+  baseURL,
+}) => {
   void customer;
   const code = await issueCard(page);
   const pos = await cashier(baseURL!);
@@ -25,13 +29,22 @@ test("pages through the history with 'Pokaż więcej' without gaps or duplicates
   await expect(page.getByRole("button", { name: "Pokaż więcej" })).toBeHidden();
 
   const deltas = await page.getByTestId("history-delta").allTextContents();
-  expect(deltas).toEqual(Array.from({ length: 25 }, (_, i) => `+${34 - i} pkt`));
-  const ids = await items.evaluateAll((els) => els.map((el) => el.getAttribute("data-id")));
+  expect(deltas).toEqual(
+    Array.from({ length: 25 }, (_, i) => `+${34 - i} pkt`),
+  );
+  const ids = await items.evaluateAll((els) =>
+    els.map((el) => el.getAttribute("data-id")),
+  );
   expect(new Set(ids).size).toBe(25);
   await expect(items.last()).toContainText("Saldo po: 10 pkt");
 });
 
-test("two customers see only their own history", async ({ page, browser, customer, baseURL }) => {
+test("two customers see only their own history", async ({
+  page,
+  browser,
+  customer,
+  baseURL,
+}) => {
   void customer;
   const otherContext = await browser.newContext({ baseURL });
   const other = await otherContext.newPage();
@@ -48,19 +61,30 @@ test("two customers see only their own history", async ({ page, browser, custome
   await expect(other.getByTestId("history-delta")).toHaveText(["+222 pkt"]);
 
   await page.goto("/");
-  await expect(page.getByRole("region", { name: "Twoje saldo" })).toContainText("111 pkt");
+  await expect(page.getByRole("region", { name: "Twoje saldo" })).toContainText(
+    "111 pkt",
+  );
   await otherContext.close();
 });
 
-test("empty history, also after a purchase worth 0 points", async ({ page, customer, baseURL }) => {
+test("empty history, also after a purchase worth 0 points", async ({
+  page,
+  customer,
+  baseURL,
+}) => {
   void customer;
   const pos = await cashier(baseURL!);
   await pos.purchase(await issueCard(page), 0.99, 0.5);
   await pos.dispose();
 
   await page.goto("/historia");
-  await expect(page.getByRole("heading", { name: "Nie masz jeszcze żadnych operacji" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Pokaż kartę" })).toHaveAttribute("href", "/karta");
+  await expect(
+    page.getByRole("heading", { name: "Nie masz jeszcze żadnych operacji" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Pokaż kartę" })).toHaveAttribute(
+    "href",
+    "/karta",
+  );
 });
 
 test("loading and error states, then recovery", async ({ page, customer }) => {
@@ -89,9 +113,13 @@ test("loading and error states, then recovery", async ({ page, customer }) => {
   release();
 
   const alert = page.getByRole("main").getByRole("alert");
-  await expect(alert).toContainText("Brak połączenia z serwerem", { timeout: 15_000 });
+  await expect(alert).toContainText("Brak połączenia z serwerem", {
+    timeout: 15_000,
+  });
 
   healthy = true;
   await page.getByRole("button", { name: "Spróbuj ponownie" }).click();
-  await expect(page.getByRole("heading", { name: "Nie masz jeszcze żadnych operacji" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Nie masz jeszcze żadnych operacji" }),
+  ).toBeVisible();
 });

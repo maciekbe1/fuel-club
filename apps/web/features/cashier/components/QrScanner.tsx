@@ -6,14 +6,20 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { looksLikeCardCode } from "../schemas";
 
-type State = { kind: "idle" } | { kind: "starting" } | { kind: "scanning" } | { kind: "error"; message: string };
+type State =
+  | { kind: "idle" }
+  | { kind: "starting" }
+  | { kind: "scanning" }
+  | { kind: "error"; message: string };
 
 function cameraError(error: unknown) {
   const name = error instanceof DOMException ? error.name : "";
   if (name === "NotAllowedError" || name === "SecurityError")
     return "Brak zgody na użycie kamery. Zezwól na kamerę w ustawieniach przeglądarki albo wklej kod ręcznie.";
-  if (name === "NotFoundError" || name === "OverconstrainedError") return "Nie znaleziono kamery. Wklej kod ręcznie.";
-  if (name === "NotReadableError") return "Kamera jest zajęta przez inną aplikację. Wklej kod ręcznie.";
+  if (name === "NotFoundError" || name === "OverconstrainedError")
+    return "Nie znaleziono kamery. Wklej kod ręcznie.";
+  if (name === "NotReadableError")
+    return "Kamera jest zajęta przez inną aplikację. Wklej kod ręcznie.";
   return "Nie udało się uruchomić kamery. Wklej kod ręcznie.";
 }
 
@@ -23,7 +29,13 @@ function cameraError(error: unknown) {
  * the component unmounts. Every start is an attempt with an id; stopping invalidates it, so a stream
  * that arrives late (permission granted after "Zatrzymaj") is stopped at once and a late scan is ignored.
  */
-export function QrScanner({ onScan, disabled }: { onScan: (code: string) => void; disabled?: boolean }) {
+export function QrScanner({
+  onScan,
+  disabled,
+}: {
+  onScan: (code: string) => void;
+  disabled?: boolean;
+}) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -50,7 +62,9 @@ export function QrScanner({ onScan, disabled }: { onScan: (code: string) => void
     if (!disabled) return;
     stop();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- stopping an external resource
-    setState((current) => (current.kind === "error" ? current : { kind: "idle" }));
+    setState((current) =>
+      current.kind === "error" ? current : { kind: "idle" },
+    );
   }, [disabled]);
 
   const scanFrame = (attempt: number) => {
@@ -63,8 +77,14 @@ export function QrScanner({ onScan, disabled }: { onScan: (code: string) => void
       const context = canvas.getContext("2d", { willReadFrequently: true })!;
       context.drawImage(video, 0, 0);
       const image = context.getImageData(0, 0, canvas.width, canvas.height);
-      const result = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
-      if (result && looksLikeCardCode(result.data) && attempt === attemptRef.current) {
+      const result = jsQR(image.data, image.width, image.height, {
+        inversionAttempts: "dontInvert",
+      });
+      if (
+        result &&
+        looksLikeCardCode(result.data) &&
+        attempt === attemptRef.current
+      ) {
         stop();
         setState({ kind: "idle" });
         onScanRef.current(result.data.trim().toUpperCase());
@@ -78,12 +98,19 @@ export function QrScanner({ onScan, disabled }: { onScan: (code: string) => void
     stop();
     const attempt = attemptRef.current;
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      setState({ kind: "error", message: "Kamera działa tylko przez HTTPS (lub na localhost). Wklej kod ręcznie." });
+      setState({
+        kind: "error",
+        message:
+          "Kamera działa tylko przez HTTPS (lub na localhost). Wklej kod ręcznie.",
+      });
       return;
     }
     setState({ kind: "starting" });
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
       if (attempt !== attemptRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -106,8 +133,16 @@ export function QrScanner({ onScan, disabled }: { onScan: (code: string) => void
 
   return (
     <div className="flex flex-col gap-3">
-      <div className={active ? "overflow-hidden rounded-2xl bg-black" : "hidden"}>
-        <video ref={videoRef} muted playsInline className="aspect-video w-full object-cover" aria-label="Podgląd kamery" />
+      <div
+        className={active ? "overflow-hidden rounded-2xl bg-black" : "hidden"}
+      >
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          className="aspect-video w-full object-cover"
+          aria-label="Podgląd kamery"
+        />
       </div>
       {state.kind === "scanning" && (
         <p role="status" className="text-sm text-muted-foreground">
@@ -132,7 +167,12 @@ export function QrScanner({ onScan, disabled }: { onScan: (code: string) => void
           Zatrzymaj kamerę
         </Button>
       ) : (
-        <Button type="button" variant="outline" onClick={start} disabled={disabled}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={start}
+          disabled={disabled}
+        >
           <Camera className="size-4" aria-hidden />
           Skanuj kod QR
         </Button>

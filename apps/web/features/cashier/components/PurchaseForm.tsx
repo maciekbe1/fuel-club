@@ -1,7 +1,12 @@
 "use client";
 
 import { CircleCheck } from "lucide-react";
-import { fieldA11y, fieldClass, FormAlert, FormField } from "@/components/form/FormField";
+import {
+  fieldA11y,
+  fieldClass,
+  FormAlert,
+  FormField,
+} from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -13,7 +18,17 @@ import type { PurchaseFlow } from "./usePurchaseFlow";
 const plain = new Intl.NumberFormat("pl-PL");
 
 export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
-  const { purchase, pending, setPending, saved, form, unknown, locked, send, onSubmit } = flow;
+  const {
+    purchase,
+    pending,
+    setPending,
+    saved,
+    form,
+    unknown,
+    locked,
+    send,
+    onSubmit,
+  } = flow;
   const { errors } = form.formState;
 
   return (
@@ -25,8 +40,12 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
         >
           <CircleCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
           <div>
-            <p className="font-semibold">Zakup zapisany. Przyznano {plain.format(saved.pointsAwarded)} pkt.</p>
-            {saved.pointsAwarded === 0 && <p className="text-sm">Kwota poniżej 1 zł nie daje punktów.</p>}
+            <p className="font-semibold">
+              Zakup zapisany. Przyznano {plain.format(saved.pointsAwarded)} pkt.
+            </p>
+            {saved.pointsAwarded === 0 && (
+              <p className="text-sm">Kwota poniżej 1 zł nie daje punktów.</p>
+            )}
           </div>
         </div>
       )}
@@ -44,10 +63,17 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <FormAlert message={errors.root?.message} />
-        <fieldset disabled={locked} className="flex flex-col gap-5 disabled:opacity-70">
+        <fieldset
+          disabled={locked}
+          className="flex flex-col gap-5 disabled:opacity-70"
+        >
           <legend className="sr-only">Zakup paliwa</legend>
 
-          <FormField id="cardCode" label="Kod karty klienta" error={errors.cardCode}>
+          <FormField
+            id="cardCode"
+            label="Kod karty klienta"
+            error={errors.cardCode}
+          >
             <Input
               autoComplete="off"
               autoCapitalize="characters"
@@ -89,7 +115,11 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
                 {...form.register("liters")}
               />
             </FormField>
-            <FormField id="saleDate" label="Data sprzedaży" error={errors.saleDate}>
+            <FormField
+              id="saleDate"
+              label="Data sprzedaży"
+              error={errors.saleDate}
+            >
               <Input
                 type="date"
                 max={warsawToday()}
@@ -98,7 +128,11 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
                 {...form.register("saleDate")}
               />
             </FormField>
-            <FormField id="receiptNumber" label="Numer paragonu" error={errors.receiptNumber}>
+            <FormField
+              id="receiptNumber"
+              label="Numer paragonu"
+              error={errors.receiptNumber}
+            >
               <Input
                 autoComplete="off"
                 autoCapitalize="characters"
@@ -109,7 +143,11 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
             </FormField>
           </div>
 
-          <Button type="submit" size="lg" className="h-12 bg-brand-orange text-brand-navy hover:bg-brand-orange/90">
+          <Button
+            type="submit"
+            size="lg"
+            className="h-12 bg-brand-orange text-brand-navy hover:bg-brand-orange/90"
+          >
             {purchase.isPending ? "Zapisywanie…" : "Zapisz zakup"}
           </Button>
         </fieldset>

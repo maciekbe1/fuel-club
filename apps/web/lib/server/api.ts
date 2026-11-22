@@ -3,7 +3,9 @@ import { cookies } from "next/headers";
 
 const apiInternalUrl = process.env.API_INTERNAL_URL ?? "http://localhost:5271";
 
-export async function serverGet<T>(path: `/api/${string}`): Promise<{ status: number; data: T | null }> {
+export async function serverGet<T>(
+  path: `/api/${string}`,
+): Promise<{ status: number; data: T | null }> {
   const cookieHeader = (await cookies()).toString();
   const response = await fetch(`${apiInternalUrl}${path}`, {
     headers: { cookie: cookieHeader, accept: "application/json" },

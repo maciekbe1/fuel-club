@@ -2,9 +2,16 @@ using FuelClub.Api.Modules.Loyalty.Domain;
 
 namespace FuelClub.Api.Modules.Rewards.Domain;
 
-public sealed record RewardOfferInput(string? Name, string? Description, int PointsCost, decimal DiscountPerLiter, decimal MaxLiters);
+public sealed record RewardOfferInput(
+    string? Name,
+    string? Description,
+    int PointsCost,
+    decimal DiscountPerLiter,
+    decimal MaxLiters
+);
 
-public sealed record RewardsValidationError(string Field, string Code) : FuelClub.Api.Infrastructure.IFieldError;
+public sealed record RewardsValidationError(string Field, string Code)
+    : FuelClub.Api.Infrastructure.IFieldError;
 
 /// <summary>
 /// Offer rules. Precision is checked here: PostgreSQL numeric(p,s) rounds extra decimals on write
@@ -25,7 +32,11 @@ public static class RewardOfferRules
     public const int MaxLitersScale = FuelPurchaseRules.LitersScale;
 
     public static RewardOfferInput Normalize(RewardOfferInput input) =>
-        input with { Name = input.Name?.Trim(), Description = input.Description?.Trim() ?? string.Empty };
+        input with
+        {
+            Name = input.Name?.Trim(),
+            Description = input.Description?.Trim() ?? string.Empty,
+        };
 
     public static IReadOnlyList<RewardsValidationError> Validate(RewardOfferInput input)
     {
@@ -44,7 +55,9 @@ public static class RewardOfferRules
 
         if (input.DiscountPerLiter <= 0m || input.DiscountPerLiter > MaxDiscountPerLiter)
             errors.Add(new("discountPerLiter", RewardsErrorCodes.DiscountPerLiterOutOfRange));
-        else if (!FuelPurchaseRules.HasAtMostDecimals(input.DiscountPerLiter, DiscountPerLiterScale))
+        else if (
+            !FuelPurchaseRules.HasAtMostDecimals(input.DiscountPerLiter, DiscountPerLiterScale)
+        )
             errors.Add(new("discountPerLiter", RewardsErrorCodes.DiscountPerLiterPrecision));
 
         if (input.MaxLiters <= 0m || input.MaxLiters > MaxDiscountLiters)

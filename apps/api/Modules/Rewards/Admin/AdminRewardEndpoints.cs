@@ -15,7 +15,8 @@ public sealed record AdminRewardResponse(
     bool IsActive,
     int Version,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt
+);
 
 public sealed record AdminRewardsResponse(IReadOnlyList<AdminRewardResponse> Items);
 
@@ -29,7 +30,8 @@ public sealed record CreateRewardRequest(
     int? PointsCost,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
-    bool? IsActive);
+    bool? IsActive
+);
 
 /// <summary>The whole form plus the version it was loaded with (PUT, also for activate/deactivate).</summary>
 public sealed record UpdateRewardRequest(
@@ -39,7 +41,8 @@ public sealed record UpdateRewardRequest(
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
     bool? IsActive,
-    int? Version);
+    int? Version
+);
 
 /// <summary>
 /// Offer management for admins. Edits are guarded by an explicit version: one conditional
@@ -56,10 +59,13 @@ public static class AdminRewardEndpoints
         + "after a lost response a retry gets 409 because the first attempt already raised the version, which "
         + "does not prove that someone else changed the offer - reload it.";
 
-    public static async Task<Ok<AdminRewardsResponse>> GetAll(AppDbContext db, CancellationToken cancellationToken)
+    public static async Task<Ok<AdminRewardsResponse>> GetAll(
+        AppDbContext db,
+        CancellationToken cancellationToken
+    )
     {
-        var items = await db.RewardOffers
-            .AsNoTracking()
+        var items = await db
+            .RewardOffers.AsNoTracking()
             .OrderByDescending(offer => offer.CreatedAt)
             .ThenBy(offer => offer.Id)
             .Select(ToAdmin)
@@ -70,9 +76,14 @@ public static class AdminRewardEndpoints
     public static async Task<Results<Ok<AdminRewardResponse>, ProblemHttpResult>> GetOne(
         Guid id,
         AppDbContext db,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
-        var offer = await db.RewardOffers.AsNoTracking().Where(o => o.Id == id).Select(ToAdmin).SingleOrDefaultAsync(cancellationToken);
+        var offer = await db
+            .RewardOffers.AsNoTracking()
+            .Where(o => o.Id == id)
+            .Select(ToAdmin)
+            .SingleOrDefaultAsync(cancellationToken);
         return offer is null ? RewardsProblems.OfferNotFound() : TypedResults.Ok(offer);
     }
 
@@ -80,10 +91,17 @@ public static class AdminRewardEndpoints
     public static async Task<Results<Created<AdminRewardResponse>, ProblemHttpResult>> Create(
         CreateRewardRequest request,
         AppDbContext db,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var (input, errors) = ValidateForm(
-            request.Name, request.Description, request.PointsCost, request.DiscountPerLiter, request.MaxLiters, request.IsActive);
+            request.Name,
+            request.Description,
+            request.PointsCost,
+            request.DiscountPerLiter,
+            request.MaxLiters,
+            request.IsActive
+        );
         if (errors.Count > 0)
             return RewardsProblems.Validation("Offer is not valid", errors);
 
@@ -101,7 +119,11 @@ public static class AdminRewardEndpoints
         db.RewardOffers.Add(offer);
         await db.SaveChangesAsync(cancellationToken);
 
-        var created = await db.RewardOffers.AsNoTracking().Where(o => o.Id == offer.Id).Select(ToAdmin).SingleAsync(cancellationToken);
+        var created = await db
+            .RewardOffers.AsNoTracking()
+            .Where(o => o.Id == offer.Id)
+            .Select(ToAdmin)
+            .SingleAsync(cancellationToken);
         return TypedResults.Created($"{Path}/{offer.Id}", created);
     }
 
@@ -109,10 +131,17 @@ public static class AdminRewardEndpoints
         Guid id,
         UpdateRewardRequest request,
         AppDbContext db,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var (input, errors) = ValidateForm(
-            request.Name, request.Description, request.PointsCost, request.DiscountPerLiter, request.MaxLiters, request.IsActive);
+            request.Name,
+            request.Description,
+            request.PointsCost,
+            request.DiscountPerLiter,
+            request.MaxLiters,
+            request.IsActive
+        );
         if (request.Version is null)
             errors.Add(new("version", RewardsErrorCodes.RequiredField));
         else if (request.Version < 1)
@@ -121,8 +150,9 @@ public static class AdminRewardEndpoints
             return RewardsProblems.Validation("Offer is not valid", errors);
 
         // Single statement: compare the version, apply the form, bump the version, return the stored row.
-        var rows = await db.Database
-            .SqlQuery<AdminRewardResponse>($"""
+        var rows = await db
+            .Database.SqlQuery<AdminRewardResponse>(
+                $"""
                 UPDATE "RewardOffers"
                 SET "Name" = {input.Name}, "Description" = {input.Description}, "PointsCost" = {input.PointsCost},
                     "DiscountPerLiter" = {input.DiscountPerLiter}, "MaxLiters" = {input.MaxLiters},
@@ -130,7 +160,8 @@ public static class AdminRewardEndpoints
                 WHERE "Id" = {id} AND "Version" = {request.Version!.Value}
                 RETURNING "Id", "Name", "Description", "PointsCost", "DiscountPerLiter", "MaxLiters",
                           "IsActive", "Version", "CreatedAt", "UpdatedAt"
-                """)
+                """
+            )
             .ToListAsync(cancellationToken);
 
         if (rows.Count == 1)
@@ -138,29 +169,68 @@ public static class AdminRewardEndpoints
 
         // Offers are never deleted, so "exists" cannot change between the UPDATE and this check.
         return await db.RewardOffers.AnyAsync(offer => offer.Id == id, cancellationToken)
-            ? ApiProblems.Problem(StatusCodes.Status409Conflict, "Offer was changed since it was loaded", RewardsErrorCodes.OfferVersionConflict)
+            ? ApiProblems.Problem(
+                StatusCodes.Status409Conflict,
+                "Offer was changed since it was loaded",
+                RewardsErrorCodes.OfferVersionConflict
+            )
             : RewardsProblems.OfferNotFound();
     }
 
-    private static readonly System.Linq.Expressions.Expression<Func<RewardOffer, AdminRewardResponse>> ToAdmin =
-        offer => new AdminRewardResponse(
-            offer.Id, offer.Name, offer.Description, offer.PointsCost, offer.DiscountPerLiter, offer.MaxLiters,
-            offer.IsActive, offer.Version, offer.CreatedAt, offer.UpdatedAt);
+    private static readonly System.Linq.Expressions.Expression<
+        Func<RewardOffer, AdminRewardResponse>
+    > ToAdmin = offer => new AdminRewardResponse(
+        offer.Id,
+        offer.Name,
+        offer.Description,
+        offer.PointsCost,
+        offer.DiscountPerLiter,
+        offer.MaxLiters,
+        offer.IsActive,
+        offer.Version,
+        offer.CreatedAt,
+        offer.UpdatedAt
+    );
 
     private static (RewardOfferInput Input, List<RewardsValidationError> Errors) ValidateForm(
-        string? name, string? description, int? pointsCost, decimal? discountPerLiter, decimal? maxLiters, bool? isActive)
+        string? name,
+        string? description,
+        int? pointsCost,
+        decimal? discountPerLiter,
+        decimal? maxLiters,
+        bool? isActive
+    )
     {
         var input = RewardOfferRules.Normalize(
-            new RewardOfferInput(name, description, pointsCost ?? 0, discountPerLiter ?? 0m, maxLiters ?? 0m));
+            new RewardOfferInput(
+                name,
+                description,
+                pointsCost ?? 0,
+                discountPerLiter ?? 0m,
+                maxLiters ?? 0m
+            )
+        );
         var missing = new List<string>();
-        if (pointsCost is null) missing.Add("pointsCost");
-        if (discountPerLiter is null) missing.Add("discountPerLiter");
-        if (maxLiters is null) missing.Add("maxLiters");
-        if (isActive is null) missing.Add("isActive");
+        if (pointsCost is null)
+            missing.Add("pointsCost");
+        if (discountPerLiter is null)
+            missing.Add("discountPerLiter");
+        if (maxLiters is null)
+            missing.Add("maxLiters");
+        if (isActive is null)
+            missing.Add("isActive");
 
         // A missing value is reported once, as required, not also as out of range.
-        var errors = RewardOfferRules.Validate(input).Where(error => !missing.Contains(error.Field)).ToList();
-        errors.AddRange(missing.Select(field => new RewardsValidationError(field, RewardsErrorCodes.RequiredField)));
+        var errors = RewardOfferRules
+            .Validate(input)
+            .Where(error => !missing.Contains(error.Field))
+            .ToList();
+        errors.AddRange(
+            missing.Select(field => new RewardsValidationError(
+                field,
+                RewardsErrorCodes.RequiredField
+            ))
+        );
         return (input, errors);
     }
 }

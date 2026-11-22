@@ -18,7 +18,8 @@ public sealed class AccountsApiTests(ApiFactory factory)
     {
         using var client = factory.CreateClient();
 
-        var response = await client.PostWithCsrfAsync("/api/auth/register",
+        var response = await client.PostWithCsrfAsync(
+            "/api/auth/register",
             new
             {
                 email = "",
@@ -48,7 +49,8 @@ public sealed class AccountsApiTests(ApiFactory factory)
     {
         using var client = factory.CreateClient();
 
-        var response = await client.PostWithCsrfAsync("/api/auth/login",
+        var response = await client.PostWithCsrfAsync(
+            "/api/auth/login",
             new { email = "", password = "" }
         );
 
@@ -76,7 +78,8 @@ public sealed class AccountsApiTests(ApiFactory factory)
             var unauthenticatedMe = await client.GetAsync("/api/auth/me");
             Assert.Equal(HttpStatusCode.Unauthorized, unauthenticatedMe.StatusCode);
 
-            var register = await client.PostWithCsrfAsync("/api/auth/register",
+            var register = await client.PostWithCsrfAsync(
+                "/api/auth/register",
                 new
                 {
                     email,
@@ -87,12 +90,14 @@ public sealed class AccountsApiTests(ApiFactory factory)
             );
             Assert.Equal(HttpStatusCode.Created, register.StatusCode);
 
-            var wrongLogin = await client.PostWithCsrfAsync("/api/auth/login",
+            var wrongLogin = await client.PostWithCsrfAsync(
+                "/api/auth/login",
                 new { email, password = "Wrong-password1!" }
             );
             Assert.Equal(HttpStatusCode.Unauthorized, wrongLogin.StatusCode);
 
-            var login = await client.PostWithCsrfAsync("/api/auth/login",
+            var login = await client.PostWithCsrfAsync(
+                "/api/auth/login",
                 new { email, password = Password }
             );
             Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
@@ -130,20 +135,41 @@ public sealed class AccountsApiTests(ApiFactory factory)
             var unauthorized = await anonymousClient.GetAsync("/api/admin/access");
             Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
 
-            using var userClient = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
-            var register = await userClient.PostWithCsrfAsync("/api/auth/register", new
-            {
-                email = userEmail, password = Password, displayName = "Regular User",
-            });
+            using var userClient = factory.CreateClient(
+                new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+                {
+                    HandleCookies = true,
+                }
+            );
+            var register = await userClient.PostWithCsrfAsync(
+                "/api/auth/register",
+                new
+                {
+                    email = userEmail,
+                    password = Password,
+                    displayName = "Regular User",
+                }
+            );
             Assert.Equal(HttpStatusCode.Created, register.StatusCode);
-            var userLogin = await userClient.PostWithCsrfAsync("/api/auth/login", new { email = userEmail, password = Password });
+            var userLogin = await userClient.PostWithCsrfAsync(
+                "/api/auth/login",
+                new { email = userEmail, password = Password }
+            );
             Assert.Equal(HttpStatusCode.NoContent, userLogin.StatusCode);
             var forbidden = await userClient.GetAsync("/api/admin/access");
             Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
 
-            using var adminClient = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+            using var adminClient = factory.CreateClient(
+                new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+                {
+                    HandleCookies = true,
+                }
+            );
             await factory.CreateTestUserAsync(adminEmail, Password, "Admin");
-            var adminLogin = await adminClient.PostWithCsrfAsync("/api/auth/login", new { email = adminEmail, password = Password });
+            var adminLogin = await adminClient.PostWithCsrfAsync(
+                "/api/auth/login",
+                new { email = adminEmail, password = Password }
+            );
             Assert.Equal(HttpStatusCode.NoContent, adminLogin.StatusCode);
             var allowed = await adminClient.GetAsync("/api/admin/access");
             Assert.Equal(HttpStatusCode.NoContent, allowed.StatusCode);
@@ -162,25 +188,33 @@ public sealed class AccountsApiTests(ApiFactory factory)
         try
         {
             using var client = factory.CreateClient();
-            var registration = await client.PostWithCsrfAsync("/api/auth/register", new
-            {
-                email, password = Password, displayName = "Existing User",
-            });
+            var registration = await client.PostWithCsrfAsync(
+                "/api/auth/register",
+                new
+                {
+                    email,
+                    password = Password,
+                    displayName = "Existing User",
+                }
+            );
             Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
 
-            var configuration = new ConfigurationBuilder().AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["BootstrapAdmin:Email"] = email,
-                    ["BootstrapAdmin:Password"] = Password,
-                }
-            ).Build();
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["BootstrapAdmin:Email"] = email,
+                        ["BootstrapAdmin:Password"] = Password,
+                    }
+                )
+                .Build();
             var provisioner = new AdminAccountProvisioner(
-                factory.Services.GetRequiredService<IServiceScopeFactory>(), configuration
+                factory.Services.GetRequiredService<IServiceScopeFactory>(),
+                configuration
             );
 
-            var error = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => provisioner.StartAsync(CancellationToken.None)
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                provisioner.StartAsync(CancellationToken.None)
             );
             Assert.Contains("already exists without the Admin role", error.Message);
 
@@ -219,12 +253,21 @@ public sealed class AccountsApiTests(ApiFactory factory)
         try
         {
             using var client = factory.CreateClient();
-            await client.PostWithCsrfAsync("/api/auth/register",
-                new { email, password = Password, displayName = "Csrf Test" }
+            await client.PostWithCsrfAsync(
+                "/api/auth/register",
+                new
+                {
+                    email,
+                    password = Password,
+                    displayName = "Csrf Test",
+                }
             );
             var anonymousToken = await client.GetCsrfTokenAsync();
 
-            var login = await client.PostWithCsrfAsync("/api/auth/login", new { email, password = Password });
+            var login = await client.PostWithCsrfAsync(
+                "/api/auth/login",
+                new { email, password = Password }
+            );
             Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
 
             using var staleLogout = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
@@ -243,5 +286,10 @@ public sealed class AccountsApiTests(ApiFactory factory)
 
     private sealed record FieldError(string Field, string Code);
 
-    private sealed record ProfileResponse(string Id, string? Email, string DisplayName, string[] Roles);
+    private sealed record ProfileResponse(
+        string Id,
+        string? Email,
+        string DisplayName,
+        string[] Roles
+    );
 }

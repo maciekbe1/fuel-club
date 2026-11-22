@@ -3,7 +3,12 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace FuelClub.Api.Modules.Accounts
 {
-    public sealed record MeResponse(string Id, string? Email, string DisplayName, IList<string> Roles);
+    public sealed record MeResponse(
+        string Id,
+        string? Email,
+        string DisplayName,
+        IList<string> Roles
+    );
 
     public static class MeEndpoint
     {
@@ -18,7 +23,9 @@ namespace FuelClub.Api.Modules.Accounts
                 return TypedResults.Unauthorized();
             }
 
-            return TypedResults.Ok(new MeResponse(user.Id, user.Email, user.DisplayName, user.Roles));
+            return TypedResults.Ok(
+                new MeResponse(user.Id, user.Email, user.DisplayName, user.Roles)
+            );
         }
     }
 }

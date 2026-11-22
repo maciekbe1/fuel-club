@@ -16,23 +16,44 @@ public interface IFieldError
 public static class ApiProblems
 {
     public static ProblemHttpResult Problem(int status, string title, string code) =>
-        TypedResults.Problem(statusCode: status, title: title, extensions: new Dictionary<string, object?> { ["code"] = code });
+        TypedResults.Problem(
+            statusCode: status,
+            title: title,
+            extensions: new Dictionary<string, object?> { ["code"] = code }
+        );
 
-    public static ProblemHttpResult Validation(string title, string code, IEnumerable<IFieldError> errors, int status = StatusCodes.Status400BadRequest) =>
+    public static ProblemHttpResult Validation(
+        string title,
+        string code,
+        IEnumerable<IFieldError> errors,
+        int status = StatusCodes.Status400BadRequest
+    ) =>
         TypedResults.Problem(
             statusCode: status,
             title: title,
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = code,
-                ["errors"] = errors.GroupBy(error => error.Field)
-                    .ToDictionary(group => group.Key, group => group.Select(error => new { error.Field, error.Code }).ToArray()),
-            });
+                ["errors"] = errors
+                    .GroupBy(error => error.Field)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.Select(error => new { error.Field, error.Code }).ToArray()
+                    ),
+            }
+        );
 
     /// <summary>Transient 503 with Retry-After; idempotency does not store 5xx, so the client retries with the same key.</summary>
-    public static ProblemHttpResult Busy(HttpContext http, string title, string code, int retryAfterSeconds = 1)
+    public static ProblemHttpResult Busy(
+        HttpContext http,
+        string title,
+        string code,
+        int retryAfterSeconds = 1
+    )
     {
-        http.Response.Headers.RetryAfter = retryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        http.Response.Headers.RetryAfter = retryAfterSeconds.ToString(
+            System.Globalization.CultureInfo.InvariantCulture
+        );
         return Problem(StatusCodes.Status503ServiceUnavailable, title, code);
     }
 }

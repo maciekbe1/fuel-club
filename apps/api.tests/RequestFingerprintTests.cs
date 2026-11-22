@@ -12,14 +12,16 @@ public sealed class RequestFingerprintTests
         string id = "A",
         Dictionary<string, StringValues>? query = null,
         string method = "POST",
-        string? contentType = "application/json") =>
+        string? contentType = "application/json"
+    ) =>
         RequestFingerprint.Compute(
             method,
             route,
             [KeyValuePair.Create("id", (string?)id)],
             query ?? [],
             contentType,
-            Encoding.UTF8.GetBytes(body));
+            Encoding.UTF8.GetBytes(body)
+        );
 
     [Fact]
     public void Different_route_values_give_different_fingerprints() =>
@@ -28,7 +30,10 @@ public sealed class RequestFingerprintTests
     [Fact]
     public void Different_templates_and_methods_give_different_fingerprints()
     {
-        Assert.NotEqual(Fingerprint(route: "/api/coupons/{id}/activate"), Fingerprint(route: "/api/coupons/{id}/redeem"));
+        Assert.NotEqual(
+            Fingerprint(route: "/api/coupons/{id}/activate"),
+            Fingerprint(route: "/api/coupons/{id}/redeem")
+        );
         Assert.NotEqual(Fingerprint(method: "POST"), Fingerprint(method: "PUT"));
     }
 
@@ -36,17 +41,22 @@ public sealed class RequestFingerprintTests
     public void Query_takes_part_and_its_order_does_not_matter()
     {
         Assert.NotEqual(Fingerprint(), Fingerprint(query: new() { ["x"] = "1" }));
-        Assert.NotEqual(Fingerprint(query: new() { ["x"] = "1" }), Fingerprint(query: new() { ["x"] = "2" }));
+        Assert.NotEqual(
+            Fingerprint(query: new() { ["x"] = "1" }),
+            Fingerprint(query: new() { ["x"] = "2" })
+        );
         Assert.Equal(
             Fingerprint(query: new() { ["a"] = "1", ["b"] = "2" }),
-            Fingerprint(query: new() { ["b"] = "2", ["a"] = "1" }));
+            Fingerprint(query: new() { ["b"] = "2", ["a"] = "1" })
+        );
     }
 
     [Fact]
     public void Json_key_order_and_whitespace_do_not_matter() =>
         Assert.Equal(
             Fingerprint("""{"a":1,"b":{"x":true,"y":[1,2]}}"""),
-            Fingerprint(""" { "b" : { "y" : [ 1, 2 ], "x" : true }, "a" : 1 } """));
+            Fingerprint(""" { "b" : { "y" : [ 1, 2 ], "x" : true }, "a" : 1 } """)
+        );
 
     [Fact]
     public void Values_and_array_order_matter()
@@ -84,8 +94,14 @@ public sealed class RequestFingerprintTests
     public void Empty_and_non_json_bodies_are_fingerprinted_as_is()
     {
         Assert.NotEqual(Fingerprint(""), Fingerprint("{}"));
-        Assert.Equal(Fingerprint("raw", contentType: "text/plain"), Fingerprint("raw", contentType: "text/plain"));
-        Assert.NotEqual(Fingerprint("raw-1", contentType: "text/plain"), Fingerprint("raw-2", contentType: "text/plain"));
+        Assert.Equal(
+            Fingerprint("raw", contentType: "text/plain"),
+            Fingerprint("raw", contentType: "text/plain")
+        );
+        Assert.NotEqual(
+            Fingerprint("raw-1", contentType: "text/plain"),
+            Fingerprint("raw-2", contentType: "text/plain")
+        );
     }
 
     [Fact]

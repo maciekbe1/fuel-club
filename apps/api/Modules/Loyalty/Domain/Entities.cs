@@ -19,6 +19,7 @@ public sealed class FuelPurchase
     public string RegisterCode { get; set; } = null!;
     public DateOnly SaleDate { get; set; }
     public string ReceiptNumber { get; set; } = null!;
+
     /// <summary>Receipt value before any discount (what the dispenser shows).</summary>
     public decimal GrossAmount { get; set; }
 

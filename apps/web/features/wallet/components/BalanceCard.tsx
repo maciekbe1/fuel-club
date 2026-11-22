@@ -26,7 +26,10 @@ export function BalanceCard({ className }: { className?: string }) {
       )}
     >
       <div className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-brand-orange/25 blur-2xl" />
-      <h2 id="balance-heading" className="relative text-sm font-medium uppercase tracking-widest text-white/70">
+      <h2
+        id="balance-heading"
+        className="relative text-sm font-medium uppercase tracking-widest text-white/70"
+      >
         Twoje saldo
       </h2>
 
@@ -41,11 +44,19 @@ export function BalanceCard({ className }: { className?: string }) {
 
         {wallet.isError && (
           <div className="flex flex-col items-start gap-3" role="alert">
-            <p className="text-sm text-white/90">{readErrorMessage(wallet.error, "Nie udało się pobrać salda. Spróbuj ponownie za chwilę.")}</p>
+            <p className="text-sm text-white/90">
+              {readErrorMessage(
+                wallet.error,
+                "Nie udało się pobrać salda. Spróbuj ponownie za chwilę.",
+              )}
+            </p>
             {wallet.error instanceof ApiError && wallet.error.status === 401 ? (
               <Link
                 href="/login"
-                className={cn(buttonVariants({ size: "sm" }), "bg-brand-orange text-brand-navy hover:bg-brand-orange/90")}
+                className={cn(
+                  buttonVariants({ size: "sm" }),
+                  "bg-brand-orange text-brand-navy hover:bg-brand-orange/90",
+                )}
               >
                 Zaloguj się
               </Link>
@@ -61,7 +72,9 @@ export function BalanceCard({ className }: { className?: string }) {
 
         {wallet.isSuccess && (
           <>
-            <p className="text-4xl font-bold tabular-nums tracking-tight sm:text-5xl">{formatPoints(wallet.data.balance)}</p>
+            <p className="text-4xl font-bold tabular-nums tracking-tight sm:text-5xl">
+              {formatPoints(wallet.data.balance)}
+            </p>
             <p className="mt-2 text-sm text-white/70">
               {wallet.data.balance === 0
                 ? "Zatankuj z kartą Fuel Club, a punkty pojawią się tutaj."

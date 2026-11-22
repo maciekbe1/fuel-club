@@ -15,28 +15,43 @@ namespace FuelClub.Api.Migrations
                 columns: table => new
                 {
                     UserId = table.Column<string>(type: "text", nullable: false),
-                    StationCode = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    RegisterCode = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
+                    StationCode = table.Column<string>(
+                        type: "character varying(32)",
+                        maxLength: 32,
+                        nullable: false
+                    ),
+                    RegisterCode = table.Column<string>(
+                        type: "character varying(32)",
+                        maxLength: 32,
+                        nullable: false
+                    ),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_CashierStations", x => x.UserId);
-                    table.CheckConstraint("CK_CashierStations_RegisterCode_Format", "\"RegisterCode\" ~ '^[A-Z0-9-]+$'");
-                    table.CheckConstraint("CK_CashierStations_StationCode_Format", "\"StationCode\" ~ '^[A-Z0-9-]+$'");
+                    table.CheckConstraint(
+                        "CK_CashierStations_RegisterCode_Format",
+                        "\"RegisterCode\" ~ '^[A-Z0-9-]+$'"
+                    );
+                    table.CheckConstraint(
+                        "CK_CashierStations_StationCode_Format",
+                        "\"StationCode\" ~ '^[A-Z0-9-]+$'"
+                    );
                     table.ForeignKey(
                         name: "FK_CashierStations_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
+                        onDelete: ReferentialAction.Restrict
+                    );
+                }
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "CashierStations");
+            migrationBuilder.DropTable(name: "CashierStations");
         }
     }
 }

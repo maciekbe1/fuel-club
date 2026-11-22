@@ -22,7 +22,12 @@ public sealed record SpendResult(SpendOutcome Outcome, int BalanceAfter = 0);
 public sealed class PointsSpending(AppDbContext db, CustomerLock customerLock)
 {
     public async Task<SpendResult> SpendAsync(
-        string userId, int points, PointsLedgerEntryType type, Guid sourceId, CancellationToken cancellationToken)
+        string userId,
+        int points,
+        PointsLedgerEntryType type,
+        Guid sourceId,
+        CancellationToken cancellationToken
+    )
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(points);
 
@@ -30,24 +35,29 @@ public sealed class PointsSpending(AppDbContext db, CustomerLock customerLock)
             return new SpendResult(SpendOutcome.CustomerBusy);
 
         // Debit only when the balance covers it; no account row means a balance of 0.
-        var balances = await db.Database.SqlQuery<int>(
-            $"""
-            UPDATE "LoyaltyAccounts" SET "Balance" = "Balance" - {points}
-            WHERE "UserId" = {userId} AND "Balance" >= {points}
-            RETURNING "Balance" AS "Value"
-            """).ToListAsync(cancellationToken);
+        var balances = await db
+            .Database.SqlQuery<int>(
+                $"""
+                UPDATE "LoyaltyAccounts" SET "Balance" = "Balance" - {points}
+                WHERE "UserId" = {userId} AND "Balance" >= {points}
+                RETURNING "Balance" AS "Value"
+                """
+            )
+            .ToListAsync(cancellationToken);
         if (balances.Count == 0)
             return new SpendResult(SpendOutcome.InsufficientPoints);
 
-        db.PointsLedgerEntries.Add(new PointsLedgerEntry
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Delta = -points,
-            Type = type,
-            SourceId = sourceId,
-            BalanceAfter = balances[0],
-        });
+        db.PointsLedgerEntries.Add(
+            new PointsLedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Delta = -points,
+                Type = type,
+                SourceId = sourceId,
+                BalanceAfter = balances[0],
+            }
+        );
         await db.SaveChangesAsync(cancellationToken);
         return new SpendResult(SpendOutcome.Spent, balances[0]);
     }

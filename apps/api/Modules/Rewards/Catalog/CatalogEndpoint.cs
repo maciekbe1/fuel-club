@@ -11,7 +11,8 @@ public sealed record RewardResponse(
     int PointsCost,
     decimal DiscountPerLiter,
     decimal MaxLiters,
-    int Version);
+    int Version
+);
 
 public sealed record RewardsResponse(IReadOnlyList<RewardResponse> Items);
 
@@ -22,16 +23,26 @@ public sealed record RewardsResponse(IReadOnlyList<RewardResponse> Items);
 /// </summary>
 public static class CatalogEndpoint
 {
-    public static async Task<Ok<RewardsResponse>> Handle(AppDbContext db, CancellationToken cancellationToken)
+    public static async Task<Ok<RewardsResponse>> Handle(
+        AppDbContext db,
+        CancellationToken cancellationToken
+    )
     {
-        var items = await db.RewardOffers
-            .AsNoTracking()
+        var items = await db
+            .RewardOffers.AsNoTracking()
             .Where(offer => offer.IsActive)
             .OrderBy(offer => offer.PointsCost)
             .ThenBy(offer => offer.Name)
             .ThenBy(offer => offer.Id)
             .Select(offer => new RewardResponse(
-                offer.Id, offer.Name, offer.Description, offer.PointsCost, offer.DiscountPerLiter, offer.MaxLiters, offer.Version))
+                offer.Id,
+                offer.Name,
+                offer.Description,
+                offer.PointsCost,
+                offer.DiscountPerLiter,
+                offer.MaxLiters,
+                offer.Version
+            ))
             .ToListAsync(cancellationToken);
         return TypedResults.Ok(new RewardsResponse(items));
     }

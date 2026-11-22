@@ -27,7 +27,12 @@ public static class AccountProvisioning
             return user;
         }
 
-        user = new ApplicationUser { Email = email, UserName = email, DisplayName = displayName };
+        user = new ApplicationUser
+        {
+            Email = email,
+            UserName = email,
+            DisplayName = displayName,
+        };
         var created = await users.CreateAsync(user, password);
         if (!created.Succeeded)
             throw new InvalidOperationException(

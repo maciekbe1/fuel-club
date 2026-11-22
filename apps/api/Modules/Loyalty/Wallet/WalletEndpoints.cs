@@ -12,7 +12,13 @@ namespace FuelClub.Api.Modules.Loyalty.Wallet;
 public sealed record WalletResponse(int Balance);
 
 /// <summary>Fuel purchase behind a history entry; null for entries of other types.</summary>
-public sealed record TransactionFuelPurchase(Guid PurchaseId, string StationCode, DateOnly SaleDate, decimal Amount, decimal Liters);
+public sealed record TransactionFuelPurchase(
+    Guid PurchaseId,
+    string StationCode,
+    DateOnly SaleDate,
+    decimal Amount,
+    decimal Liters
+);
 
 /// <summary>Coupon bought by a CouponExchange entry; null for entries of other types.</summary>
 public sealed record TransactionCouponExchange(Guid CouponId, string OfferName);
@@ -24,7 +30,8 @@ public sealed record TransactionItem(
     int BalanceAfter,
     DateTimeOffset CreatedAt,
     TransactionFuelPurchase? FuelPurchase,
-    TransactionCouponExchange? CouponExchange);
+    TransactionCouponExchange? CouponExchange
+);
 
 public sealed record TransactionsResponse(IReadOnlyList<TransactionItem> Items, string? NextCursor);
 
@@ -41,10 +48,15 @@ public static class WalletEndpoints
         + "returns entries older than the cursor; entries added later show up after reloading the first page.";
 
     public static async Task<Ok<WalletResponse>> GetWallet(
-        HttpContext http, UserManager<ApplicationUser> users, AppDbContext db, CancellationToken cancellationToken)
+        HttpContext http,
+        UserManager<ApplicationUser> users,
+        AppDbContext db,
+        CancellationToken cancellationToken
+    )
     {
         var userId = users.GetUserId(http.User)!;
-        var balance = await db.LoyaltyAccounts.AsNoTracking()
+        var balance = await db
+            .LoyaltyAccounts.AsNoTracking()
             .Where(account => account.UserId == userId)
             .Select(account => (int?)account.Balance)
             .SingleOrDefaultAsync(cancellationToken);
@@ -58,7 +70,8 @@ public static class WalletEndpoints
         AppDbContext db,
         int? limit,
         string? cursor,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var errors = new List<LoyaltyValidationError>();
         var pageSize = limit ?? DefaultLimit;
@@ -82,31 +95,34 @@ public static class WalletEndpoints
 
         // The linked purchase must belong to the same user, not just match the SourceId.
         // Same for the coupon of an exchange (read from the Rewards table in the shared database).
-        var ownPurchases = db.FuelPurchases.AsNoTracking().Where(purchase => purchase.UserId == userId);
+        var ownPurchases = db
+            .FuelPurchases.AsNoTracking()
+            .Where(purchase => purchase.UserId == userId);
         var ownCoupons = db.Coupons.AsNoTracking().Where(coupon => coupon.UserId == userId);
         var rows = await (
-                from entry in entries
-                join purchase in ownPurchases on entry.SourceId equals purchase.Id into matches
-                from purchase in matches.DefaultIfEmpty()
-                join coupon in ownCoupons on entry.SourceId equals coupon.Id into couponMatches
-                from coupon in couponMatches.DefaultIfEmpty()
-                orderby entry.Sequence descending
-                select new
-                {
-                    entry.Id,
-                    entry.Type,
-                    entry.Delta,
-                    entry.BalanceAfter,
-                    entry.CreatedAt,
-                    entry.Sequence,
-                    PurchaseId = (Guid?)purchase.Id,
-                    purchase.StationCode,
-                    SaleDate = (DateOnly?)purchase.SaleDate,
-                    Amount = (decimal?)purchase.GrossAmount,
-                    Liters = (decimal?)purchase.Liters,
-                    CouponId = (Guid?)coupon.Id,
-                    coupon.OfferName,
-                })
+            from entry in entries
+            join purchase in ownPurchases on entry.SourceId equals purchase.Id into matches
+            from purchase in matches.DefaultIfEmpty()
+            join coupon in ownCoupons on entry.SourceId equals coupon.Id into couponMatches
+            from coupon in couponMatches.DefaultIfEmpty()
+            orderby entry.Sequence descending
+            select new
+            {
+                entry.Id,
+                entry.Type,
+                entry.Delta,
+                entry.BalanceAfter,
+                entry.CreatedAt,
+                entry.Sequence,
+                PurchaseId = (Guid?)purchase.Id,
+                purchase.StationCode,
+                SaleDate = (DateOnly?)purchase.SaleDate,
+                Amount = (decimal?)purchase.GrossAmount,
+                Liters = (decimal?)purchase.Liters,
+                CouponId = (Guid?)coupon.Id,
+                coupon.OfferName,
+            }
+        )
             // One extra row tells whether another page exists.
             .Take(pageSize + 1)
             .ToListAsync(cancellationToken);
@@ -119,18 +135,29 @@ public static class WalletEndpoints
                 row.BalanceAfter,
                 row.CreatedAt,
                 row.Type == PointsLedgerEntryType.FuelPurchase && row.PurchaseId is { } purchaseId
-                    ? new TransactionFuelPurchase(purchaseId, row.StationCode!, row.SaleDate!.Value, row.Amount!.Value, row.Liters!.Value)
+                    ? new TransactionFuelPurchase(
+                        purchaseId,
+                        row.StationCode!,
+                        row.SaleDate!.Value,
+                        row.Amount!.Value,
+                        row.Liters!.Value
+                    )
                     : null,
                 row.Type == PointsLedgerEntryType.CouponExchange && row.CouponId is { } couponId
                     ? new TransactionCouponExchange(couponId, row.OfferName!)
-                    : null))
+                    : null
+            ))
             .ToList();
         var nextCursor = rows.Count > pageSize ? EncodeCursor(page[^1].Sequence) : null;
         return TypedResults.Ok(new TransactionsResponse(items, nextCursor));
     }
 
     public static string EncodeCursor(long sequence) =>
-        WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(CursorPrefix + sequence.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        WebEncoders.Base64UrlEncode(
+            Encoding.UTF8.GetBytes(
+                CursorPrefix + sequence.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            )
+        );
 
     private static bool TryDecodeCursor(string cursor, out long sequence)
     {
@@ -139,8 +166,12 @@ public static class WalletEndpoints
         {
             var text = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(cursor));
             return text.StartsWith(CursorPrefix, StringComparison.Ordinal)
-                && long.TryParse(text[CursorPrefix.Length..], System.Globalization.NumberStyles.None,
-                    System.Globalization.CultureInfo.InvariantCulture, out sequence)
+                && long.TryParse(
+                    text[CursorPrefix.Length..],
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out sequence
+                )
                 && sequence > 0;
         }
         catch (FormatException)

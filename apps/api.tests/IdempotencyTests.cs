@@ -33,12 +33,16 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
             await factory.DeleteTestUserAsync(email);
     }
 
-    private async Task<(HttpClient Client, string UserId)> LoggedInAsync(string role = RoleNames.User)
+    private async Task<(HttpClient Client, string UserId)> LoggedInAsync(
+        string role = RoleNames.User
+    )
     {
         var email = $"idempotency-{Guid.NewGuid():N}@example.test";
         _emails.Add(email);
         await factory.CreateTestUserAsync(email, Password, role);
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions { HandleCookies = true }
+        );
         await client.LoginAsync(email, Password);
         return (client, await UserIdAsync(email));
     }
@@ -54,7 +58,10 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.LoyaltyAccounts.Where(a => a.UserId == userId).Select(a => (decimal?)a.Balance).SingleOrDefaultAsync();
+        return await db
+            .LoyaltyAccounts.Where(a => a.UserId == userId)
+            .Select(a => (decimal?)a.Balance)
+            .SingleOrDefaultAsync();
     }
 
     private async Task<int> StoredRecordsAsync(string userId)
@@ -68,7 +75,12 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         $$"""{"amount":{{amount}},"outcome":"{{outcome}}"}""";
 
     private static async Task<HttpResponseMessage> SendAsync(
-        HttpClient client, string url, string json, string? key, bool csrf = true)
+        HttpClient client,
+        string url,
+        string json,
+        string? key,
+        bool csrf = true
+    )
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
@@ -87,7 +99,8 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
     private sealed record ProblemCode(string? Code);
 
     private static bool IsReplayed(HttpResponseMessage response) =>
-        response.Headers.TryGetValues(Idempotency.ReplayedHeaderName, out var values) && values.Contains("true");
+        response.Headers.TryGetValues(Idempotency.ReplayedHeaderName, out var values)
+        && values.Contains("true");
 
     [Fact]
     public async Task Replay_returns_the_stored_status_body_and_location_without_running_again()
@@ -102,7 +115,10 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Created, replay.StatusCode);
         Assert.False(IsReplayed(first));
         Assert.True(IsReplayed(replay));
-        Assert.Equal(await first.Content.ReadAsStringAsync(), await replay.Content.ReadAsStringAsync());
+        Assert.Equal(
+            await first.Content.ReadAsStringAsync(),
+            await replay.Content.ReadAsStringAsync()
+        );
         Assert.Equal(first.Headers.Location, replay.Headers.Location);
         Assert.Equal($"{Items}/A", replay.Headers.Location!.OriginalString);
         Assert.Equal(first.Content.Headers.ContentType, replay.Content.Headers.ContentType);
@@ -115,7 +131,10 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         var (client, userId) = await LoggedInAsync();
         var key = Guid.NewGuid().ToString();
 
-        Assert.Equal(HttpStatusCode.Created, (await SendAsync(client, $"{Items}/A", Body(), key)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await SendAsync(client, $"{Items}/A", Body(), key)).StatusCode
+        );
         var other = await SendAsync(client, $"{Items}/B", Body(), key);
 
         Assert.Equal(HttpStatusCode.Conflict, other.StatusCode);
@@ -126,12 +145,18 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
     [Theory]
     [InlineData("?note=1", "?note=2")]
     [InlineData("", "?note=1")]
-    public async Task Same_key_with_a_different_query_is_rejected(string firstQuery, string secondQuery)
+    public async Task Same_key_with_a_different_query_is_rejected(
+        string firstQuery,
+        string secondQuery
+    )
     {
         var (client, _) = await LoggedInAsync();
         var key = Guid.NewGuid().ToString();
 
-        Assert.Equal(HttpStatusCode.Created, (await SendAsync(client, $"{Items}/A{firstQuery}", Body(), key)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await SendAsync(client, $"{Items}/A{firstQuery}", Body(), key)).StatusCode
+        );
         var other = await SendAsync(client, $"{Items}/A{secondQuery}", Body(), key);
 
         Assert.Equal(IdempotencyErrorCodes.KeyReused, await CodeAsync(other));
@@ -158,7 +183,12 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         var key = Guid.NewGuid().ToString();
 
         await SendAsync(client, $"{Items}/A", """{"amount":10,"outcome":"ok"}""", key);
-        var replay = await SendAsync(client, $"{Items}/A", """ { "outcome" : "ok",  "amount" : 10 } """, key);
+        var replay = await SendAsync(
+            client,
+            $"{Items}/A",
+            """ { "outcome" : "ok",  "amount" : 10 } """,
+            key
+        );
 
         Assert.Equal(HttpStatusCode.Created, replay.StatusCode);
         Assert.True(IsReplayed(replay));
@@ -171,7 +201,12 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         var (client, userId) = await LoggedInAsync();
         var key = Guid.NewGuid().ToString();
 
-        var duplicate = await SendAsync(client, $"{Items}/A", """{"amount":10,"amount":20,"outcome":"ok"}""", key);
+        var duplicate = await SendAsync(
+            client,
+            $"{Items}/A",
+            """{"amount":10,"amount":20,"outcome":"ok"}""",
+            key
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
         Assert.Equal(IdempotencyErrorCodes.DuplicateJsonProperty, await CodeAsync(duplicate));
@@ -183,7 +218,9 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
     [InlineData("""{"amount":10,"Amount":20,"outcome":"ok"}""")]
     [InlineData("""{"Amount":20,"amount":10,"outcome":"ok"}""")]
     [InlineData("""{"amount":10,"outcome":"ok","OUTCOME":"conflict"}""")]
-    public async Task Duplicate_property_differing_only_in_case_is_rejected_before_dto_binding_matters(string json)
+    public async Task Duplicate_property_differing_only_in_case_is_rejected_before_dto_binding_matters(
+        string json
+    )
     {
         var (client, userId) = await LoggedInAsync();
 
@@ -198,7 +235,9 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
     [Theory]
     [InlineData("disconnect")]
     [InlineData("disconnect-cancellation-aware")]
-    public async Task Outcome_is_stored_when_the_client_disconnects_after_the_domain_write(string outcome)
+    public async Task Outcome_is_stored_when_the_client_disconnects_after_the_domain_write(
+        string outcome
+    )
     {
         var (client, userId) = await LoggedInAsync();
         var key = Guid.NewGuid().ToString();
@@ -207,7 +246,8 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         {
             using var lost = await SendAsync(client, $"{Items}/A", Body(outcome: outcome), key);
         }
-        catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException)
+        catch (Exception exception)
+            when (exception is HttpRequestException or IOException or OperationCanceledException)
         {
             // Expected: the server aborted the connection.
         }
@@ -254,7 +294,10 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, replay.StatusCode);
         Assert.True(IsReplayed(replay));
         Assert.Equal("test.conflict", await CodeAsync(replay));
-        Assert.Equal(await first.Content.ReadAsStringAsync(), await replay.Content.ReadAsStringAsync());
+        Assert.Equal(
+            await first.Content.ReadAsStringAsync(),
+            await replay.Content.ReadAsStringAsync()
+        );
         Assert.Equal(1, await StoredRecordsAsync(userId));
     }
 
@@ -312,7 +355,10 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         var (client, userId) = await LoggedInAsync();
         var key = Guid.NewGuid().ToString();
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, $"{Items}/A", Body(0), key)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await SendAsync(client, $"{Items}/A", Body(0), key)).StatusCode
+        );
         var corrected = await SendAsync(client, $"{Items}/A", Body(10), key);
 
         Assert.Equal(HttpStatusCode.Created, corrected.StatusCode);
@@ -326,10 +372,16 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         var key = Guid.NewGuid().ToString();
 
         var responses = await Task.WhenAll(
-            Enumerable.Range(0, 8).Select(_ => SendAsync(client, $"{Items}/A", Body(), key)));
+            Enumerable.Range(0, 8).Select(_ => SendAsync(client, $"{Items}/A", Body(), key))
+        );
 
-        Assert.All(responses, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
-        var bodies = await Task.WhenAll(responses.Select(response => response.Content.ReadAsStringAsync()));
+        Assert.All(
+            responses,
+            response => Assert.Equal(HttpStatusCode.Created, response.StatusCode)
+        );
+        var bodies = await Task.WhenAll(
+            responses.Select(response => response.Content.ReadAsStringAsync())
+        );
         Assert.Single(bodies.Distinct());
         Assert.Equal(7, responses.Count(IsReplayed));
         Assert.Equal(10m, await BalanceAsync(userId));
@@ -347,7 +399,10 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
         Assert.False(IsReplayed(second));
-        Assert.NotEqual(await first.Content.ReadAsStringAsync(), await second.Content.ReadAsStringAsync());
+        Assert.NotEqual(
+            await first.Content.ReadAsStringAsync(),
+            await second.Content.ReadAsStringAsync()
+        );
         Assert.Equal(10m, await BalanceAsync(annaId));
         Assert.Equal(10m, await BalanceAsync(bartekId));
     }
@@ -385,9 +440,18 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
         var started = DateTime.UtcNow;
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => store.ReserveAsync(userId, key, new byte[IdempotencyRecord.FingerprintLength], cancellation.Token));
-        Assert.True(DateTime.UtcNow - started < TimeSpan.FromMilliseconds(900), "Cancellation should win over the lock timeout.");
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            store.ReserveAsync(
+                userId,
+                key,
+                new byte[IdempotencyRecord.FingerprintLength],
+                cancellation.Token
+            )
+        );
+        Assert.True(
+            DateTime.UtcNow - started < TimeSpan.FromMilliseconds(900),
+            "Cancellation should win over the lock timeout."
+        );
     }
 
     [Fact]
@@ -410,7 +474,10 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         var (client, userId) = await LoggedInAsync(RoleNames.Cashier);
         var key = Guid.NewGuid().ToString();
         var url = $"{IdempotencyTestEndpoints.Prefix}/cashier-items/A";
-        Assert.Equal(HttpStatusCode.Created, (await SendAsync(client, url, Body(), key)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await SendAsync(client, url, Body(), key)).StatusCode
+        );
 
         await using (var scope = factory.Services.CreateAsyncScope())
         {
@@ -428,7 +495,9 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
     [Fact]
     public async Task Anonymous_request_is_rejected_before_idempotency()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        using var client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions { HandleCookies = true }
+        );
 
         var response = await SendAsync(client, $"{Items}/A", Body(), Guid.NewGuid().ToString());
 
@@ -442,9 +511,16 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
         var document = await client.GetStringAsync("/openapi/v1.json");
         using var json = System.Text.Json.JsonDocument.Parse(document);
 
-        var parameters = json.RootElement.GetProperty("paths").GetProperty($"{Items}/{{id}}")
-            .GetProperty("post").GetProperty("parameters").EnumerateArray();
-        var header = Assert.Single(parameters, p => p.GetProperty("name").GetString() == Idempotency.HeaderName);
+        var parameters = json
+            .RootElement.GetProperty("paths")
+            .GetProperty($"{Items}/{{id}}")
+            .GetProperty("post")
+            .GetProperty("parameters")
+            .EnumerateArray();
+        var header = Assert.Single(
+            parameters,
+            p => p.GetProperty("name").GetString() == Idempotency.HeaderName
+        );
         Assert.Equal("header", header.GetProperty("in").GetString());
         Assert.True(header.GetProperty("required").GetBoolean());
     }
@@ -452,22 +528,29 @@ public sealed class IdempotencyTests(ApiFactory factory) : IAsyncLifetime
     /// <summary>Reserves the key in an open transaction, like a concurrent request still running.</summary>
     private async Task<KeyHolder> HoldKeyAsync(string userId, Guid key)
     {
-        var connectionString = factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
+        var connectionString = factory
+            .Services.GetRequiredService<IConfiguration>()
+            .GetConnectionString("DefaultConnection");
         var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
         var transaction = await connection.BeginTransactionAsync();
         await using var command = new NpgsqlCommand(
             """INSERT INTO "IdempotencyRecords" ("UserId", "IdempotencyKey", "Fingerprint") VALUES (@user, @key, @fingerprint)""",
             connection,
-            transaction);
+            transaction
+        );
         command.Parameters.AddWithValue("user", userId);
         command.Parameters.AddWithValue("key", key);
-        command.Parameters.AddWithValue("fingerprint", new byte[IdempotencyRecord.FingerprintLength]);
+        command.Parameters.AddWithValue(
+            "fingerprint",
+            new byte[IdempotencyRecord.FingerprintLength]
+        );
         await command.ExecuteNonQueryAsync();
         return new KeyHolder(connection, transaction);
     }
 
-    private sealed class KeyHolder(NpgsqlConnection connection, NpgsqlTransaction transaction) : IAsyncDisposable
+    private sealed class KeyHolder(NpgsqlConnection connection, NpgsqlTransaction transaction)
+        : IAsyncDisposable
     {
         public async ValueTask DisposeAsync()
         {

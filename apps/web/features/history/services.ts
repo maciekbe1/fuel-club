@@ -8,5 +8,9 @@ export const HISTORY_PAGE_SIZE = 20;
 
 export const historyService = {
   page: (cursor?: string) =>
-    unwrap(api.GET("/api/me/transactions", { params: { query: { limit: HISTORY_PAGE_SIZE, cursor } } })),
+    unwrap(
+      api.GET("/api/me/transactions", {
+        params: { query: { limit: HISTORY_PAGE_SIZE, cursor } },
+      }),
+    ),
 };

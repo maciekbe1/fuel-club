@@ -40,14 +40,20 @@ public sealed class CustomerLockTests(ApiFactory factory) : IAsyncLifetime
         var email = $"card-lock-{Guid.NewGuid():N}@example.test";
         _emails.Add(email);
         await factory.CreateTestUserAsync(email, Password, RoleNames.User);
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions { HandleCookies = true }
+        );
         await client.LoginAsync(email, Password);
         await using var scope = factory.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         return (client, (await users.FindByEmailAsync(email))!.Id);
     }
 
-    private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string url, string key)
+    private static async Task<HttpResponseMessage> PostAsync(
+        HttpClient client,
+        string url,
+        string key
+    )
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Add(Idempotency.HeaderName, key);
@@ -58,22 +64,33 @@ public sealed class CustomerLockTests(ApiFactory factory) : IAsyncLifetime
     private async Task<int> StoredRecordsAsync(string userId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().IdempotencyRecords.CountAsync(r => r.UserId == userId);
+        return await scope
+            .ServiceProvider.GetRequiredService<AppDbContext>()
+            .IdempotencyRecords.CountAsync(r => r.UserId == userId);
     }
 
     /// <summary>Holds the customer lock in another connection, like a concurrent purchase or rotation.</summary>
     private async Task<IAsyncDisposable> HoldCustomerLockAsync(string userId)
     {
-        var connection = new NpgsqlConnection(factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection"));
+        var connection = new NpgsqlConnection(
+            factory
+                .Services.GetRequiredService<IConfiguration>()
+                .GetConnectionString("DefaultConnection")
+        );
         await connection.OpenAsync();
         var transaction = await connection.BeginTransactionAsync();
-        await using var command = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended(@key, 0))", connection, transaction);
+        await using var command = new NpgsqlCommand(
+            "SELECT pg_advisory_xact_lock(hashtextextended(@key, 0))",
+            connection,
+            transaction
+        );
         command.Parameters.AddWithValue("key", CustomerLock.Key(userId));
         await command.ExecuteNonQueryAsync();
         return new Holder(connection, transaction);
     }
 
-    private sealed class Holder(NpgsqlConnection connection, NpgsqlTransaction transaction) : IAsyncDisposable
+    private sealed class Holder(NpgsqlConnection connection, NpgsqlTransaction transaction)
+        : IAsyncDisposable
     {
         public async ValueTask DisposeAsync()
         {
@@ -86,7 +103,11 @@ public sealed class CustomerLockTests(ApiFactory factory) : IAsyncLifetime
     public async Task Rotation_waiting_for_a_busy_customer_times_out_with_a_retryable_503()
     {
         var (client, userId) = await LoggedInAsync();
-        var issued = (await (await PostAsync(client, Card, Guid.NewGuid().ToString())).Content.ReadFromJsonAsync<CardResponse>())!.Code;
+        var issued = (
+            await (
+                await PostAsync(client, Card, Guid.NewGuid().ToString())
+            ).Content.ReadFromJsonAsync<CardResponse>()
+        )!.Code;
         var key = Guid.NewGuid().ToString();
         var recordsBefore = await StoredRecordsAsync(userId);
 
@@ -95,7 +116,10 @@ public sealed class CustomerLockTests(ApiFactory factory) : IAsyncLifetime
             var busy = await PostAsync(client, $"{Card}/rotate", key);
 
             Assert.Equal(HttpStatusCode.ServiceUnavailable, busy.StatusCode);
-            Assert.Equal(LoyaltyErrorCodes.CustomerBusy, (await busy.Content.ReadFromJsonAsync<ProblemCode>())!.Code);
+            Assert.Equal(
+                LoyaltyErrorCodes.CustomerBusy,
+                (await busy.Content.ReadFromJsonAsync<ProblemCode>())!.Code
+            );
             // Set by the handler, it must survive the idempotency filter's response capture.
             Assert.Equal("1", busy.Headers.GetValues("Retry-After").Single());
             Assert.Equal(recordsBefore, await StoredRecordsAsync(userId));
@@ -120,8 +144,13 @@ public sealed class CustomerLockTests(ApiFactory factory) : IAsyncLifetime
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
         var started = DateTime.UtcNow;
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => customerLock.TryAcquireAsync(userId, cancellation.Token));
-        Assert.True(DateTime.UtcNow - started < TimeSpan.FromMilliseconds(900), "Cancellation should win over the lock timeout.");
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            customerLock.TryAcquireAsync(userId, cancellation.Token)
+        );
+        Assert.True(
+            DateTime.UtcNow - started < TimeSpan.FromMilliseconds(900),
+            "Cancellation should win over the lock timeout."
+        );
     }
 
     [Fact]
@@ -130,7 +159,9 @@ public sealed class CustomerLockTests(ApiFactory factory) : IAsyncLifetime
         await using var scope = factory.Services.CreateAsyncScope();
         var customerLock = scope.ServiceProvider.GetRequiredService<CustomerLock>();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => customerLock.TryAcquireAsync("any-user", CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            customerLock.TryAcquireAsync("any-user", CancellationToken.None)
+        );
     }
 
     [Fact]
@@ -140,15 +171,24 @@ public sealed class CustomerLockTests(ApiFactory factory) : IAsyncLifetime
         var key = Guid.NewGuid().ToString();
         var logsBefore = factory.Logs.Messages.Count;
 
-        var issued = (await (await PostAsync(client, Card, key)).Content.ReadFromJsonAsync<CardResponse>())!.Code;
+        var issued = (
+            await (await PostAsync(client, Card, key)).Content.ReadFromJsonAsync<CardResponse>()
+        )!.Code;
         await PostAsync(client, Card, key);
-        var rotated = (await (await PostAsync(client, $"{Card}/rotate", Guid.NewGuid().ToString())).Content.ReadFromJsonAsync<CardResponse>())!.Code;
+        var rotated = (
+            await (
+                await PostAsync(client, $"{Card}/rotate", Guid.NewGuid().ToString())
+            ).Content.ReadFromJsonAsync<CardResponse>()
+        )!.Code;
         await client.GetAsync(Card);
 
         var messages = factory.Logs.Messages;
         Assert.True(messages.Count > logsBefore, "The capture must see the requests' logs.");
         Assert.Contains(messages, message => message.Contains("LoyaltyCards"));
-        Assert.DoesNotContain(messages, message => message.Contains(issued) || message.Contains(rotated));
+        Assert.DoesNotContain(
+            messages,
+            message => message.Contains(issued) || message.Contains(rotated)
+        );
     }
 }
 
@@ -161,8 +201,12 @@ public sealed class LoyaltyOptionsValidatorTests
     [InlineData("00:00:00.001", true)]
     [InlineData("00:00:30", true)]
     public void Customer_lock_timeout_must_be_in_range(string value, bool valid) =>
-        Assert.Equal(valid, new LoyaltyOptionsValidator()
-            .Validate(null, new LoyaltyOptions { CustomerLockTimeout = TimeSpan.Parse(value) }).Succeeded);
+        Assert.Equal(
+            valid,
+            new LoyaltyOptionsValidator()
+                .Validate(null, new LoyaltyOptions { CustomerLockTimeout = TimeSpan.Parse(value) })
+                .Succeeded
+        );
 }
 
 [Collection(DatabaseCollection.Name)]
@@ -172,8 +216,16 @@ public sealed class LoyaltyOptionsStartupTests(ApiFactory factory)
     public void Api_refuses_to_start_with_an_unbounded_customer_lock()
     {
         using var misconfigured = factory.WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Loyalty:CustomerLockTimeout"] = "00:00:00" })));
+            builder.ConfigureAppConfiguration(
+                (_, config) =>
+                    config.AddInMemoryCollection(
+                        new Dictionary<string, string?>
+                        {
+                            ["Loyalty:CustomerLockTimeout"] = "00:00:00",
+                        }
+                    )
+            )
+        );
 
         var error = Assert.Throws<OptionsValidationException>(() => misconfigured.CreateClient());
         Assert.Contains("CustomerLockTimeout", error.Message);

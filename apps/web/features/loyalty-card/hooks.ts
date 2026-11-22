@@ -6,7 +6,10 @@ import { queryKeys } from "@/lib/query-keys";
 import { loyaltyCardService } from "./services";
 
 export function useLoyaltyCard() {
-  return useQuery({ queryKey: queryKeys.loyaltyCard, queryFn: loyaltyCardService.get });
+  return useQuery({
+    queryKey: queryKeys.loyaltyCard,
+    queryFn: loyaltyCardService.get,
+  });
 }
 
 /**
@@ -18,7 +21,8 @@ function useCardMutation(call: (key: string) => Promise<unknown>) {
   const queryClient = useQueryClient();
   return useIdempotentMutation<unknown>({
     mutationFn: (_vars, key) => call(key),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.loyaltyCard }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.loyaltyCard }),
   });
 }
 

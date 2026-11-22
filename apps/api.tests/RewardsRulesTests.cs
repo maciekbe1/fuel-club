@@ -20,7 +20,14 @@ public sealed class CouponDiscountTests
     [InlineData("0.25", "50", "10.01", "60.00", "2.50", "57.50")] // 2.5025
     [InlineData("10.00", "100", "5", "30.00", "30.00", "0.00")] // capped at the gross amount
     [InlineData("0.20", "50", "0.5", "0.08", "0.08", "0.00")]
-    public void Computes_discount_and_paid_amount(string rate, string maxLiters, string liters, string gross, string discount, string paid)
+    public void Computes_discount_and_paid_amount(
+        string rate,
+        string maxLiters,
+        string liters,
+        string gross,
+        string discount,
+        string paid
+    )
     {
         var result = CouponDiscount.Calculate(D(rate), D(maxLiters), D(liters), D(gross));
 
@@ -38,15 +45,25 @@ public sealed class CouponDiscountTests
 
     [Fact]
     public void Points_come_from_the_paid_amount() =>
-        Assert.Equal(241, PointsPolicy.ForPaidAmount(CouponDiscount.Calculate(0.20m, 50m, 40.5m, 250m).PaidAmount));
+        Assert.Equal(
+            241,
+            PointsPolicy.ForPaidAmount(CouponDiscount.Calculate(0.20m, 50m, 40.5m, 250m).PaidAmount)
+        );
 
     [Theory]
     [InlineData("0", "50", "10", "100")]
     [InlineData("0.20", "0", "10", "100")]
     [InlineData("0.20", "50", "0", "100")]
     [InlineData("0.20", "50", "10", "0")]
-    public void Rejects_unvalidated_input(string rate, string maxLiters, string liters, string gross) =>
-        Assert.Throws<ArgumentOutOfRangeException>(() => CouponDiscount.Calculate(D(rate), D(maxLiters), D(liters), D(gross)));
+    public void Rejects_unvalidated_input(
+        string rate,
+        string maxLiters,
+        string liters,
+        string gross
+    ) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CouponDiscount.Calculate(D(rate), D(maxLiters), D(liters), D(gross))
+        );
 }
 
 public sealed class CouponCodeTests
@@ -56,14 +73,17 @@ public sealed class CouponCodeTests
     {
         var codes = Enumerable.Range(0, 1000).Select(_ => CouponCode.Generate()).ToList();
 
-        Assert.All(codes, code =>
-        {
-            Assert.Equal(27, code.Length);
-            Assert.StartsWith("K", code);
-            Assert.True(CouponCode.IsValid(code), code);
-            // The random part is a full card-style encoding, not shortened by the prefix.
-            Assert.True(LoyaltyCardCode.IsValid(code[1..]), code);
-        });
+        Assert.All(
+            codes,
+            code =>
+            {
+                Assert.Equal(27, code.Length);
+                Assert.StartsWith("K", code);
+                Assert.True(CouponCode.IsValid(code), code);
+                // The random part is a full card-style encoding, not shortened by the prefix.
+                Assert.True(LoyaltyCardCode.IsValid(code[1..]), code);
+            }
+        );
         Assert.Equal(codes.Count, codes.Distinct().Count());
     }
 
@@ -97,31 +117,51 @@ public sealed class RewardOfferRulesTests
         string? description = "Na dowolne paliwo",
         int cost = 500,
         decimal rate = 0.20m,
-        decimal maxLiters = 50m) =>
-        RewardOfferRules.Validate(RewardOfferRules.Normalize(new RewardOfferInput(name, description, cost, rate, maxLiters)));
+        decimal maxLiters = 50m
+    ) =>
+        RewardOfferRules.Validate(
+            RewardOfferRules.Normalize(
+                new RewardOfferInput(name, description, cost, rate, maxLiters)
+            )
+        );
 
-    private static void AssertSingle(IReadOnlyList<RewardsValidationError> errors, string field, string code) =>
-        Assert.Equal([new RewardsValidationError(field, code)], errors);
+    private static void AssertSingle(
+        IReadOnlyList<RewardsValidationError> errors,
+        string field,
+        string code
+    ) => Assert.Equal([new RewardsValidationError(field, code)], errors);
 
     [Fact]
     public void Accepts_a_valid_offer_and_the_limits()
     {
         Assert.Empty(Validate());
         Assert.Empty(Validate(cost: 1, rate: 0.01m, maxLiters: 0.001m));
-        Assert.Empty(Validate(cost: RewardOfferRules.MaxPointsCost, rate: 10m, maxLiters: 1000m, description: null));
+        Assert.Empty(
+            Validate(
+                cost: RewardOfferRules.MaxPointsCost,
+                rate: 10m,
+                maxLiters: 1000m,
+                description: null
+            )
+        );
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Requires_a_name(string? name) => AssertSingle(Validate(name: name), "name", RewardsErrorCodes.RequiredField);
+    public void Requires_a_name(string? name) =>
+        AssertSingle(Validate(name: name), "name", RewardsErrorCodes.RequiredField);
 
     [Fact]
     public void Limits_name_and_description_length()
     {
         AssertSingle(Validate(name: new string('a', 101)), "name", RewardsErrorCodes.TooLong);
-        AssertSingle(Validate(description: new string('a', 501)), "description", RewardsErrorCodes.TooLong);
+        AssertSingle(
+            Validate(description: new string('a', 501)),
+            "description",
+            RewardsErrorCodes.TooLong
+        );
     }
 
     [Theory]
@@ -139,12 +179,17 @@ public sealed class RewardOfferRulesTests
         AssertSingle(
             Validate(rate: decimal.Parse(rate, CultureInfo.InvariantCulture)),
             "discountPerLiter",
-            RewardsErrorCodes.DiscountPerLiterOutOfRange);
+            RewardsErrorCodes.DiscountPerLiterOutOfRange
+        );
 
     /// <summary>numeric(4,2) would silently store 0.205 as 0.21, so the application must reject it.</summary>
     [Fact]
     public void Rejects_rate_with_more_than_two_decimals() =>
-        AssertSingle(Validate(rate: 0.205m), "discountPerLiter", RewardsErrorCodes.DiscountPerLiterPrecision);
+        AssertSingle(
+            Validate(rate: 0.205m),
+            "discountPerLiter",
+            RewardsErrorCodes.DiscountPerLiterPrecision
+        );
 
     [Theory]
     [InlineData("0")]
@@ -153,9 +198,14 @@ public sealed class RewardOfferRulesTests
         AssertSingle(
             Validate(maxLiters: decimal.Parse(liters, CultureInfo.InvariantCulture)),
             "maxLiters",
-            RewardsErrorCodes.MaxLitersOutOfRange);
+            RewardsErrorCodes.MaxLitersOutOfRange
+        );
 
     [Fact]
     public void Rejects_max_liters_with_more_than_three_decimals() =>
-        AssertSingle(Validate(maxLiters: 50.0005m), "maxLiters", RewardsErrorCodes.MaxLitersPrecision);
+        AssertSingle(
+            Validate(maxLiters: 50.0005m),
+            "maxLiters",
+            RewardsErrorCodes.MaxLitersPrecision
+        );
 }

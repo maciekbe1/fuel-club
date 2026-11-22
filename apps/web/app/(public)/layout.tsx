@@ -9,10 +9,12 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
         <Wordmark />
         <div className="relative flex flex-col gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-balance lg:text-5xl">
-            Tankuj. Zbieraj punkty. <span className="text-brand-orange">Odbieraj nagrody.</span>
+            Tankuj. Zbieraj punkty.{" "}
+            <span className="text-brand-orange">Odbieraj nagrody.</span>
           </h1>
           <p className="max-w-md text-white/70 max-sm:hidden">
-            Za każdy pełny 1 zł wydany na paliwo dostajesz 1 punkt. Punkty wymienisz na kupony do wykorzystania na stacji.
+            Za każdy pełny 1 zł wydany na paliwo dostajesz 1 punkt. Punkty
+            wymienisz na kupony do wykorzystania na stacji.
           </p>
         </div>
         <LoyaltyCard className="relative mx-auto -rotate-6 max-sm:max-w-64 lg:mx-0 lg:max-w-sm" />

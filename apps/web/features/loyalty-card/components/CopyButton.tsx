@@ -25,12 +25,17 @@ export function CopyButton({ code }: { code: string }) {
   return (
     <div className="flex items-center gap-3">
       <Button variant="outline" onClick={copy}>
-        {state === "copied" ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+        {state === "copied" ? (
+          <Check className="size-4" aria-hidden />
+        ) : (
+          <Copy className="size-4" aria-hidden />
+        )}
         Kopiuj kod
       </Button>
       <span role="status" className="text-sm text-muted-foreground">
         {state === "copied" && "Skopiowano"}
-        {state === "failed" && "Nie udało się skopiować - przepisz kod ręcznie."}
+        {state === "failed" &&
+          "Nie udało się skopiować - przepisz kod ręcznie."}
       </span>
     </div>
   );

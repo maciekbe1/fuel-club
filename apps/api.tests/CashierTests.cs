@@ -39,13 +39,23 @@ public sealed class CashierTests(ApiFactory factory) : IAsyncLifetime
     private HttpClient NewClient() =>
         factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private async Task<ApplicationUser> EnsureCashierAsync(string email, string station, string register)
+    private async Task<ApplicationUser> EnsureCashierAsync(
+        string email,
+        string station,
+        string register
+    )
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await using var transaction = await db.Database.BeginTransactionAsync();
         var user = await CashierProvisioning.EnsureCashierAsync(
-            scope.ServiceProvider, email, Password, "Test Cashier", station, register);
+            scope.ServiceProvider,
+            email,
+            Password,
+            "Test Cashier",
+            station,
+            register
+        );
         await transaction.CommitAsync();
         return user;
     }
@@ -61,7 +71,9 @@ public sealed class CashierTests(ApiFactory factory) : IAsyncLifetime
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var row = await db.CashierStations.AsNoTracking().SingleOrDefaultAsync(station => station.UserId == userId);
+        var row = await db
+            .CashierStations.AsNoTracking()
+            .SingleOrDefaultAsync(station => station.UserId == userId);
         return row is null ? null : (row.StationCode, row.RegisterCode);
     }
 
@@ -76,15 +88,24 @@ public sealed class CashierTests(ApiFactory factory) : IAsyncLifetime
         await EnsureCashierAsync(cashierEmail, "ST-01", "K2");
 
         using var anonymous = NewClient();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/cashier/station")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await anonymous.GetAsync("/api/cashier/station")).StatusCode
+        );
 
         using var user = NewClient();
         await user.LoginAsync(userEmail, Password);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync("/api/cashier/station")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await user.GetAsync("/api/cashier/station")).StatusCode
+        );
 
         using var admin = NewClient();
         await admin.LoginAsync(adminEmail, Password);
-        Assert.Equal(HttpStatusCode.Forbidden, (await admin.GetAsync("/api/cashier/station")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await admin.GetAsync("/api/cashier/station")).StatusCode
+        );
 
         using var cashier = NewClient();
         await cashier.LoginAsync(cashierEmail, Password);
@@ -122,7 +143,9 @@ public sealed class CashierTests(ApiFactory factory) : IAsyncLifetime
         var email = NewEmail("existing");
         await factory.CreateTestUserAsync(email, Password, existingRole);
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => EnsureCashierAsync(email, "ST-01", "K1"));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            EnsureCashierAsync(email, "ST-01", "K1")
+        );
 
         Assert.Contains("already exists without the Cashier role", error.Message);
         Assert.Equal([existingRole], await RolesOfAsync(email));
@@ -136,7 +159,9 @@ public sealed class CashierTests(ApiFactory factory) : IAsyncLifetime
     {
         var email = NewEmail("invalid");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => EnsureCashierAsync(email, station, register));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            EnsureCashierAsync(email, station, register)
+        );
 
         await using var scope = factory.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -147,13 +172,24 @@ public sealed class CashierTests(ApiFactory factory) : IAsyncLifetime
     public async Task Bootstrap_cashier_requires_all_settings_or_none()
     {
         var none = new CashierAccountProvisioner(
-            factory.Services.GetRequiredService<IServiceScopeFactory>(), Configuration([]));
+            factory.Services.GetRequiredService<IServiceScopeFactory>(),
+            Configuration([])
+        );
         await none.StartAsync(CancellationToken.None);
 
         var partial = new CashierAccountProvisioner(
             factory.Services.GetRequiredService<IServiceScopeFactory>(),
-            Configuration(new() { ["BootstrapCashier:Email"] = NewEmail("partial"), ["BootstrapCashier:Password"] = Password }));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => partial.StartAsync(CancellationToken.None));
+            Configuration(
+                new()
+                {
+                    ["BootstrapCashier:Email"] = NewEmail("partial"),
+                    ["BootstrapCashier:Password"] = Password,
+                }
+            )
+        );
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            partial.StartAsync(CancellationToken.None)
+        );
     }
 
     [Fact]
@@ -186,15 +222,23 @@ public sealed class CashierTests(ApiFactory factory) : IAsyncLifetime
         var cashier = await users.FindByEmailAsync("kasjer@demo.fuelclub.test");
         Assert.Equal(
             (DemoAccountsSeeder.CashierStationCode, DemoAccountsSeeder.CashierRegisterCode),
-            await StationOfAsync(cashier!.Id));
+            await StationOfAsync(cashier!.Id)
+        );
     }
 
     private DemoAccountsSeeder DemoSeeder(string environmentName) =>
         new(
             factory.Services.GetRequiredService<IServiceScopeFactory>(),
             new TestHostEnvironment(environmentName),
-            Configuration(new() { [DemoAccountsSeeder.EnabledKey] = "true", [DemoAccountsSeeder.PasswordKey] = Password }),
-            NullLogger<DemoAccountsSeeder>.Instance);
+            Configuration(
+                new()
+                {
+                    [DemoAccountsSeeder.EnabledKey] = "true",
+                    [DemoAccountsSeeder.PasswordKey] = Password,
+                }
+            ),
+            NullLogger<DemoAccountsSeeder>.Instance
+        );
 
     private static IConfiguration Configuration(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();

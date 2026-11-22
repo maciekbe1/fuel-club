@@ -15,10 +15,20 @@ export function NoCard({ issue }: { issue: ReturnType<typeof useIssueCard> }) {
         Nie masz jeszcze karty
       </h2>
       <p className="text-muted-foreground">
-        Karta Fuel Club to kod, który pokazujesz przy kasie. Dzięki niemu punkty za tankowanie trafią na Twoje konto.
+        Karta Fuel Club to kod, który pokazujesz przy kasie. Dzięki niemu punkty
+        za tankowanie trafią na Twoje konto.
       </p>
-      <Button size="lg" className={orange} onClick={() => issue.mutate()} disabled={issue.isPending}>
-        {issue.isPending ? "Wydawanie…" : issue.isError && keepsIdempotencyKey(issue.error) ? "Ponów" : "Wydaj kartę"}
+      <Button
+        size="lg"
+        className={orange}
+        onClick={() => issue.mutate()}
+        disabled={issue.isPending}
+      >
+        {issue.isPending
+          ? "Wydawanie…"
+          : issue.isError && keepsIdempotencyKey(issue.error)
+            ? "Ponów"
+            : "Wydaj kartę"}
       </Button>
       {issue.isError && (
         <p role="alert" className="text-sm text-destructive">

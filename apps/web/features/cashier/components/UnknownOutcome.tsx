@@ -43,12 +43,20 @@ export function UnknownOutcome({
           </Button>
         </div>
       ) : (
-        <div role="group" aria-label="Potwierdzenie odblokowania" className="flex flex-col gap-2">
-          <p className="text-sm font-semibold">Zakup mógł już zostać zapisany.</p>
+        <div
+          role="group"
+          aria-label="Potwierdzenie odblokowania"
+          className="flex flex-col gap-2"
+        >
+          <p className="text-sm font-semibold">
+            Zakup mógł już zostać zapisany.
+          </p>
           <p className="text-sm">
-            Odblokowanie nie cofa zapisu na serwerze. Zakup z tym samym numerem paragonu nie zostanie zapisany drugi
-            raz, ale <strong>zmiana numeru paragonu omija tę ochronę</strong> i może naliczyć punkty podwójnie. Najpierw
-            ponów zapis albo ustal wynik (np. w historii punktów klienta).
+            Odblokowanie nie cofa zapisu na serwerze. Zakup z tym samym numerem
+            paragonu nie zostanie zapisany drugi raz, ale{" "}
+            <strong>zmiana numeru paragonu omija tę ochronę</strong> i może
+            naliczyć punkty podwójnie. Najpierw ponów zapis albo ustal wynik
+            (np. w historii punktów klienta).
           </p>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setUnlocking(false)}>Wróć</Button>

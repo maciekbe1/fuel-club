@@ -19,7 +19,8 @@ public sealed record CouponResponse(
     string? Code,
     DateTimeOffset PurchasedAt,
     DateTimeOffset? ActivatedAt,
-    DateTimeOffset? RedeemedAt);
+    DateTimeOffset? RedeemedAt
+);
 
 public sealed record CouponsResponse(IReadOnlyList<CouponResponse> Items);
 
@@ -29,7 +30,11 @@ public static class MyCouponsEndpoints
     public const string Path = "/api/me/coupons";
 
     public static async Task<Ok<CouponsResponse>> GetAll(
-        HttpContext http, UserManager<ApplicationUser> users, AppDbContext db, CancellationToken cancellationToken)
+        HttpContext http,
+        UserManager<ApplicationUser> users,
+        AppDbContext db,
+        CancellationToken cancellationToken
+    )
     {
         var userId = users.GetUserId(http.User)!;
         var items = await Own(db, userId)
@@ -41,21 +46,52 @@ public static class MyCouponsEndpoints
     }
 
     public static async Task<Results<Ok<CouponResponse>, ProblemHttpResult>> GetOne(
-        Guid id, HttpContext http, UserManager<ApplicationUser> users, AppDbContext db, CancellationToken cancellationToken)
+        Guid id,
+        HttpContext http,
+        UserManager<ApplicationUser> users,
+        AppDbContext db,
+        CancellationToken cancellationToken
+    )
     {
         var userId = users.GetUserId(http.User)!;
-        var coupon = await Own(db, userId).Where(coupon => coupon.Id == id).Select(Projection).SingleOrDefaultAsync(cancellationToken);
+        var coupon = await Own(db, userId)
+            .Where(coupon => coupon.Id == id)
+            .Select(Projection)
+            .SingleOrDefaultAsync(cancellationToken);
         return coupon is null ? RewardsProblems.CouponNotFound() : TypedResults.Ok(coupon);
     }
 
     internal static IQueryable<Coupon> Own(AppDbContext db, string userId) =>
         db.Coupons.AsNoTracking().Where(coupon => coupon.UserId == userId);
 
-    public static CouponResponse ToResponse(Coupon coupon) => new(
-        coupon.Id, coupon.OfferId, coupon.OfferName, coupon.PointsCost, coupon.DiscountPerLiter, coupon.MaxLiters,
-        coupon.Status.ToString(), coupon.Code, coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
+    public static CouponResponse ToResponse(Coupon coupon) =>
+        new(
+            coupon.Id,
+            coupon.OfferId,
+            coupon.OfferName,
+            coupon.PointsCost,
+            coupon.DiscountPerLiter,
+            coupon.MaxLiters,
+            coupon.Status.ToString(),
+            coupon.Code,
+            coupon.PurchasedAt,
+            coupon.ActivatedAt,
+            coupon.RedeemedAt
+        );
 
-    private static readonly System.Linq.Expressions.Expression<Func<Coupon, CouponResponse>> Projection = coupon => new CouponResponse(
-        coupon.Id, coupon.OfferId, coupon.OfferName, coupon.PointsCost, coupon.DiscountPerLiter, coupon.MaxLiters,
-        coupon.Status.ToString(), coupon.Code, coupon.PurchasedAt, coupon.ActivatedAt, coupon.RedeemedAt);
+    private static readonly System.Linq.Expressions.Expression<
+        Func<Coupon, CouponResponse>
+    > Projection = coupon => new CouponResponse(
+        coupon.Id,
+        coupon.OfferId,
+        coupon.OfferName,
+        coupon.PointsCost,
+        coupon.DiscountPerLiter,
+        coupon.MaxLiters,
+        coupon.Status.ToString(),
+        coupon.Code,
+        coupon.PurchasedAt,
+        coupon.ActivatedAt,
+        coupon.RedeemedAt
+    );
 }

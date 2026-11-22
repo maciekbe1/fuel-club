@@ -9,13 +9,20 @@ const QUIET_ZONE = 4;
  * QR with exactly the raw card code, computed locally (no network). Dark modules on a white
  * background in every theme: scanners need the contrast and the quiet zone.
  */
-export function CardQr({ code, className }: { code: string; className?: string }) {
+export function CardQr({
+  code,
+  className,
+}: {
+  code: string;
+  className?: string;
+}) {
   const { size, path } = useMemo(() => {
     const { modules } = create(code, { errorCorrectionLevel: "M" });
     let d = "";
     for (let row = 0; row < modules.size; row++)
       for (let col = 0; col < modules.size; col++)
-        if (modules.get(row, col)) d += `M${col + QUIET_ZONE} ${row + QUIET_ZONE}h1v1h-1z`;
+        if (modules.get(row, col))
+          d += `M${col + QUIET_ZONE} ${row + QUIET_ZONE}h1v1h-1z`;
     return { size: modules.size + QUIET_ZONE * 2, path: d };
   }, [code]);
 

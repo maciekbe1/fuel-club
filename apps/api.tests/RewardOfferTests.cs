@@ -27,14 +27,32 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
     {
         foreach (var email in _emails)
             await factory.DeleteTestUserAsync(email);
-        await DbAsync(db => db.RewardOffers.Where(offer => offer.Name.Contains(_tag)).ExecuteDeleteAsync());
+        await DbAsync(db =>
+            db.RewardOffers.Where(offer => offer.Name.Contains(_tag)).ExecuteDeleteAsync()
+        );
     }
 
     private sealed record Offer(
-        Guid Id, string Name, string Description, int PointsCost, decimal DiscountPerLiter, decimal MaxLiters,
-        bool IsActive, int Version, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+        Guid Id,
+        string Name,
+        string Description,
+        int PointsCost,
+        decimal DiscountPerLiter,
+        decimal MaxLiters,
+        bool IsActive,
+        int Version,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt
+    );
 
-    private sealed record CatalogItem(Guid Id, string Name, string Description, int PointsCost, decimal DiscountPerLiter, decimal MaxLiters);
+    private sealed record CatalogItem(
+        Guid Id,
+        string Name,
+        string Description,
+        int PointsCost,
+        decimal DiscountPerLiter,
+        decimal MaxLiters
+    );
 
     private sealed record ListBody<T>(List<T> Items);
 
@@ -53,15 +71,32 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var email = $"rewards-{role.ToLowerInvariant()}-{Guid.NewGuid():N}@example.test";
         _emails.Add(email);
         await factory.CreateTestUserAsync(email, Password, role);
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions { HandleCookies = true }
+        );
         await client.LoginAsync(email, Password);
         return client;
     }
 
     private string Name(string label) => $"{label} {_tag}";
 
-    private object Form(string label = "Rabat", int cost = 500, decimal rate = 0.20m, decimal liters = 50m, bool? active = true, string description = "Na dowolne paliwo") =>
-        new { name = Name(label), description, pointsCost = cost, discountPerLiter = rate, maxLiters = liters, isActive = active };
+    private object Form(
+        string label = "Rabat",
+        int cost = 500,
+        decimal rate = 0.20m,
+        decimal liters = 50m,
+        bool? active = true,
+        string description = "Na dowolne paliwo"
+    ) =>
+        new
+        {
+            name = Name(label),
+            description,
+            pointsCost = cost,
+            discountPerLiter = rate,
+            maxLiters = liters,
+            isActive = active,
+        };
 
     private static object WithVersion(object form, int? version)
     {
@@ -70,9 +105,19 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         return json;
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string url, object? body, string? key = null, bool csrf = true)
+    private static async Task<HttpResponseMessage> SendAsync(
+        HttpClient client,
+        HttpMethod method,
+        string url,
+        object? body,
+        string? key = null,
+        bool csrf = true
+    )
     {
-        using var request = new HttpRequestMessage(method, url) { Content = body is null ? null : JsonContent.Create(body) };
+        using var request = new HttpRequestMessage(method, url)
+        {
+            Content = body is null ? null : JsonContent.Create(body),
+        };
         if (key is not null)
             request.Headers.Add(Idempotency.HeaderName, key);
         if (csrf)
@@ -89,16 +134,25 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<Offer>())!;
     }
 
-    private static Task<HttpResponseMessage> PutAsync(HttpClient admin, Guid id, object form, int? version) =>
-        SendAsync(admin, HttpMethod.Put, $"{Admin}/{id}", WithVersion(form, version));
+    private static Task<HttpResponseMessage> PutAsync(
+        HttpClient admin,
+        Guid id,
+        object form,
+        int? version
+    ) => SendAsync(admin, HttpMethod.Put, $"{Admin}/{id}", WithVersion(form, version));
 
-    private static async Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code)
+    private static async Task AssertProblemAsync(
+        HttpResponseMessage response,
+        HttpStatusCode status,
+        string code
+    )
     {
         Assert.Equal(status, response.StatusCode);
         Assert.Equal(code, (await response.Content.ReadFromJsonAsync<ProblemBody>())!.Code);
     }
 
-    private Task<RewardOffer> StoredAsync(Guid id) => DbAsync(db => db.RewardOffers.AsNoTracking().SingleAsync(o => o.Id == id));
+    private Task<RewardOffer> StoredAsync(Guid id) =>
+        DbAsync(db => db.RewardOffers.AsNoTracking().SingleAsync(o => o.Id == id));
 
     [Fact]
     public async Task Catalog_lists_active_offers_by_cost_then_name_then_id()
@@ -112,22 +166,36 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var inactive = await CreateAsync(admin, Form("Off", cost: 1, active: false));
 
         var customer = await AccountAsync(RoleNames.User);
-        var catalog = (await customer.GetFromJsonAsync<ListBody<CatalogItem>>(Catalog))!.Items
-            .Where(item => item.Name.Contains(_tag))
+        var catalog = (await customer.GetFromJsonAsync<ListBody<CatalogItem>>(Catalog))!
+            .Items.Where(item => item.Name.Contains(_tag))
             .ToList();
 
-        var expected = new[] { cheap, a, b }.Concat(new[] { twin1, twin2 }.OrderBy(o => o.Id)).Select(o => o.Id);
+        var expected = new[] { cheap, a, b }
+            .Concat(new[] { twin1, twin2 }.OrderBy(o => o.Id))
+            .Select(o => o.Id);
         Assert.Equal(expected, catalog.Select(item => item.Id));
         Assert.DoesNotContain(catalog, item => item.Id == inactive.Id);
-        Assert.Equal(new CatalogItem(cheap.Id, Name("Z"), "Na dowolne paliwo", 50, 0.20m, 50m), catalog[0]);
+        Assert.Equal(
+            new CatalogItem(cheap.Id, Name("Z"), "Na dowolne paliwo", 50, 0.20m, 50m),
+            catalog[0]
+        );
     }
 
     [Fact]
     public async Task Catalog_requires_the_user_role()
     {
-        Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().GetAsync(Catalog)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await (await AccountAsync(RoleNames.Cashier)).GetAsync(Catalog)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await (await AccountAsync(RoleNames.Admin)).GetAsync(Catalog)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await factory.CreateClient().GetAsync(Catalog)).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await (await AccountAsync(RoleNames.Cashier)).GetAsync(Catalog)).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await (await AccountAsync(RoleNames.Admin)).GetAsync(Catalog)).StatusCode
+        );
     }
 
     [Fact]
@@ -135,26 +203,60 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
     {
         var anonymous = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(Admin)).StatusCode);
-        foreach (var client in new[] { await AccountAsync(RoleNames.User), await AccountAsync(RoleNames.Cashier) })
+        foreach (
+            var client in new[]
+            {
+                await AccountAsync(RoleNames.User),
+                await AccountAsync(RoleNames.Cashier),
+            }
+        )
         {
             Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Admin)).StatusCode);
-            Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Post, Admin, Form(), NewKey())).StatusCode);
+            Assert.Equal(
+                HttpStatusCode.Forbidden,
+                (await SendAsync(client, HttpMethod.Post, Admin, Form(), NewKey())).StatusCode
+            );
         }
-        Assert.Equal(0, await DbAsync(db => db.RewardOffers.CountAsync(o => o.Name.Contains(_tag))));
+        Assert.Equal(
+            0,
+            await DbAsync(db => db.RewardOffers.CountAsync(o => o.Name.Contains(_tag)))
+        );
     }
 
     [Fact]
     public async Task Create_returns_the_offer_with_version_one_and_location()
     {
         var admin = await AccountAsync(RoleNames.Admin);
-        var response = await SendAsync(admin, HttpMethod.Post, Admin, Form(cost: 750, rate: 0.25m, liters: 40.5m), NewKey());
+        var response = await SendAsync(
+            admin,
+            HttpMethod.Post,
+            Admin,
+            Form(cost: 750, rate: 0.25m, liters: 40.5m),
+            NewKey()
+        );
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var offer = (await response.Content.ReadFromJsonAsync<Offer>())!;
         Assert.Equal($"{Admin}/{offer.Id}", response.Headers.Location!.OriginalString);
-        Assert.Equal((Name("Rabat"), 750, 0.25m, 40.5m, true, 1), (offer.Name, offer.PointsCost, offer.DiscountPerLiter, offer.MaxLiters, offer.IsActive, offer.Version));
-        Assert.Equal(offer, await admin.GetFromJsonAsync<Offer>(response.Headers.Location.OriginalString));
-        Assert.Contains((await admin.GetFromJsonAsync<ListBody<Offer>>(Admin))!.Items, o => o.Id == offer.Id);
+        Assert.Equal(
+            (Name("Rabat"), 750, 0.25m, 40.5m, true, 1),
+            (
+                offer.Name,
+                offer.PointsCost,
+                offer.DiscountPerLiter,
+                offer.MaxLiters,
+                offer.IsActive,
+                offer.Version
+            )
+        );
+        Assert.Equal(
+            offer,
+            await admin.GetFromJsonAsync<Offer>(response.Headers.Location.OriginalString)
+        );
+        Assert.Contains(
+            (await admin.GetFromJsonAsync<ListBody<Offer>>(Admin))!.Items,
+            o => o.Id == offer.Id
+        );
     }
 
     [Fact]
@@ -166,9 +268,18 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var retry = await SendAsync(admin, HttpMethod.Post, Admin, Form("Once"), key);
 
         Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
-        Assert.Equal((await first.Content.ReadFromJsonAsync<Offer>())!.Id, (await retry.Content.ReadFromJsonAsync<Offer>())!.Id);
-        Assert.Equal(1, await DbAsync(db => db.RewardOffers.CountAsync(o => o.Name == Name("Once"))));
-        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(admin, HttpMethod.Post, Admin, Form("Once"), key: null)).StatusCode);
+        Assert.Equal(
+            (await first.Content.ReadFromJsonAsync<Offer>())!.Id,
+            (await retry.Content.ReadFromJsonAsync<Offer>())!.Id
+        );
+        Assert.Equal(
+            1,
+            await DbAsync(db => db.RewardOffers.CountAsync(o => o.Name == Name("Once")))
+        );
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await SendAsync(admin, HttpMethod.Post, Admin, Form("Once"), key: null)).StatusCode
+        );
     }
 
     [Fact]
@@ -176,8 +287,20 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
     {
         var admin = await AccountAsync(RoleNames.Admin);
         // Tagged (but too long) name, so the test can prove that no row was stored.
-        var response = await SendAsync(admin, HttpMethod.Post, Admin,
-            new { name = new string('x', 101) + _tag, description = "", pointsCost = 0, discountPerLiter = 0.205m, maxLiters = 0m }, NewKey());
+        var response = await SendAsync(
+            admin,
+            HttpMethod.Post,
+            Admin,
+            new
+            {
+                name = new string('x', 101) + _tag,
+                description = "",
+                pointsCost = 0,
+                discountPerLiter = 0.205m,
+                maxLiters = 0m,
+            },
+            NewKey()
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = (await response.Content.ReadFromJsonAsync<ProblemBody>())!;
@@ -191,8 +314,12 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
                 ["maxLiters"] = "rewards.max_liters_out_of_range",
                 ["isActive"] = "rewards.required_field",
             },
-            problem.Errors!.ToDictionary(e => e.Key, e => e.Value.Single().Code));
-        Assert.Equal(0, await DbAsync(db => db.RewardOffers.CountAsync(o => o.Name.Contains(_tag))));
+            problem.Errors!.ToDictionary(e => e.Key, e => e.Value.Single().Code)
+        );
+        Assert.Equal(
+            0,
+            await DbAsync(db => db.RewardOffers.CountAsync(o => o.Name.Contains(_tag)))
+        );
     }
 
     [Fact]
@@ -207,13 +334,41 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
             ["maxLiters"] = "rewards.required_field",
         };
 
-        var create = await SendAsync(admin, HttpMethod.Post, Admin, new { name = Name("Missing"), description = "", isActive = true }, NewKey());
-        var update = await SendAsync(admin, HttpMethod.Put, $"{Admin}/{offer.Id}", new { name = Name("Missing"), description = "", isActive = true, version = 1 });
+        var create = await SendAsync(
+            admin,
+            HttpMethod.Post,
+            Admin,
+            new
+            {
+                name = Name("Missing"),
+                description = "",
+                isActive = true,
+            },
+            NewKey()
+        );
+        var update = await SendAsync(
+            admin,
+            HttpMethod.Put,
+            $"{Admin}/{offer.Id}",
+            new
+            {
+                name = Name("Missing"),
+                description = "",
+                isActive = true,
+                version = 1,
+            }
+        );
 
         foreach (var response in new[] { create, update })
         {
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            Assert.Equal(expected, (await response.Content.ReadFromJsonAsync<ProblemBody>())!.Errors!.ToDictionary(e => e.Key, e => e.Value.Single().Code));
+            Assert.Equal(
+                expected,
+                (await response.Content.ReadFromJsonAsync<ProblemBody>())!.Errors!.ToDictionary(
+                    e => e.Key,
+                    e => e.Value.Single().Code
+                )
+            );
         }
         Assert.Equal(1, (await StoredAsync(offer.Id)).Version);
     }
@@ -234,7 +389,11 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(2, changed.Version);
         Assert.True(changed.UpdatedAt > offer.UpdatedAt);
 
-        await AssertProblemAsync(await PutAsync(admin, offer.Id, Form("Stary"), offer.Version), HttpStatusCode.Conflict, "rewards.offer_version_conflict");
+        await AssertProblemAsync(
+            await PutAsync(admin, offer.Id, Form("Stary"), offer.Version),
+            HttpStatusCode.Conflict,
+            "rewards.offer_version_conflict"
+        );
         Assert.False((await StoredAsync(offer.Id)).IsActive);
     }
 
@@ -242,8 +401,21 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
     public async Task Numbers_sent_as_strings_are_rejected()
     {
         var admin = await AccountAsync(RoleNames.Admin);
-        var response = await SendAsync(admin, HttpMethod.Post, Admin,
-            new { name = Name("Str"), description = "", pointsCost = "500", discountPerLiter = 0.2m, maxLiters = 50m, isActive = true }, NewKey());
+        var response = await SendAsync(
+            admin,
+            HttpMethod.Post,
+            Admin,
+            new
+            {
+                name = Name("Str"),
+                description = "",
+                pointsCost = "500",
+                discountPerLiter = 0.2m,
+                maxLiters = 50m,
+                isActive = true,
+            },
+            NewKey()
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -253,17 +425,35 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var admin = await AccountAsync(RoleNames.Admin);
         var offer = await CreateAsync(admin, Form());
 
-        var response = await PutAsync(admin, offer.Id, Form("Nowa", cost: 900, rate: 0.3m, liters: 30m, active: false, description: "Opis"), offer.Version);
+        var response = await PutAsync(
+            admin,
+            offer.Id,
+            Form("Nowa", cost: 900, rate: 0.3m, liters: 30m, active: false, description: "Opis"),
+            offer.Version
+        );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = (await response.Content.ReadFromJsonAsync<Offer>())!;
-        Assert.Equal((Name("Nowa"), "Opis", 900, 0.3m, 30m, false, 2),
-            (updated.Name, updated.Description, updated.PointsCost, updated.DiscountPerLiter, updated.MaxLiters, updated.IsActive, updated.Version));
+        Assert.Equal(
+            (Name("Nowa"), "Opis", 900, 0.3m, 30m, false, 2),
+            (
+                updated.Name,
+                updated.Description,
+                updated.PointsCost,
+                updated.DiscountPerLiter,
+                updated.MaxLiters,
+                updated.IsActive,
+                updated.Version
+            )
+        );
         Assert.Equal(offer.CreatedAt, updated.CreatedAt);
         Assert.True(updated.UpdatedAt >= offer.UpdatedAt);
         // The response is the stored row (UPDATE ... RETURNING).
         var stored = await StoredAsync(offer.Id);
-        Assert.Equal((stored.Name, stored.PointsCost, stored.Version, stored.IsActive), (updated.Name, updated.PointsCost, updated.Version, updated.IsActive));
+        Assert.Equal(
+            (stored.Name, stored.PointsCost, stored.Version, stored.IsActive),
+            (updated.Name, updated.PointsCost, updated.Version, updated.IsActive)
+        );
     }
 
     [Fact]
@@ -287,13 +477,26 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var admin = await AccountAsync(RoleNames.Admin);
         var offer = await CreateAsync(admin, Form());
 
-        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(i => PutAsync(admin, offer.Id, Form($"Edit{i}", cost: 100 + i), offer.Version)));
+        var responses = await Task.WhenAll(
+            Enumerable
+                .Range(0, 8)
+                .Select(i =>
+                    PutAsync(admin, offer.Id, Form($"Edit{i}", cost: 100 + i), offer.Version)
+                )
+        );
 
         Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
         Assert.Equal(7, responses.Count(r => r.StatusCode == HttpStatusCode.Conflict));
-        var winner = (await responses.Single(r => r.StatusCode == HttpStatusCode.OK).Content.ReadFromJsonAsync<Offer>())!;
+        var winner = (
+            await responses
+                .Single(r => r.StatusCode == HttpStatusCode.OK)
+                .Content.ReadFromJsonAsync<Offer>()
+        )!;
         var stored = await StoredAsync(offer.Id);
-        Assert.Equal((winner.Name, winner.PointsCost, 2), (stored.Name, stored.PointsCost, stored.Version));
+        Assert.Equal(
+            (winner.Name, winner.PointsCost, 2),
+            (stored.Name, stored.PointsCost, stored.Version)
+        );
     }
 
     [Fact]
@@ -305,15 +508,32 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         async Task<Dictionary<string, string>> Errors(HttpResponseMessage response)
         {
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            return (await response.Content.ReadFromJsonAsync<ProblemBody>())!.Errors!.ToDictionary(e => e.Key, e => e.Value.Single().Code);
+            return (await response.Content.ReadFromJsonAsync<ProblemBody>())!.Errors!.ToDictionary(
+                e => e.Key,
+                e => e.Value.Single().Code
+            );
         }
 
-        Assert.Equal("rewards.required_field", (await Errors(await PutAsync(admin, offer.Id, Form(), null)))["version"]);
-        Assert.Equal("rewards.version_out_of_range", (await Errors(await PutAsync(admin, offer.Id, Form(), 0)))["version"]);
+        Assert.Equal(
+            "rewards.required_field",
+            (await Errors(await PutAsync(admin, offer.Id, Form(), null)))["version"]
+        );
+        Assert.Equal(
+            "rewards.version_out_of_range",
+            (await Errors(await PutAsync(admin, offer.Id, Form(), 0)))["version"]
+        );
         // Invalid form with a stale version: 400, not 409.
-        Assert.Equal("rewards.points_cost_out_of_range", (await Errors(await PutAsync(admin, offer.Id, Form(cost: 0), 99)))["pointsCost"]);
+        Assert.Equal(
+            "rewards.points_cost_out_of_range",
+            (await Errors(await PutAsync(admin, offer.Id, Form(cost: 0), 99)))["pointsCost"]
+        );
         // isActive is required on PUT too: a missing field must not deactivate the offer.
-        Assert.Equal("rewards.required_field", (await Errors(await PutAsync(admin, offer.Id, Form(active: null), offer.Version)))["isActive"]);
+        Assert.Equal(
+            "rewards.required_field",
+            (await Errors(await PutAsync(admin, offer.Id, Form(active: null), offer.Version)))[
+                "isActive"
+            ]
+        );
         Assert.Equal(1, (await StoredAsync(offer.Id)).Version);
     }
 
@@ -322,8 +542,16 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
     {
         var admin = await AccountAsync(RoleNames.Admin);
         var id = Guid.NewGuid();
-        await AssertProblemAsync(await admin.GetAsync($"{Admin}/{id}"), HttpStatusCode.NotFound, "rewards.offer_not_found");
-        await AssertProblemAsync(await PutAsync(admin, id, Form(), 1), HttpStatusCode.NotFound, "rewards.offer_not_found");
+        await AssertProblemAsync(
+            await admin.GetAsync($"{Admin}/{id}"),
+            HttpStatusCode.NotFound,
+            "rewards.offer_not_found"
+        );
+        await AssertProblemAsync(
+            await PutAsync(admin, id, Form(), 1),
+            HttpStatusCode.NotFound,
+            "rewards.offer_not_found"
+        );
     }
 
     [Fact]
@@ -333,13 +561,26 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var customer = await AccountAsync(RoleNames.User);
         var offer = await CreateAsync(admin, Form("Toggle"));
 
-        async Task<bool> Listed() => (await customer.GetFromJsonAsync<ListBody<CatalogItem>>(Catalog))!.Items.Any(i => i.Id == offer.Id);
+        async Task<bool> Listed() =>
+            (await customer.GetFromJsonAsync<ListBody<CatalogItem>>(Catalog))!.Items.Any(i =>
+                i.Id == offer.Id
+            );
 
         Assert.True(await Listed());
-        var off = (await (await PutAsync(admin, offer.Id, Form("Toggle", active: false), 1)).Content.ReadFromJsonAsync<Offer>())!;
+        var off = (
+            await (
+                await PutAsync(admin, offer.Id, Form("Toggle", active: false), 1)
+            ).Content.ReadFromJsonAsync<Offer>()
+        )!;
         Assert.False(await Listed());
-        Assert.Contains((await admin.GetFromJsonAsync<ListBody<Offer>>(Admin))!.Items, o => o.Id == offer.Id && !o.IsActive);
-        Assert.Equal(HttpStatusCode.OK, (await PutAsync(admin, offer.Id, Form("Toggle", active: true), off.Version)).StatusCode);
+        Assert.Contains(
+            (await admin.GetFromJsonAsync<ListBody<Offer>>(Admin))!.Items,
+            o => o.Id == offer.Id && !o.IsActive
+        );
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PutAsync(admin, offer.Id, Form("Toggle", active: true), off.Version)).StatusCode
+        );
         Assert.True(await Listed());
     }
 
@@ -349,20 +590,52 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var admin = await AccountAsync(RoleNames.Admin);
         await AccountAsync(RoleNames.User);
         var email = _emails[^1];
-        var userId = await DbAsync(db => db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync());
+        var userId = await DbAsync(db =>
+            db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync()
+        );
         var offer = await CreateAsync(admin, Form(cost: 500, rate: 0.20m, liters: 50m));
         var coupon = new Coupon
         {
-            Id = Guid.CreateVersion7(), UserId = userId, OfferId = offer.Id, OfferName = offer.Name, PointsCost = 500,
-            DiscountPerLiter = 0.20m, MaxLiters = 50m, Status = CouponStatus.Purchased,
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            OfferId = offer.Id,
+            OfferName = offer.Name,
+            PointsCost = 500,
+            DiscountPerLiter = 0.20m,
+            MaxLiters = 50m,
+            Status = CouponStatus.Purchased,
         };
-        await DbAsync(async db => { db.Coupons.Add(coupon); return await db.SaveChangesAsync(); });
+        await DbAsync(async db =>
+        {
+            db.Coupons.Add(coupon);
+            return await db.SaveChangesAsync();
+        });
 
-        Assert.Equal(HttpStatusCode.OK, (await PutAsync(admin, offer.Id, Form("Zmieniona", cost: 900, rate: 0.5m, liters: 10m, active: false), 1)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await PutAsync(
+                    admin,
+                    offer.Id,
+                    Form("Zmieniona", cost: 900, rate: 0.5m, liters: 10m, active: false),
+                    1
+                )
+            ).StatusCode
+        );
 
-        var stored = await DbAsync(db => db.Coupons.AsNoTracking().SingleAsync(c => c.Id == coupon.Id));
-        Assert.Equal((Name("Rabat"), 500, 0.20m, 50m, CouponStatus.Purchased),
-            (stored.OfferName, stored.PointsCost, stored.DiscountPerLiter, stored.MaxLiters, stored.Status));
+        var stored = await DbAsync(db =>
+            db.Coupons.AsNoTracking().SingleAsync(c => c.Id == coupon.Id)
+        );
+        Assert.Equal(
+            (Name("Rabat"), 500, 0.20m, 50m, CouponStatus.Purchased),
+            (
+                stored.OfferName,
+                stored.PointsCost,
+                stored.DiscountPerLiter,
+                stored.MaxLiters,
+                stored.Status
+            )
+        );
     }
 
     [Fact]
@@ -371,9 +644,31 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         var admin = await AccountAsync(RoleNames.Admin);
         var offer = await CreateAsync(admin, Form());
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(admin, HttpMethod.Post, Admin, Form("NoCsrf"), NewKey(), csrf: false)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden,
-            (await SendAsync(admin, HttpMethod.Put, $"{Admin}/{offer.Id}", WithVersion(Form("NoCsrf"), 1), csrf: false)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (
+                await SendAsync(
+                    admin,
+                    HttpMethod.Post,
+                    Admin,
+                    Form("NoCsrf"),
+                    NewKey(),
+                    csrf: false
+                )
+            ).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (
+                await SendAsync(
+                    admin,
+                    HttpMethod.Put,
+                    $"{Admin}/{offer.Id}",
+                    WithVersion(Form("NoCsrf"), 1),
+                    csrf: false
+                )
+            ).StatusCode
+        );
         Assert.Equal(1, (await StoredAsync(offer.Id)).Version);
     }
 }

@@ -42,21 +42,39 @@ public static class ExchangeEndpoint
         AppDbContext db,
         PointsSpending points,
         IOptions<RewardsOptions> options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (request.Version is not { } version)
-            return RewardsProblems.Validation("Exchange is not valid", [new("version", RewardsErrorCodes.RequiredField)]);
+            return RewardsProblems.Validation(
+                "Exchange is not valid",
+                [new("version", RewardsErrorCodes.RequiredField)]
+            );
         if (version < 1)
-            return RewardsProblems.Validation("Exchange is not valid", [new("version", RewardsErrorCodes.VersionOutOfRange)]);
+            return RewardsProblems.Validation(
+                "Exchange is not valid",
+                [new("version", RewardsErrorCodes.VersionOutOfRange)]
+            );
 
-        if (await LockOfferAsync(db, id, options.Value.OfferLockTimeout, cancellationToken) is not { } offers)
+        if (
+            await LockOfferAsync(db, id, options.Value.OfferLockTimeout, cancellationToken)
+            is not { } offers
+        )
             return RewardsProblems.OfferBusy(http);
         if (offers.SingleOrDefault() is not { } offer)
             return RewardsProblems.OfferNotFound();
         if (!offer.IsActive)
-            return ApiProblems.Problem(StatusCodes.Status409Conflict, "Offer is not available", RewardsErrorCodes.OfferInactive);
+            return ApiProblems.Problem(
+                StatusCodes.Status409Conflict,
+                "Offer is not available",
+                RewardsErrorCodes.OfferInactive
+            );
         if (offer.Version != version)
-            return ApiProblems.Problem(StatusCodes.Status409Conflict, "Offer changed since it was shown", RewardsErrorCodes.OfferChanged);
+            return ApiProblems.Problem(
+                StatusCodes.Status409Conflict,
+                "Offer changed since it was shown",
+                RewardsErrorCodes.OfferChanged
+            );
 
         var userId = users.GetUserId(http.User)!;
         var coupon = new Coupon
@@ -71,13 +89,23 @@ public static class ExchangeEndpoint
             Status = CouponStatus.Purchased,
         };
 
-        var spent = await points.SpendAsync(userId, offer.PointsCost, PointsLedgerEntryType.CouponExchange, coupon.Id, cancellationToken);
+        var spent = await points.SpendAsync(
+            userId,
+            offer.PointsCost,
+            PointsLedgerEntryType.CouponExchange,
+            coupon.Id,
+            cancellationToken
+        );
         switch (spent.Outcome)
         {
             case SpendOutcome.CustomerBusy:
                 return LoyaltyProblems.CustomerBusy(http);
             case SpendOutcome.InsufficientPoints:
-                return ApiProblems.Problem(StatusCodes.Status409Conflict, "Not enough points", RewardsErrorCodes.InsufficientPoints);
+                return ApiProblems.Problem(
+                    StatusCodes.Status409Conflict,
+                    "Not enough points",
+                    RewardsErrorCodes.InsufficientPoints
+                );
         }
 
         // Added after a successful debit, so nothing is tracked for the failure paths. A failed
@@ -87,31 +115,46 @@ public static class ExchangeEndpoint
 
         return TypedResults.Created(
             $"{MyCouponsEndpoints.Path}/{coupon.Id}",
-            new ExchangeResponse(MyCouponsEndpoints.ToResponse(coupon), spent.BalanceAfter));
+            new ExchangeResponse(MyCouponsEndpoints.ToResponse(coupon), spent.BalanceAfter)
+        );
     }
 
     /// <returns>null when the wait timed out; the transaction is then aborted and must be rolled back.</returns>
     private static async Task<List<RewardOffer>?> LockOfferAsync(
-        AppDbContext db, Guid id, TimeSpan timeout, CancellationToken cancellationToken)
+        AppDbContext db,
+        Guid id,
+        TimeSpan timeout,
+        CancellationToken cancellationToken
+    )
     {
         var timeoutMs = (long)timeout.TotalMilliseconds;
-        await db.Database.ExecuteSqlRawAsync($"SET LOCAL lock_timeout = {timeoutMs}", cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            $"SET LOCAL lock_timeout = {timeoutMs}",
+            cancellationToken
+        );
         List<RewardOffer> offers;
         try
         {
-            offers = await db.RewardOffers
-                .FromSql($"""SELECT * FROM "RewardOffers" WHERE "Id" = {id} FOR SHARE""")
+            offers = await db
+                .RewardOffers.FromSql(
+                    $"""SELECT * FROM "RewardOffers" WHERE "Id" = {id} FOR SHARE"""
+                )
                 .AsNoTracking()
                 .ToListAsync(cancellationToken);
         }
         // Queries go through the execution strategy, which wraps errors it considers transient.
-        catch (Exception exception) when ((exception as PostgresException ?? exception.InnerException as PostgresException)
-            is { SqlState: PostgresErrorCodes.LockNotAvailable })
+        catch (Exception exception)
+            when ((exception as PostgresException ?? exception.InnerException as PostgresException)
+                    is { SqlState: PostgresErrorCodes.LockNotAvailable }
+            )
         {
             return null;
         }
 
-        await db.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout TO DEFAULT", cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "SET LOCAL lock_timeout TO DEFAULT",
+            cancellationToken
+        );
         return offers;
     }
 }

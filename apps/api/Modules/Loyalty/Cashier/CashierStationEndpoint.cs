@@ -25,7 +25,11 @@ public static class CashierStationEndpoint
             .SingleOrDefaultAsync(cancellationToken);
 
         if (station is null)
-            return ApiProblems.Problem(StatusCodes.Status404NotFound, "Cashier station not assigned", LoyaltyErrorCodes.CashierStationMissing);
+            return ApiProblems.Problem(
+                StatusCodes.Status404NotFound,
+                "Cashier station not assigned",
+                LoyaltyErrorCodes.CashierStationMissing
+            );
 
         return TypedResults.Ok(station);
     }

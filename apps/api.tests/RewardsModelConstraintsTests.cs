@@ -19,13 +19,17 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
     public async Task InitializeAsync()
     {
         await factory.CreateTestUserAsync(_userEmail, Password, "User");
-        _userId = await DbAsync(db => db.Users.Where(user => user.Email == _userEmail).Select(user => user.Id).SingleAsync());
+        _userId = await DbAsync(db =>
+            db.Users.Where(user => user.Email == _userEmail).Select(user => user.Id).SingleAsync()
+        );
     }
 
     public async Task DisposeAsync()
     {
         await factory.DeleteTestUserAsync(_userEmail);
-        await DbAsync(db => db.RewardOffers.Where(offer => _offerIds.Contains(offer.Id)).ExecuteDeleteAsync());
+        await DbAsync(db =>
+            db.RewardOffers.Where(offer => _offerIds.Contains(offer.Id)).ExecuteDeleteAsync()
+        );
     }
 
     private async Task<T> DbAsync<T>(Func<AppDbContext, Task<T>> action)
@@ -34,7 +38,12 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
         return await action(scope.ServiceProvider.GetRequiredService<AppDbContext>());
     }
 
-    private RewardOffer Offer(decimal rate = 0.20m, decimal maxLiters = 50m, int cost = 500, string name = "Rabat")
+    private RewardOffer Offer(
+        decimal rate = 0.20m,
+        decimal maxLiters = 50m,
+        int cost = 500,
+        string name = "Rabat"
+    )
     {
         var offer = new RewardOffer
         {
@@ -56,44 +65,59 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
         string? code = null,
         DateTimeOffset? activatedAt = null,
         DateTimeOffset? redeemedAt = null,
-        Guid? purchaseId = null) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        UserId = _userId,
-        OfferId = offer.Id,
-        OfferName = offer.Name,
-        PointsCost = offer.PointsCost,
-        DiscountPerLiter = offer.DiscountPerLiter,
-        MaxLiters = offer.MaxLiters,
-        Status = status,
-        Code = code,
-        PurchasedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
-        ActivatedAt = activatedAt,
-        RedeemedAt = redeemedAt,
-        RedeemedPurchaseId = purchaseId,
-    };
+        Guid? purchaseId = null
+    ) =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = _userId,
+            OfferId = offer.Id,
+            OfferName = offer.Name,
+            PointsCost = offer.PointsCost,
+            DiscountPerLiter = offer.DiscountPerLiter,
+            MaxLiters = offer.MaxLiters,
+            Status = status,
+            Code = code,
+            PurchasedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+            ActivatedAt = activatedAt,
+            RedeemedAt = redeemedAt,
+            RedeemedPurchaseId = purchaseId,
+        };
 
     private Coupon Active(RewardOffer offer) =>
-        NewCoupon(offer, CouponStatus.Active, CouponCode.Generate(), DateTimeOffset.UtcNow.AddMinutes(-5));
+        NewCoupon(
+            offer,
+            CouponStatus.Active,
+            CouponCode.Generate(),
+            DateTimeOffset.UtcNow.AddMinutes(-5)
+        );
 
     private Coupon Redeemed(RewardOffer offer, Guid purchaseId) =>
-        NewCoupon(offer, CouponStatus.Redeemed, CouponCode.Generate(), DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow, purchaseId);
+        NewCoupon(
+            offer,
+            CouponStatus.Redeemed,
+            CouponCode.Generate(),
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            DateTimeOffset.UtcNow,
+            purchaseId
+        );
 
-    private FuelPurchase Purchase() => new()
-    {
-        Id = Guid.CreateVersion7(),
-        UserId = _userId,
-        RegisteredByUserId = _userId,
-        StationCode = "ST-001",
-        RegisterCode = "K1",
-        SaleDate = new DateOnly(2026, 11, 21),
-        ReceiptNumber = Guid.NewGuid().ToString("N").ToUpperInvariant(),
-        GrossAmount = 100m,
-        Discount = 8.10m,
-        PaidAmount = 91.90m,
-        Liters = 40.5m,
-        PointsAwarded = 91,
-    };
+    private FuelPurchase Purchase() =>
+        new()
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = _userId,
+            RegisteredByUserId = _userId,
+            StationCode = "ST-001",
+            RegisterCode = "K1",
+            SaleDate = new DateOnly(2026, 11, 21),
+            ReceiptNumber = Guid.NewGuid().ToString("N").ToUpperInvariant(),
+            GrossAmount = 100m,
+            Discount = 8.10m,
+            PaidAmount = 91.90m,
+            Liters = 40.5m,
+            PointsAwarded = 91,
+        };
 
     private Task SaveAsync(params object[] entities) =>
         DbAsync(async db =>
@@ -102,7 +126,11 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
             return await db.SaveChangesAsync();
         });
 
-    private async Task AssertRejectedAsync(string sqlState, string constraint, params object[] entities)
+    private async Task AssertRejectedAsync(
+        string sqlState,
+        string constraint,
+        params object[] entities
+    )
     {
         var error = await Assert.ThrowsAsync<DbUpdateException>(() => SaveAsync(entities));
         var postgres = Assert.IsType<PostgresException>(error.InnerException);
@@ -125,15 +153,29 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
     [InlineData("0.20", "0", 500, "CK_RewardOffers_MaxLiters_Range")]
     [InlineData("0.20", "1000.001", 500, "CK_RewardOffers_MaxLiters_Range")]
     [InlineData("0.20", "50", 0, "CK_RewardOffers_PointsCost_Range")]
-    public async Task Rejects_offer_benefit_outside_range(string rate, string liters, int cost, string constraint) =>
+    public async Task Rejects_offer_benefit_outside_range(
+        string rate,
+        string liters,
+        int cost,
+        string constraint
+    ) =>
         await AssertRejectedAsync(
             PostgresErrorCodes.CheckViolation,
             constraint,
-            Offer(decimal.Parse(rate, System.Globalization.CultureInfo.InvariantCulture), decimal.Parse(liters, System.Globalization.CultureInfo.InvariantCulture), cost));
+            Offer(
+                decimal.Parse(rate, System.Globalization.CultureInfo.InvariantCulture),
+                decimal.Parse(liters, System.Globalization.CultureInfo.InvariantCulture),
+                cost
+            )
+        );
 
     [Fact]
     public async Task Rejects_blank_offer_name() =>
-        await AssertRejectedAsync(PostgresErrorCodes.CheckViolation, "CK_RewardOffers_Name_NotBlank", Offer(name: "  "));
+        await AssertRejectedAsync(
+            PostgresErrorCodes.CheckViolation,
+            "CK_RewardOffers_Name_NotBlank",
+            Offer(name: "  ")
+        );
 
     /// <summary>Documents why precision is validated in the application: numeric(4,2) rounds, it does not reject.</summary>
     [Fact]
@@ -141,7 +183,14 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
     {
         var offer = Offer(rate: 0.205m);
         await SaveAsync(offer);
-        Assert.Equal(0.21m, await DbAsync(db => db.RewardOffers.Where(o => o.Id == offer.Id).Select(o => o.DiscountPerLiter).SingleAsync()));
+        Assert.Equal(
+            0.21m,
+            await DbAsync(db =>
+                db.RewardOffers.Where(o => o.Id == offer.Id)
+                    .Select(o => o.DiscountPerLiter)
+                    .SingleAsync()
+            )
+        );
     }
 
     [Fact]
@@ -151,19 +200,24 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
         await SaveAsync(offer);
         var coupon = NewCoupon(offer);
         coupon.DiscountPerLiter = 0m;
-        await AssertRejectedAsync(PostgresErrorCodes.CheckViolation, "CK_Coupons_DiscountPerLiter_Range", coupon);
+        await AssertRejectedAsync(
+            PostgresErrorCodes.CheckViolation,
+            "CK_Coupons_DiscountPerLiter_Range",
+            coupon
+        );
     }
 
-    public static TheoryData<string> InconsistentStates => new()
-    {
-        "purchased-with-code",
-        "purchased-activated",
-        "active-without-code",
-        "active-without-activation",
-        "active-with-purchase",
-        "redeemed-without-purchase",
-        "redeemed-without-time",
-    };
+    public static TheoryData<string> InconsistentStates =>
+        new()
+        {
+            "purchased-with-code",
+            "purchased-activated",
+            "active-without-code",
+            "active-without-activation",
+            "active-with-purchase",
+            "redeemed-without-purchase",
+            "redeemed-without-time",
+        };
 
     [Theory]
     [MemberData(nameof(InconsistentStates))]
@@ -178,10 +232,32 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
             "purchased-with-code" => NewCoupon(offer, code: CouponCode.Generate()),
             "purchased-activated" => NewCoupon(offer, activatedAt: now),
             "active-without-code" => NewCoupon(offer, CouponStatus.Active, activatedAt: now),
-            "active-without-activation" => NewCoupon(offer, CouponStatus.Active, CouponCode.Generate()),
-            "active-with-purchase" => NewCoupon(offer, CouponStatus.Active, CouponCode.Generate(), now, purchaseId: purchase.Id),
-            "redeemed-without-purchase" => NewCoupon(offer, CouponStatus.Redeemed, CouponCode.Generate(), now, now),
-            "redeemed-without-time" => NewCoupon(offer, CouponStatus.Redeemed, CouponCode.Generate(), now, purchaseId: purchase.Id),
+            "active-without-activation" => NewCoupon(
+                offer,
+                CouponStatus.Active,
+                CouponCode.Generate()
+            ),
+            "active-with-purchase" => NewCoupon(
+                offer,
+                CouponStatus.Active,
+                CouponCode.Generate(),
+                now,
+                purchaseId: purchase.Id
+            ),
+            "redeemed-without-purchase" => NewCoupon(
+                offer,
+                CouponStatus.Redeemed,
+                CouponCode.Generate(),
+                now,
+                now
+            ),
+            "redeemed-without-time" => NewCoupon(
+                offer,
+                CouponStatus.Redeemed,
+                CouponCode.Generate(),
+                now,
+                purchaseId: purchase.Id
+            ),
             _ => throw new ArgumentOutOfRangeException(nameof(state)),
         };
 
@@ -234,7 +310,11 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
         var purchase = Purchase();
         await SaveAsync(offer, purchase);
         await SaveAsync(Redeemed(offer, purchase.Id));
-        await AssertRejectedAsync(PostgresErrorCodes.UniqueViolation, "UX_Coupons_RedeemedPurchase", Redeemed(offer, purchase.Id));
+        await AssertRejectedAsync(
+            PostgresErrorCodes.UniqueViolation,
+            "UX_Coupons_RedeemedPurchase",
+            Redeemed(offer, purchase.Id)
+        );
     }
 
     [Fact]
@@ -244,8 +324,9 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
         await SaveAsync(offer);
         await SaveAsync(NewCoupon(offer));
 
-        var error = await Assert.ThrowsAsync<PostgresException>(
-            () => DbAsync(db => db.RewardOffers.Where(o => o.Id == offer.Id).ExecuteDeleteAsync()));
+        var error = await Assert.ThrowsAsync<PostgresException>(() =>
+            DbAsync(db => db.RewardOffers.Where(o => o.Id == offer.Id).ExecuteDeleteAsync())
+        );
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
     }
 
@@ -254,7 +335,11 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
     {
         var offer = Offer();
         offer.Version = 0;
-        await AssertRejectedAsync(PostgresErrorCodes.CheckViolation, "CK_RewardOffers_Version_Positive", offer);
+        await AssertRejectedAsync(
+            PostgresErrorCodes.CheckViolation,
+            "CK_RewardOffers_Version_Positive",
+            offer
+        );
     }
 
     [Fact]
@@ -285,6 +370,9 @@ public sealed class RewardsModelConstraintsTests(ApiFactory factory) : IAsyncLif
         await SaveAsync(offer);
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(1, (await db.RewardOffers.AsNoTracking().SingleAsync(o => o.Id == offer.Id)).Version);
+        Assert.Equal(
+            1,
+            (await db.RewardOffers.AsNoTracking().SingleAsync(o => o.Id == offer.Id)).Version
+        );
     }
 }

@@ -13,9 +13,13 @@ namespace FuelClub.Api.Modules.Loyalty;
 
 public static class LoyaltyModule
 {
-    public static IServiceCollection AddLoyalty(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLoyalty(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
-        services.AddOptions<LoyaltyOptions>()
+        services
+            .AddOptions<LoyaltyOptions>()
             .Bind(configuration.GetSection(LoyaltyOptions.Section))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<LoyaltyOptions>, LoyaltyOptionsValidator>();

@@ -28,14 +28,25 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
     {
         foreach (var email in _emails)
             await factory.DeleteTestUserAsync(email);
-        await DbAsync(db => db.RewardOffers.Where(offer => offer.Name.Contains(_tag)).ExecuteDeleteAsync());
+        await DbAsync(db =>
+            db.RewardOffers.Where(offer => offer.Name.Contains(_tag)).ExecuteDeleteAsync()
+        );
     }
 
     private sealed record Customer(HttpClient Client, string UserId);
 
     private sealed record CouponBody(
-        Guid Id, Guid OfferId, string OfferName, int PointsCost, decimal DiscountPerLiter, decimal MaxLiters,
-        string Status, DateTimeOffset PurchasedAt, DateTimeOffset? ActivatedAt, DateTimeOffset? RedeemedAt);
+        Guid Id,
+        Guid OfferId,
+        string OfferName,
+        int PointsCost,
+        decimal DiscountPerLiter,
+        decimal MaxLiters,
+        string Status,
+        DateTimeOffset PurchasedAt,
+        DateTimeOffset? ActivatedAt,
+        DateTimeOffset? RedeemedAt
+    );
 
     private sealed record ExchangeBody(CouponBody Coupon, int Balance);
 
@@ -45,7 +56,14 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
 
     private sealed record CouponExchangeBody(Guid CouponId, string OfferName);
 
-    private sealed record TransactionBody(Guid Id, string Type, int Delta, int BalanceAfter, object? FuelPurchase, CouponExchangeBody? CouponExchange);
+    private sealed record TransactionBody(
+        Guid Id,
+        string Type,
+        int Delta,
+        int BalanceAfter,
+        object? FuelPurchase,
+        CouponExchangeBody? CouponExchange
+    );
 
     private sealed record ProblemBody(string? Code);
 
@@ -60,9 +78,13 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var email = $"exchange-{role.ToLowerInvariant()}-{Guid.NewGuid():N}@example.test";
         _emails.Add(email);
         await factory.CreateTestUserAsync(email, Password, role);
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions { HandleCookies = true }
+        );
         await client.LoginAsync(email, Password);
-        var userId = await DbAsync(db => db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync());
+        var userId = await DbAsync(db =>
+            db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync()
+        );
         return (client, userId);
     }
 
@@ -78,7 +100,12 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         return new Customer(client, userId);
     }
 
-    private async Task<RewardOffer> OfferAsync(int cost = 500, bool active = true, decimal rate = 0.20m, decimal liters = 50m)
+    private async Task<RewardOffer> OfferAsync(
+        int cost = 500,
+        bool active = true,
+        decimal rate = 0.20m,
+        decimal liters = 50m
+    )
     {
         var offer = new RewardOffer
         {
@@ -90,15 +117,28 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
             MaxLiters = liters,
             IsActive = active,
         };
-        await DbAsync(async db => { db.RewardOffers.Add(offer); return await db.SaveChangesAsync(); });
+        await DbAsync(async db =>
+        {
+            db.RewardOffers.Add(offer);
+            return await db.SaveChangesAsync();
+        });
         return offer;
     }
 
     private static string NewKey() => Guid.NewGuid().ToString();
 
-    private static async Task<HttpResponseMessage> ExchangeAsync(HttpClient client, Guid offerId, int? version, string? key = null, bool csrf = true)
+    private static async Task<HttpResponseMessage> ExchangeAsync(
+        HttpClient client,
+        Guid offerId,
+        int? version,
+        string? key = null,
+        bool csrf = true
+    )
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/rewards/{offerId}/exchange")
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/rewards/{offerId}/exchange"
+        )
         {
             Content = JsonContent.Create(new { version }),
         };
@@ -112,22 +152,43 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         (await response.Content.ReadFromJsonAsync<ProblemBody>())!.Code;
 
     private Task<int?> BalanceAsync(string userId) =>
-        DbAsync(db => db.LoyaltyAccounts.Where(a => a.UserId == userId).Select(a => (int?)a.Balance).SingleOrDefaultAsync());
+        DbAsync(db =>
+            db.LoyaltyAccounts.Where(a => a.UserId == userId)
+                .Select(a => (int?)a.Balance)
+                .SingleOrDefaultAsync()
+        );
 
-    private Task<int> CouponCountAsync(string userId) => DbAsync(db => db.Coupons.CountAsync(c => c.UserId == userId));
+    private Task<int> CouponCountAsync(string userId) =>
+        DbAsync(db => db.Coupons.CountAsync(c => c.UserId == userId));
 
     private Task<int> ExchangeEntriesAsync(string userId) =>
-        DbAsync(db => db.PointsLedgerEntries.CountAsync(e => e.UserId == userId && e.Type == PointsLedgerEntryType.CouponExchange));
+        DbAsync(db =>
+            db.PointsLedgerEntries.CountAsync(e =>
+                e.UserId == userId && e.Type == PointsLedgerEntryType.CouponExchange
+            )
+        );
 
-    private async Task<HttpResponseMessage> EditOfferAsync(HttpClient admin, RewardOffer offer, int version, int cost)
+    private async Task<HttpResponseMessage> EditOfferAsync(
+        HttpClient admin,
+        RewardOffer offer,
+        int version,
+        int cost
+    )
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, $"/api/admin/rewards/{offer.Id}")
         {
-            Content = JsonContent.Create(new
-            {
-                name = offer.Name, description = offer.Description, pointsCost = cost,
-                discountPerLiter = offer.DiscountPerLiter, maxLiters = offer.MaxLiters, isActive = true, version,
-            }),
+            Content = JsonContent.Create(
+                new
+                {
+                    name = offer.Name,
+                    description = offer.Description,
+                    pointsCost = cost,
+                    discountPerLiter = offer.DiscountPerLiter,
+                    maxLiters = offer.MaxLiters,
+                    isActive = true,
+                    version,
+                }
+            ),
         };
         request.Headers.Add(TestHttpExtensions.CsrfHeader, await admin.GetCsrfTokenAsync());
         return await admin.SendAsync(request);
@@ -139,7 +200,9 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var customer = await CustomerAsync(1200);
         var offer = await OfferAsync(cost: 500, rate: 0.25m, liters: 40.5m);
 
-        var catalog = (await customer.Client.GetFromJsonAsync<ListBody<CatalogItem>>("/api/rewards"))!.Items.Single(i => i.Id == offer.Id);
+        var catalog = (
+            await customer.Client.GetFromJsonAsync<ListBody<CatalogItem>>("/api/rewards")
+        )!.Items.Single(i => i.Id == offer.Id);
         Assert.Equal(1, catalog.Version);
 
         var response = await ExchangeAsync(customer.Client, offer.Id, catalog.Version);
@@ -147,17 +210,44 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = (await response.Content.ReadFromJsonAsync<ExchangeBody>())!;
         Assert.Equal(700, body.Balance);
-        Assert.Equal((offer.Id, offer.Name, 500, 0.25m, 40.5m, "Purchased"),
-            (body.Coupon.OfferId, body.Coupon.OfferName, body.Coupon.PointsCost, body.Coupon.DiscountPerLiter, body.Coupon.MaxLiters, body.Coupon.Status));
+        Assert.Equal(
+            (offer.Id, offer.Name, 500, 0.25m, 40.5m, "Purchased"),
+            (
+                body.Coupon.OfferId,
+                body.Coupon.OfferName,
+                body.Coupon.PointsCost,
+                body.Coupon.DiscountPerLiter,
+                body.Coupon.MaxLiters,
+                body.Coupon.Status
+            )
+        );
         Assert.Null(body.Coupon.ActivatedAt);
         Assert.Equal($"{Coupons}/{body.Coupon.Id}", response.Headers.Location!.OriginalString);
 
-        Assert.Equal(body.Coupon, await customer.Client.GetFromJsonAsync<CouponBody>(response.Headers.Location.OriginalString));
-        Assert.Equal([body.Coupon.Id], (await customer.Client.GetFromJsonAsync<ListBody<CouponBody>>(Coupons))!.Items.Select(c => c.Id));
+        Assert.Equal(
+            body.Coupon,
+            await customer.Client.GetFromJsonAsync<CouponBody>(
+                response.Headers.Location.OriginalString
+            )
+        );
+        Assert.Equal(
+            [body.Coupon.Id],
+            (await customer.Client.GetFromJsonAsync<ListBody<CouponBody>>(Coupons))!.Items.Select(
+                c => c.Id
+            )
+        );
         Assert.Equal(700, await BalanceAsync(customer.UserId));
-        Assert.Null(await DbAsync(db => db.Coupons.Where(c => c.Id == body.Coupon.Id).Select(c => c.Code).SingleAsync()));
+        Assert.Null(
+            await DbAsync(db =>
+                db.Coupons.Where(c => c.Id == body.Coupon.Id).Select(c => c.Code).SingleAsync()
+            )
+        );
 
-        var history = (await customer.Client.GetFromJsonAsync<ListBody<TransactionBody>>("/api/me/transactions"))!.Items;
+        var history = (
+            await customer.Client.GetFromJsonAsync<ListBody<TransactionBody>>(
+                "/api/me/transactions"
+            )
+        )!.Items;
         var entry = Assert.Single(history);
         Assert.Equal(("CouponExchange", -500, 700), (entry.Type, entry.Delta, entry.BalanceAfter));
         Assert.Equal(new CouponExchangeBody(body.Coupon.Id, offer.Name), entry.CouponExchange);
@@ -197,13 +287,22 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var customer = await CustomerAsync(10_000);
 
         var missing = await ExchangeAsync(customer.Client, Guid.NewGuid(), 1);
-        Assert.Equal((HttpStatusCode.NotFound, "rewards.offer_not_found"), (missing.StatusCode, await CodeOf(missing)));
+        Assert.Equal(
+            (HttpStatusCode.NotFound, "rewards.offer_not_found"),
+            (missing.StatusCode, await CodeOf(missing))
+        );
 
         // Deactivation also raises the version: the customer must learn "unavailable", not "changed".
         var inactive = await OfferAsync(active: false);
-        await DbAsync(db => db.RewardOffers.Where(o => o.Id == inactive.Id).ExecuteUpdateAsync(s => s.SetProperty(o => o.Version, 2)));
+        await DbAsync(db =>
+            db.RewardOffers.Where(o => o.Id == inactive.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(o => o.Version, 2))
+        );
         var unavailable = await ExchangeAsync(customer.Client, inactive.Id, 1);
-        Assert.Equal((HttpStatusCode.Conflict, "rewards.offer_inactive"), (unavailable.StatusCode, await CodeOf(unavailable)));
+        Assert.Equal(
+            (HttpStatusCode.Conflict, "rewards.offer_inactive"),
+            (unavailable.StatusCode, await CodeOf(unavailable))
+        );
 
         var offer = await OfferAsync();
         await DbAsync(async db =>
@@ -213,11 +312,17 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
             return await db.SaveChangesAsync();
         });
         var changed = await ExchangeAsync(customer.Client, offer.Id, 1);
-        Assert.Equal((HttpStatusCode.Conflict, "rewards.offer_changed"), (changed.StatusCode, await CodeOf(changed)));
+        Assert.Equal(
+            (HttpStatusCode.Conflict, "rewards.offer_changed"),
+            (changed.StatusCode, await CodeOf(changed))
+        );
 
         Assert.Equal(10_000, await BalanceAsync(customer.UserId));
         Assert.Equal(0, await CouponCountAsync(customer.UserId));
-        Assert.Equal(HttpStatusCode.Created, (await ExchangeAsync(customer.Client, offer.Id, 2)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await ExchangeAsync(customer.Client, offer.Id, 2)).StatusCode
+        );
         Assert.Equal(9_100, await BalanceAsync(customer.UserId));
     }
 
@@ -246,7 +351,10 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var retry = await ExchangeAsync(customer.Client, offer.Id, 1, key);
 
         Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
-        Assert.Equal((await first.Content.ReadFromJsonAsync<ExchangeBody>())!, (await retry.Content.ReadFromJsonAsync<ExchangeBody>())!);
+        Assert.Equal(
+            (await first.Content.ReadFromJsonAsync<ExchangeBody>())!,
+            (await retry.Content.ReadFromJsonAsync<ExchangeBody>())!
+        );
         Assert.Equal(1500, await BalanceAsync(customer.UserId));
         Assert.Equal(1, await CouponCountAsync(customer.UserId));
     }
@@ -258,10 +366,19 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var offer = await OfferAsync(cost: 500);
         var key = NewKey();
 
-        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => ExchangeAsync(customer.Client, offer.Id, 1, key)));
+        var responses = await Task.WhenAll(
+            Enumerable.Range(0, 6).Select(_ => ExchangeAsync(customer.Client, offer.Id, 1, key))
+        );
 
         Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.Created);
-        Assert.All(responses, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.Created, HttpStatusCode.Conflict }));
+        Assert.All(
+            responses,
+            r =>
+                Assert.Contains(
+                    r.StatusCode,
+                    new[] { HttpStatusCode.Created, HttpStatusCode.Conflict }
+                )
+        );
         Assert.Equal(1, await CouponCountAsync(customer.UserId));
         Assert.Equal(4500, await BalanceAsync(customer.UserId));
     }
@@ -272,7 +389,9 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var customer = await CustomerAsync(1000);
         var offer = await OfferAsync(cost: 500);
 
-        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => ExchangeAsync(customer.Client, offer.Id, 1)));
+        var responses = await Task.WhenAll(
+            Enumerable.Range(0, 6).Select(_ => ExchangeAsync(customer.Client, offer.Id, 1))
+        );
 
         Assert.Equal(2, responses.Count(r => r.StatusCode == HttpStatusCode.Created));
         var rejected = responses.Where(r => r.StatusCode != HttpStatusCode.Created).ToList();
@@ -282,8 +401,12 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(0, await BalanceAsync(customer.UserId));
         Assert.Equal(2, await CouponCountAsync(customer.UserId));
         Assert.Equal(2, await ExchangeEntriesAsync(customer.UserId));
-        var balancesAfter = await DbAsync(db => db.PointsLedgerEntries.Where(e => e.UserId == customer.UserId)
-            .OrderBy(e => e.Sequence).Select(e => e.BalanceAfter).ToListAsync());
+        var balancesAfter = await DbAsync(db =>
+            db.PointsLedgerEntries.Where(e => e.UserId == customer.UserId)
+                .OrderBy(e => e.Sequence)
+                .Select(e => e.BalanceAfter)
+                .ToListAsync()
+        );
         Assert.Equal([500, 0], balancesAfter);
     }
 
@@ -294,7 +417,8 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var (admin, _) = await AccountAsync(RoleNames.Admin);
         var offer = await OfferAsync(cost: 500);
 
-        Task<HttpResponseMessage> exchange, edit;
+        Task<HttpResponseMessage> exchange,
+            edit;
         using (var gate = factory.LockGate.Arm(CustomerLock.Key(customer.UserId)))
         {
             // The exchange holds the offer row (FOR SHARE) and is paused right after the customer lock.
@@ -316,7 +440,12 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(1500, await BalanceAsync(customer.UserId));
 
         // The coupon is a snapshot: the later edit does not change it.
-        Assert.Equal(500, (await customer.Client.GetFromJsonAsync<CouponBody>($"{Coupons}/{coupon.Id}"))!.PointsCost);
+        Assert.Equal(
+            500,
+            (
+                await customer.Client.GetFromJsonAsync<CouponBody>($"{Coupons}/{coupon.Id}")
+            )!.PointsCost
+        );
         var stale = await ExchangeAsync(customer.Client, offer.Id, 1);
         Assert.Equal("rewards.offer_changed", await CodeOf(stale));
     }
@@ -329,11 +458,23 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var key = NewKey();
 
         HttpResponseMessage busy;
-        await using (var connection = new NpgsqlConnection(factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection")))
+        await using (
+            var connection = new NpgsqlConnection(
+                factory
+                    .Services.GetRequiredService<IConfiguration>()
+                    .GetConnectionString("DefaultConnection")
+            )
+        )
         {
             await connection.OpenAsync();
             await using var transaction = await connection.BeginTransactionAsync();
-            await using (var command = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended(@key, 0))", connection, transaction))
+            await using (
+                var command = new NpgsqlCommand(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(@key, 0))",
+                    connection,
+                    transaction
+                )
+            )
             {
                 command.Parameters.AddWithValue("key", CustomerLock.Key(customer.UserId));
                 await command.ExecuteNonQueryAsync();
@@ -348,7 +489,10 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(1000, await BalanceAsync(customer.UserId));
         Assert.Equal(0, await CouponCountAsync(customer.UserId));
 
-        Assert.Equal(HttpStatusCode.Created, (await ExchangeAsync(customer.Client, offer.Id, 1, key)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await ExchangeAsync(customer.Client, offer.Id, 1, key)).StatusCode
+        );
         Assert.Equal(500, await BalanceAsync(customer.UserId));
     }
 
@@ -360,11 +504,23 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var key = NewKey();
 
         HttpResponseMessage busy;
-        await using (var connection = new NpgsqlConnection(factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection")))
+        await using (
+            var connection = new NpgsqlConnection(
+                factory
+                    .Services.GetRequiredService<IConfiguration>()
+                    .GetConnectionString("DefaultConnection")
+            )
+        )
         {
             await connection.OpenAsync();
             await using var transaction = await connection.BeginTransactionAsync();
-            await using (var command = new NpgsqlCommand("""SELECT 1 FROM "RewardOffers" WHERE "Id" = @id FOR UPDATE""", connection, transaction))
+            await using (
+                var command = new NpgsqlCommand(
+                    """SELECT 1 FROM "RewardOffers" WHERE "Id" = @id FOR UPDATE""",
+                    connection,
+                    transaction
+                )
+            )
             {
                 command.Parameters.AddWithValue("id", offer.Id);
                 await command.ExecuteNonQueryAsync();
@@ -379,7 +535,10 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(1000, await BalanceAsync(customer.UserId));
         Assert.Equal(0, await CouponCountAsync(customer.UserId));
 
-        Assert.Equal(HttpStatusCode.Created, (await ExchangeAsync(customer.Client, offer.Id, 1, key)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await ExchangeAsync(customer.Client, offer.Id, 1, key)).StatusCode
+        );
         Assert.Equal(500, await BalanceAsync(customer.UserId));
     }
 
@@ -391,8 +550,21 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
     [InlineData("00:00:00.001", true)]
     [InlineData("00:00:30", true)]
     public void Offer_lock_timeout_must_be_between_1_ms_and_30_s(string value, bool valid) =>
-        Assert.Equal(valid, new FuelClub.Api.Modules.Rewards.Infrastructure.RewardsOptionsValidator()
-            .Validate(null, new FuelClub.Api.Modules.Rewards.Infrastructure.RewardsOptions { OfferLockTimeout = TimeSpan.Parse(value, System.Globalization.CultureInfo.InvariantCulture) }).Succeeded);
+        Assert.Equal(
+            valid,
+            new FuelClub.Api.Modules.Rewards.Infrastructure.RewardsOptionsValidator()
+                .Validate(
+                    null,
+                    new FuelClub.Api.Modules.Rewards.Infrastructure.RewardsOptions
+                    {
+                        OfferLockTimeout = TimeSpan.Parse(
+                            value,
+                            System.Globalization.CultureInfo.InvariantCulture
+                        ),
+                    }
+                )
+                .Succeeded
+        );
 
     [Fact]
     public async Task Coupons_are_visible_only_to_their_owner()
@@ -400,12 +572,22 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var owner = await CustomerAsync(1000);
         var other = await CustomerAsync(1000);
         var offer = await OfferAsync(cost: 500);
-        var coupon = (await (await ExchangeAsync(owner.Client, offer.Id, 1)).Content.ReadFromJsonAsync<ExchangeBody>())!.Coupon;
+        var coupon = (
+            await (
+                await ExchangeAsync(owner.Client, offer.Id, 1)
+            ).Content.ReadFromJsonAsync<ExchangeBody>()
+        )!.Coupon;
 
         var foreign = await other.Client.GetAsync($"{Coupons}/{coupon.Id}");
-        Assert.Equal((HttpStatusCode.NotFound, "rewards.coupon_not_found"), (foreign.StatusCode, await CodeOf(foreign)));
+        Assert.Equal(
+            (HttpStatusCode.NotFound, "rewards.coupon_not_found"),
+            (foreign.StatusCode, await CodeOf(foreign))
+        );
         Assert.Empty((await other.Client.GetFromJsonAsync<ListBody<CouponBody>>(Coupons))!.Items);
-        Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.GetAsync($"{Coupons}/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await owner.Client.GetAsync($"{Coupons}/{Guid.NewGuid()}")).StatusCode
+        );
     }
 
     [Fact]
@@ -414,17 +596,40 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         var offer = await OfferAsync(cost: 500);
         var anonymous = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(Coupons)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsync($"/api/rewards/{offer.Id}/exchange", JsonContent.Create(new { version = 1 }))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (
+                await anonymous.PostAsync(
+                    $"/api/rewards/{offer.Id}/exchange",
+                    JsonContent.Create(new { version = 1 })
+                )
+            ).StatusCode
+        );
 
         var (cashier, _) = await AccountAsync(RoleNames.Cashier);
         Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync(Coupons)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await ExchangeAsync(cashier, offer.Id, 1)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await ExchangeAsync(cashier, offer.Id, 1)).StatusCode
+        );
 
         var customer = await CustomerAsync(1000);
-        Assert.Equal(HttpStatusCode.Forbidden, (await ExchangeAsync(customer.Client, offer.Id, 1, csrf: false)).StatusCode);
-        using var noKey = new HttpRequestMessage(HttpMethod.Post, $"/api/rewards/{offer.Id}/exchange") { Content = JsonContent.Create(new { version = 1 }) };
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await ExchangeAsync(customer.Client, offer.Id, 1, csrf: false)).StatusCode
+        );
+        using var noKey = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/rewards/{offer.Id}/exchange"
+        )
+        {
+            Content = JsonContent.Create(new { version = 1 }),
+        };
         noKey.Headers.Add(TestHttpExtensions.CsrfHeader, await customer.Client.GetCsrfTokenAsync());
-        Assert.Equal(HttpStatusCode.BadRequest, (await customer.Client.SendAsync(noKey)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await customer.Client.SendAsync(noKey)).StatusCode
+        );
         Assert.Equal(1000, await BalanceAsync(customer.UserId));
     }
 
@@ -432,9 +637,12 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
     {
         for (var attempt = 0; attempt < 500; attempt++)
         {
-            var waiting = await DbAsync(db => db.Database
-                .SqlQuery<int>($"""SELECT count(*)::int AS "Value" FROM pg_locks WHERE locktype <> 'advisory' AND NOT granted""")
-                .SingleAsync());
+            var waiting = await DbAsync(db =>
+                db.Database.SqlQuery<int>(
+                        $"""SELECT count(*)::int AS "Value" FROM pg_locks WHERE locktype <> 'advisory' AND NOT granted"""
+                    )
+                    .SingleAsync()
+            );
             if (waiting > 0)
                 return;
             await Task.Delay(10);

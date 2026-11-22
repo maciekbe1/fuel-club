@@ -16,7 +16,13 @@ const issuedAt = new Intl.DateTimeFormat("pl-PL", {
 });
 
 /** The rotation mutation comes from the panel, so its idempotency key survives this view re-mounting. */
-export function ActiveCard({ card, rotate }: { card: LoyaltyCard; rotate: ReturnType<typeof useRotateCard> }) {
+export function ActiveCard({
+  card,
+  rotate,
+}: {
+  card: LoyaltyCard;
+  rotate: ReturnType<typeof useRotateCard>;
+}) {
   const [confirming, setConfirming] = useState(false);
   // An unknown outcome keeps the retry visible even if this view was re-mounted in between.
   const awaitingRetry = rotate.isError && keepsIdempotencyKey(rotate.error);
@@ -42,7 +48,9 @@ export function ActiveCard({ card, rotate }: { card: LoyaltyCard; rotate: Return
           Karta Fuel Club
         </h2>
         <div className="relative flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-widest text-white/70">Kod karty</p>
+          <p className="text-xs uppercase tracking-widest text-white/70">
+            Kod karty
+          </p>
           <p
             data-testid="card-code"
             data-code={card.code}
@@ -52,30 +60,42 @@ export function ActiveCard({ card, rotate }: { card: LoyaltyCard; rotate: Return
             {formatCardCode(card.code)}
           </p>
         </div>
-        <p className="relative text-xs text-white/70">Wydana {issuedAt.format(new Date(card.issuedAt))}</p>
+        <p className="relative text-xs text-white/70">
+          Wydana {issuedAt.format(new Date(card.issuedAt))}
+        </p>
       </section>
 
       <figure className="flex flex-col items-center gap-3 rounded-3xl border bg-white p-5 text-neutral-900">
         <CardQr code={card.code} className="size-56 max-w-full" />
-        <figcaption className="text-center text-sm">Pokaż kod QR przy kasie</figcaption>
+        <figcaption className="text-center text-sm">
+          Pokaż kod QR przy kasie
+        </figcaption>
       </figure>
 
       <p className="text-sm text-muted-foreground">
-        Kasjer może też wpisać kod ręcznie - podyktuj go albo skopiuj. Kod nie zawiera Twoich danych osobowych.
+        Kasjer może też wpisać kod ręcznie - podyktuj go albo skopiuj. Kod nie
+        zawiera Twoich danych osobowych.
       </p>
 
       <CopyButton code={card.code} />
 
-      <section aria-labelledby="rotate-heading" className="flex flex-col items-start gap-3 rounded-2xl border p-5">
+      <section
+        aria-labelledby="rotate-heading"
+        className="flex flex-col items-start gap-3 rounded-2xl border p-5"
+      >
         <h2 id="rotate-heading" className="font-medium">
           Wymiana kodu
         </h2>
         <p className="text-sm text-muted-foreground">
-          Jeśli ktoś mógł zobaczyć Twój kod, wymień go. Stary kod przestanie działać od razu.
+          Jeśli ktoś mógł zobaczyć Twój kod, wymień go. Stary kod przestanie
+          działać od razu.
         </p>
 
         {rotated && !rotate.isPending && (
-          <p role="status" className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          <p
+            role="status"
+            className="text-sm font-medium text-emerald-700 dark:text-emerald-400"
+          >
             Nowy kod jest aktywny.
           </p>
         )}
@@ -92,14 +112,22 @@ export function ActiveCard({ card, rotate }: { card: LoyaltyCard; rotate: Return
             Wymień kod
           </Button>
         ) : (
-          <div role="group" aria-label="Potwierdzenie wymiany kodu" className="flex flex-col gap-3">
+          <div
+            role="group"
+            aria-label="Potwierdzenie wymiany kodu"
+            className="flex flex-col gap-3"
+          >
             <p className="text-sm font-medium">
               {awaitingRetry
                 ? "Wymiana mogła już zostać wykonana. Ponowienie jest bezpieczne - kod nie zostanie wymieniony drugi raz."
                 : "Na pewno wymienić kod? Stary przestanie działać."}
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={confirmRotation} disabled={rotate.isPending} className={orange}>
+              <Button
+                onClick={confirmRotation}
+                disabled={rotate.isPending}
+                className={orange}
+              >
                 {rotate.isPending
                   ? "Wymiana…"
                   : rotate.isError && keepsIdempotencyKey(rotate.error)
@@ -109,7 +137,11 @@ export function ActiveCard({ card, rotate }: { card: LoyaltyCard; rotate: Return
               {/* Before sending, "Anuluj" abandons the rotation. With an unknown outcome there is nothing to
                   cancel: the server may already have rotated, so only a safe retry is offered. */}
               {!awaitingRetry && (
-                <Button variant="outline" onClick={() => setConfirming(false)} disabled={rotate.isPending}>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirming(false)}
+                  disabled={rotate.isPending}
+                >
                   Anuluj
                 </Button>
               )}

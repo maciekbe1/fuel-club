@@ -24,7 +24,10 @@ public sealed class IdempotencyOptionsValidatorTests
         Assert.True(Validate(value).Succeeded);
 
     private static ValidateOptionsResult Validate(string value) =>
-        new IdempotencyOptionsValidator().Validate(null, new IdempotencyOptions { LockTimeout = TimeSpan.Parse(value) });
+        new IdempotencyOptionsValidator().Validate(
+            null,
+            new IdempotencyOptions { LockTimeout = TimeSpan.Parse(value) }
+        );
 }
 
 [Collection(DatabaseCollection.Name)]
@@ -37,8 +40,13 @@ public sealed class IdempotencyOptionsStartupTests(ApiFactory factory)
     {
         // Added after ApiFactory's in-memory settings, so it overrides them.
         using var misconfigured = factory.WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Idempotency:LockTimeout"] = value })));
+            builder.ConfigureAppConfiguration(
+                (_, config) =>
+                    config.AddInMemoryCollection(
+                        new Dictionary<string, string?> { ["Idempotency:LockTimeout"] = value }
+                    )
+            )
+        );
 
         var error = Assert.Throws<OptionsValidationException>(() => misconfigured.CreateClient());
         Assert.Contains("LockTimeout", error.Message);

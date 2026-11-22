@@ -31,7 +31,8 @@ export class NetworkError extends Error {
 }
 
 export function toApiError(status: number, body: unknown): ApiError {
-  const problem = body && typeof body === "object" ? (body as ProblemDetails) : {};
+  const problem =
+    body && typeof body === "object" ? (body as ProblemDetails) : {};
   return new ApiError(status, problem);
 }
 
@@ -46,8 +47,14 @@ export function applyFieldErrors<T extends FieldValues>(
   for (const [field, fieldErrors] of Object.entries(error.problem.errors)) {
     const first = fieldErrors[0];
     if (!first) continue;
-    const target = !fields || fields.includes(field as Path<T>) ? (field as Path<T>) : ("root" as Path<T>);
-    setError(target, { type: first.code, message: messages[first.code] ?? messages.default });
+    const target =
+      !fields || fields.includes(field as Path<T>)
+        ? (field as Path<T>)
+        : ("root" as Path<T>);
+    setError(target, {
+      type: first.code,
+      message: messages[first.code] ?? messages.default,
+    });
     applied = true;
   }
   return applied;
@@ -55,7 +62,9 @@ export function applyFieldErrors<T extends FieldValues>(
 
 /** Message for a failed read: the shared cases (no connection, expired session) plus the screen's own fallback. */
 export function readErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof NetworkError) return "Brak połączenia z serwerem. Spróbuj ponownie.";
-  if (error instanceof ApiError && error.status === 401) return "Sesja wygasła. Zaloguj się ponownie.";
+  if (error instanceof NetworkError)
+    return "Brak połączenia z serwerem. Spróbuj ponownie.";
+  if (error instanceof ApiError && error.status === 401)
+    return "Sesja wygasła. Zaloguj się ponownie.";
   return fallback;
 }

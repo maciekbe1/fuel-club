@@ -19,7 +19,9 @@ export const authService = {
     resetCsrfToken();
   },
 
-  register: (body: RegisterInput) => unwrap(api.POST("/api/auth/register", { body })),
+  register: (body: RegisterInput) =>
+    unwrap(api.POST("/api/auth/register", { body })),
 };
 
-export const isAdmin = (me: Me | undefined) => me?.roles.includes("Admin") ?? false;
+export const isAdmin = (me: Me | undefined) =>
+  me?.roles.includes("Admin") ?? false;

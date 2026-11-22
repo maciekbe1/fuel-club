@@ -12,12 +12,16 @@ export const IDEMPOTENCY_HEADER = "Idempotency-Key";
  * a validation error, key reuse) ends the operation, and the next attempt is a new one.
  */
 export function keepsIdempotencyKey(error: unknown) {
-  if (error instanceof ApiError) return error.status >= 500 || error.code === "idempotency.in_progress";
+  if (error instanceof ApiError)
+    return error.status >= 500 || error.code === "idempotency.in_progress";
   // NetworkError (no response, e.g. lost after the server committed) and anything unexpected.
   return true;
 }
 
-type Options<TData, TVars> = Omit<UseMutationOptions<TData, Error, TVars>, "mutationFn"> & {
+type Options<TData, TVars> = Omit<
+  UseMutationOptions<TData, Error, TVars>,
+  "mutationFn"
+> & {
   mutationFn: (vars: TVars, idempotencyKey: string) => Promise<TData>;
 };
 

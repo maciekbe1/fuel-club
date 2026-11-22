@@ -17,13 +17,17 @@ namespace FuelClub.Api.Migrations
                 table: "RewardOffers",
                 type: "integer",
                 nullable: false,
-                defaultValue: 1);
-            migrationBuilder.Sql("ALTER TABLE \"RewardOffers\" ALTER COLUMN \"Version\" DROP DEFAULT;");
+                defaultValue: 1
+            );
+            migrationBuilder.Sql(
+                "ALTER TABLE \"RewardOffers\" ALTER COLUMN \"Version\" DROP DEFAULT;"
+            );
 
             migrationBuilder.AddCheckConstraint(
                 name: "CK_RewardOffers_Version_Positive",
                 table: "RewardOffers",
-                sql: "\"Version\" >= 1");
+                sql: "\"Version\" >= 1"
+            );
         }
 
         /// <inheritdoc />
@@ -31,11 +35,10 @@ namespace FuelClub.Api.Migrations
         {
             migrationBuilder.DropCheckConstraint(
                 name: "CK_RewardOffers_Version_Positive",
-                table: "RewardOffers");
+                table: "RewardOffers"
+            );
 
-            migrationBuilder.DropColumn(
-                name: "Version",
-                table: "RewardOffers");
+            migrationBuilder.DropColumn(name: "Version", table: "RewardOffers");
         }
     }
 }

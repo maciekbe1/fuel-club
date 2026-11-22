@@ -25,7 +25,8 @@ public static partial class CouponCode
     /// <summary>Same canonical form as a card code (separators removed, upper case, O/I/L look-alikes).</summary>
     public static string Normalize(string? input) => LoyaltyCardCode.Normalize(input);
 
-    public static bool IsValid(string? code) => code is not null && code.Length == Length && CodeRegex().IsMatch(code);
+    public static bool IsValid(string? code) =>
+        code is not null && code.Length == Length && CodeRegex().IsMatch(code);
 
     [GeneratedRegex(Pattern, RegexOptions.CultureInvariant)]
     private static partial Regex CodeRegex();

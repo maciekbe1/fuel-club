@@ -24,7 +24,13 @@ public sealed class AdminAccountProvisioner(
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        await AccountProvisioning.EnsureAccountAsync(users, email, password, "Administrator", RoleNames.Admin);
+        await AccountProvisioning.EnsureAccountAsync(
+            users,
+            email,
+            password,
+            "Administrator",
+            RoleNames.Admin
+        );
 
         await transaction.CommitAsync(cancellationToken);
     }

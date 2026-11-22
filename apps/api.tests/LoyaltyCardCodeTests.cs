@@ -17,7 +17,10 @@ public sealed class LoyaltyCardCodeTests
     public void Encoding_covers_all_128_bits()
     {
         Assert.Equal(new string('0', 26), LoyaltyCardCode.Encode(new byte[16]));
-        Assert.Equal("7" + new string('Z', 25), LoyaltyCardCode.Encode(Enumerable.Repeat((byte)0xFF, 16).ToArray()));
+        Assert.Equal(
+            "7" + new string('Z', 25),
+            LoyaltyCardCode.Encode(Enumerable.Repeat((byte)0xFF, 16).ToArray())
+        );
         var lastBit = new byte[16];
         lastBit[15] = 1;
         Assert.Equal(new string('0', 25) + "1", LoyaltyCardCode.Encode(lastBit));

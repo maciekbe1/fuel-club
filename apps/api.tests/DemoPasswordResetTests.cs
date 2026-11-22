@@ -23,7 +23,8 @@ public sealed class DemoPasswordResetTests(ApiFactory factory) : IAsyncLifetime
             factory.Services.GetRequiredService<IServiceScopeFactory>(),
             new TestHostEnvironment(Environments.Development),
             Configuration(OldPassword),
-            NullLogger<DemoAccountsSeeder>.Instance);
+            NullLogger<DemoAccountsSeeder>.Instance
+        );
         await seeder.StartAsync(CancellationToken.None);
     }
 
@@ -44,7 +45,8 @@ public sealed class DemoPasswordResetTests(ApiFactory factory) : IAsyncLifetime
         foreach (var (email, _, _) in DemoAccountsSeeder.Accounts)
         {
             var user = (await users.FindByEmailAsync(email))!;
-            var station = await db.CashierStations.AsNoTracking()
+            var station = await db
+                .CashierStations.AsNoTracking()
                 .Where(row => row.UserId == user.Id)
                 .Select(row => row.StationCode + "/" + row.RegisterCode)
                 .SingleOrDefaultAsync();
@@ -64,7 +66,11 @@ public sealed class DemoPasswordResetTests(ApiFactory factory) : IAsyncLifetime
     }
 
     private Task<int> RunAsync(string environment, string? password) =>
-        DemoPasswordReset.RunAsync(factory.Services, new TestHostEnvironment(environment), Configuration(password));
+        DemoPasswordReset.RunAsync(
+            factory.Services,
+            new TestHostEnvironment(environment),
+            Configuration(password)
+        );
 
     [Fact]
     public async Task Resets_passwords_keeping_ids_roles_and_station()
@@ -76,9 +82,16 @@ public sealed class DemoPasswordResetTests(ApiFactory factory) : IAsyncLifetime
         Assert.True(await AllPasswordsAreAsync(NewPassword));
         Assert.False(await AllPasswordsAreAsync(OldPassword));
         var after = await SnapshotAsync();
-        Assert.Equal(before.Select(s => (s.Id, s.Email, string.Join(",", s.Roles), s.Station)),
-            after.Select(s => (s.Id, s.Email, string.Join(",", s.Roles), s.Station)));
-        Assert.Contains(after, s => s.Station == $"{DemoAccountsSeeder.CashierStationCode}/{DemoAccountsSeeder.CashierRegisterCode}");
+        Assert.Equal(
+            before.Select(s => (s.Id, s.Email, string.Join(",", s.Roles), s.Station)),
+            after.Select(s => (s.Id, s.Email, string.Join(",", s.Roles), s.Station))
+        );
+        Assert.Contains(
+            after,
+            s =>
+                s.Station
+                == $"{DemoAccountsSeeder.CashierStationCode}/{DemoAccountsSeeder.CashierRegisterCode}"
+        );
     }
 
     [Fact]
@@ -103,11 +116,15 @@ public sealed class DemoPasswordResetTests(ApiFactory factory) : IAsyncLifetime
     }
 
     private static IConfiguration Configuration(string? password) =>
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            [DemoAccountsSeeder.EnabledKey] = "true",
-            [DemoAccountsSeeder.PasswordKey] = password,
-        }).Build();
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    [DemoAccountsSeeder.EnabledKey] = "true",
+                    [DemoAccountsSeeder.PasswordKey] = password,
+                }
+            )
+            .Build();
 
     private sealed class TestHostEnvironment(string environmentName) : IHostEnvironment
     {

@@ -15,7 +15,8 @@ public sealed record FuelPurchaseRequest(
     decimal Amount,
     decimal Liters,
     DateOnly SaleDate,
-    string? ReceiptNumber);
+    string? ReceiptNumber
+);
 
 /// <summary>The cashier learns the purchase ID and the points awarded, never the customer's balance.</summary>
 public sealed record FuelPurchaseResponse(Guid PurchaseId, int PointsAwarded);
@@ -37,7 +38,8 @@ public static class FuelPurchaseEndpoint
         AppDbContext db,
         CustomerLock customerLock,
         StationClock stationClock,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var cashierId = users.GetUserId(http.User)!;
 
@@ -49,20 +51,34 @@ public static class FuelPurchaseEndpoint
         else if (!LoyaltyCardCode.IsValid(cardCode))
             errors.Add(new("cardCode", LoyaltyErrorCodes.InvalidFormat));
 
-        var station = await db.CashierStations.AsNoTracking()
+        var station = await db
+            .CashierStations.AsNoTracking()
             .SingleOrDefaultAsync(row => row.UserId == cashierId, cancellationToken);
         if (station is null)
-            return ApiProblems.Problem(StatusCodes.Status404NotFound, "Cashier station not assigned", LoyaltyErrorCodes.CashierStationMissing);
+            return ApiProblems.Problem(
+                StatusCodes.Status404NotFound,
+                "Cashier station not assigned",
+                LoyaltyErrorCodes.CashierStationMissing
+            );
 
-        var input = FuelPurchaseRules.Normalize(new FuelPurchaseInput(
-            request.Amount,
-            request.Liters,
-            new ReceiptKey(station.StationCode, station.RegisterCode, request.SaleDate, request.ReceiptNumber ?? string.Empty)));
+        var input = FuelPurchaseRules.Normalize(
+            new FuelPurchaseInput(
+                request.Amount,
+                request.Liters,
+                new ReceiptKey(
+                    station.StationCode,
+                    station.RegisterCode,
+                    request.SaleDate,
+                    request.ReceiptNumber ?? string.Empty
+                )
+            )
+        );
         errors.AddRange(FuelPurchaseRules.Validate(input, stationClock.Today));
         if (errors.Count > 0)
             return LoyaltyProblems.Validation("Purchase is not valid", errors);
 
-        var card = await db.LoyaltyCards.AsNoTracking()
+        var card = await db
+            .LoyaltyCards.AsNoTracking()
             .Where(c => c.Code == cardCode && c.RevokedAt == null)
             .Select(c => new { c.Id, c.UserId })
             .SingleOrDefaultAsync(cancellationToken);
@@ -73,7 +89,12 @@ public static class FuelPurchaseEndpoint
             return LoyaltyProblems.CustomerBusy(http);
 
         // A new statement after the lock sees rotations committed while this request waited.
-        if (!await db.LoyaltyCards.AnyAsync(c => c.Id == card.Id && c.RevokedAt == null, cancellationToken))
+        if (
+            !await db.LoyaltyCards.AnyAsync(
+                c => c.Id == card.Id && c.RevokedAt == null,
+                cancellationToken
+            )
+        )
             return LoyaltyProblems.CardNotFound();
 
         // No coupon yet: nothing is discounted, the customer pays the gross amount.
@@ -99,25 +120,37 @@ public static class FuelPurchaseEndpoint
             await db.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception)
-            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: ReceiptConstraint })
+            when (exception.InnerException
+                    is PostgresException
+                    {
+                        SqlState: PostgresErrorCodes.UniqueViolation,
+                        ConstraintName: ReceiptConstraint
+                    }
+            )
         {
             // No owner information: the receipt may belong to another customer.
-            return ApiProblems.Problem(StatusCodes.Status409Conflict, "Receipt already registered", LoyaltyErrorCodes.ReceiptAlreadyRegistered);
+            return ApiProblems.Problem(
+                StatusCodes.Status409Conflict,
+                "Receipt already registered",
+                LoyaltyErrorCodes.ReceiptAlreadyRegistered
+            );
         }
 
         // Below 1 zł: the purchase is recorded, balance and history stay unchanged.
         if (points > 0)
         {
             var balanceAfter = await CreditAsync(db, card.UserId, points, cancellationToken);
-            db.PointsLedgerEntries.Add(new PointsLedgerEntry
-            {
-                Id = Guid.NewGuid(),
-                UserId = card.UserId,
-                Delta = points,
-                Type = PointsLedgerEntryType.FuelPurchase,
-                SourceId = purchase.Id,
-                BalanceAfter = balanceAfter,
-            });
+            db.PointsLedgerEntries.Add(
+                new PointsLedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = card.UserId,
+                    Delta = points,
+                    Type = PointsLedgerEntryType.FuelPurchase,
+                    SourceId = purchase.Id,
+                    BalanceAfter = balanceAfter,
+                }
+            );
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -128,14 +161,22 @@ public static class FuelPurchaseEndpoint
     /// One statement: adds to the existing balance or creates the account, locks the row until the
     /// transaction ends and returns the balance after the change (for BalanceAfter).
     /// </summary>
-    private static async Task<int> CreditAsync(AppDbContext db, string userId, int points, CancellationToken cancellationToken)
+    private static async Task<int> CreditAsync(
+        AppDbContext db,
+        string userId,
+        int points,
+        CancellationToken cancellationToken
+    )
     {
-        var balances = await db.Database.SqlQuery<int>(
-            $"""
-            INSERT INTO "LoyaltyAccounts" ("UserId", "Balance") VALUES ({userId}, {points})
-            ON CONFLICT ("UserId") DO UPDATE SET "Balance" = "LoyaltyAccounts"."Balance" + EXCLUDED."Balance"
-            RETURNING "Balance" AS "Value"
-            """).ToListAsync(cancellationToken);
+        var balances = await db
+            .Database.SqlQuery<int>(
+                $"""
+                INSERT INTO "LoyaltyAccounts" ("UserId", "Balance") VALUES ({userId}, {points})
+                ON CONFLICT ("UserId") DO UPDATE SET "Balance" = "LoyaltyAccounts"."Balance" + EXCLUDED."Balance"
+                RETURNING "Balance" AS "Value"
+                """
+            )
+            .ToListAsync(cancellationToken);
         return balances.Single();
     }
 }

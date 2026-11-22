@@ -33,11 +33,26 @@ public static class CashierProvisioning
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var db = services.GetRequiredService<AppDbContext>();
 
-        var user = await AccountProvisioning.EnsureAccountAsync(users, email, password, displayName, RoleNames.Cashier);
+        var user = await AccountProvisioning.EnsureAccountAsync(
+            users,
+            email,
+            password,
+            displayName,
+            RoleNames.Cashier
+        );
 
-        var assignment = await db.CashierStations.SingleOrDefaultAsync(row => row.UserId == user.Id);
+        var assignment = await db.CashierStations.SingleOrDefaultAsync(row =>
+            row.UserId == user.Id
+        );
         if (assignment is null)
-            db.CashierStations.Add(new CashierStation { UserId = user.Id, StationCode = station, RegisterCode = register });
+            db.CashierStations.Add(
+                new CashierStation
+                {
+                    UserId = user.Id,
+                    StationCode = station,
+                    RegisterCode = register,
+                }
+            );
         else
         {
             assignment.StationCode = station;
@@ -50,8 +65,10 @@ public static class CashierProvisioning
 }
 
 /// <summary>Creates the cashier configured in BootstrapCashier:* at startup. All four keys or none.</summary>
-public sealed class CashierAccountProvisioner(IServiceScopeFactory scopeFactory, IConfiguration configuration)
-    : IHostedService
+public sealed class CashierAccountProvisioner(
+    IServiceScopeFactory scopeFactory,
+    IConfiguration configuration
+) : IHostedService
 {
     public const string Section = "BootstrapCashier";
 
@@ -76,7 +93,13 @@ public sealed class CashierAccountProvisioner(IServiceScopeFactory scopeFactory,
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         await CashierProvisioning.EnsureCashierAsync(
-            scope.ServiceProvider, values[0]!, values[1]!, "Kasjer", values[2]!, values[3]!);
+            scope.ServiceProvider,
+            values[0]!,
+            values[1]!,
+            "Kasjer",
+            values[2]!,
+            values[3]!
+        );
 
         await transaction.CommitAsync(cancellationToken);
     }

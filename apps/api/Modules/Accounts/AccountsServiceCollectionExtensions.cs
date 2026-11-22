@@ -12,7 +12,8 @@ namespace FuelClub.Api.Modules.Accounts
             services.AddScoped<IAccountsService, IdentityAccountsService>();
             services.AddHostedService<RoleInitializer>();
             services.AddHostedService<AdminAccountProvisioner>();
-            services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+            services
+                .AddIdentity<ApplicationUser, IdentityRole>(options =>
                 {
                     options.User.RequireUniqueEmail = true;
                     options.Password.RequiredLength = 10;

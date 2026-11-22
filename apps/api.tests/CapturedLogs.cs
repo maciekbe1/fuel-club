@@ -16,11 +16,20 @@ public sealed class CapturedLogs : ILoggerProvider
 
     private sealed class Logger(string category, ConcurrentQueue<string> messages) : ILogger
     {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
 
         public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-            messages.Enqueue($"{logLevel} {category}: {formatter(state, exception)} {state} {exception}");
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        ) =>
+            messages.Enqueue(
+                $"{logLevel} {category}: {formatter(state, exception)} {state} {exception}"
+            );
     }
 }

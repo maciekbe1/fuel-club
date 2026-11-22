@@ -4,15 +4,21 @@ import { decodeQr } from "./qr";
 const ROTATE = "**/api/me/loyalty-card/rotate";
 const CODE = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
 
-test("issue, read and rotate the card; a retry after a lost response reuses the key", async ({ page, customer }) => {
+test("issue, read and rotate the card; a retry after a lost response reuses the key", async ({
+  page,
+  customer,
+}) => {
   void customer;
   const external: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).hostname !== "localhost") external.push(request.url());
+    if (new URL(request.url()).hostname !== "localhost")
+      external.push(request.url());
   });
 
   await page.getByRole("link", { name: /Karta/ }).click();
-  await expect(page.getByRole("heading", { name: "Nie masz jeszcze karty" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Nie masz jeszcze karty" }),
+  ).toBeVisible();
 
   // Issue.
   await page.getByRole("button", { name: "Wydaj kartę" }).click();
@@ -29,7 +35,8 @@ test("issue, read and rotate the card; a retry after a lost response reuses the 
   // Rotate, losing the first response after the server has committed it.
   const keys: string[] = [];
   page.on("request", (request) => {
-    if (request.url().endsWith("/api/me/loyalty-card/rotate")) keys.push(request.headers()["idempotency-key"]);
+    if (request.url().endsWith("/api/me/loyalty-card/rotate"))
+      keys.push(request.headers()["idempotency-key"]);
   });
   let committed: string | undefined;
   await page.route(ROTATE, async (route) => {
@@ -40,15 +47,17 @@ test("issue, read and rotate the card; a retry after a lost response reuses the 
 
   await page.getByRole("button", { name: "Wymień kod" }).click();
   await page.getByRole("button", { name: "Tak, wymień" }).click();
-  await expect(page.getByRole("region", { name: "Wymiana kodu" }).getByRole("alert")).toContainText(
-    "nie wiemy, czy operacja się udała",
-  );
+  await expect(
+    page.getByRole("region", { name: "Wymiana kodu" }).getByRole("alert"),
+  ).toContainText("nie wiemy, czy operacja się udała");
   expect(committed).toMatch(CODE);
   expect(committed).not.toBe(first);
 
   await page.unroute(ROTATE);
   await page.getByRole("button", { name: "Ponów wymianę" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Nowy kod jest aktywny." })).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Nowy kod jest aktywny." }),
+  ).toBeVisible();
 
   // Same key on the retry, and the server replayed the first rotation instead of rotating again.
   expect(keys).toHaveLength(2);
@@ -66,7 +75,10 @@ test("issue, read and rotate the card; a retry after a lost response reuses the 
   expect(external).toEqual([]);
 });
 
-test("an unreadable response is an unknown outcome: retry only, with the same key", async ({ page, customer }) => {
+test("an unreadable response is an unknown outcome: retry only, with the same key", async ({
+  page,
+  customer,
+}) => {
   void customer;
   await page.goto("/karta");
   await page.getByRole("button", { name: "Wydaj kartę" }).click();
@@ -75,20 +87,27 @@ test("an unreadable response is an unknown outcome: retry only, with the same ke
 
   const keys: string[] = [];
   page.on("request", (request) => {
-    if (request.url().endsWith("/api/me/loyalty-card/rotate")) keys.push(request.headers()["idempotency-key"]);
+    if (request.url().endsWith("/api/me/loyalty-card/rotate"))
+      keys.push(request.headers()["idempotency-key"]);
   });
   let committed: string | undefined;
   // The server commits, but the browser gets 200 with a body that is not JSON.
   await page.route(ROTATE, async (route) => {
     const response = await route.fetch();
     committed = ((await response.json()) as { code: string }).code;
-    await route.fulfill({ status: 200, contentType: "application/json", body: "{" });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: "{",
+    });
   });
 
   await page.getByRole("button", { name: "Wymień kod" }).click();
   await page.getByRole("button", { name: "Tak, wymień" }).click();
   const rotation = page.getByRole("region", { name: "Wymiana kodu" });
-  await expect(rotation.getByRole("alert")).toContainText("Nie wiemy, czy operacja się udała");
+  await expect(rotation.getByRole("alert")).toContainText(
+    "Nie wiemy, czy operacja się udała",
+  );
   await expect(rotation.getByRole("button", { name: "Anuluj" })).toHaveCount(0);
 
   await page.unroute(ROTATE);
@@ -98,9 +117,17 @@ test("an unreadable response is an unknown outcome: retry only, with the same ke
   expect(keys[1]).toBe(keys[0]);
 });
 
-test("copying puts the raw code on the clipboard", async ({ page, context, customer, browserName }) => {
+test("copying puts the raw code on the clipboard", async ({
+  page,
+  context,
+  customer,
+  browserName,
+}) => {
   void customer;
-  test.skip(browserName !== "chromium", "clipboard permissions are Chromium-only");
+  test.skip(
+    browserName !== "chromium",
+    "clipboard permissions are Chromium-only",
+  );
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
   await page.goto("/karta");
@@ -112,7 +139,10 @@ test("copying puts the raw code on the clipboard", async ({ page, context, custo
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
 });
 
-test("cancelling the confirmation keeps the card", async ({ page, customer }) => {
+test("cancelling the confirmation keeps the card", async ({
+  page,
+  customer,
+}) => {
   void customer;
   let rotations = 0;
   page.on("request", (r) => r.url().endsWith("/rotate") && rotations++);
@@ -123,11 +153,17 @@ test("cancelling the confirmation keeps the card", async ({ page, customer }) =>
 
   await page.getByRole("button", { name: "Wymień kod" }).click();
   await page.getByRole("button", { name: "Anuluj" }).click();
-  await expect(page.getByTestId("card-code")).toHaveAttribute("data-code", code);
+  await expect(page.getByTestId("card-code")).toHaveAttribute(
+    "data-code",
+    code,
+  );
   expect(rotations).toBe(0);
 });
 
-test("home screen links to existing card and history pages", async ({ page, customer }) => {
+test("home screen links to existing card and history pages", async ({
+  page,
+  customer,
+}) => {
   void customer;
   const shortcuts = page.getByRole("navigation", { name: "Na skróty" });
   await expect(shortcuts.getByRole("link")).toHaveCount(2);
@@ -135,15 +171,23 @@ test("home screen links to existing card and history pages", async ({ page, cust
     [/Karta/, "/karta", "Twoja karta"],
     [/Historia punktów/, "/historia", "Historia punktów"],
   ] as const) {
-    await expect(shortcuts.getByRole("link", { name })).toHaveAttribute("href", href);
+    await expect(shortcuts.getByRole("link", { name })).toHaveAttribute(
+      "href",
+      href,
+    );
     const response = await page.request.get(href);
     expect(response.status()).toBe(200);
     void heading;
   }
-  await expect(page.getByRole("region", { name: "Twoje saldo" })).toContainText("0 pkt");
+  await expect(page.getByRole("region", { name: "Twoje saldo" })).toContainText(
+    "0 pkt",
+  );
 });
 
-test("lost rotation response followed by a failed card read: the retry still reuses the key", async ({ page, customer }) => {
+test("lost rotation response followed by a failed card read: the retry still reuses the key", async ({
+  page,
+  customer,
+}) => {
   void customer;
   await page.goto("/karta");
   await page.getByRole("button", { name: "Wydaj kartę" }).click();
@@ -152,7 +196,8 @@ test("lost rotation response followed by a failed card read: the retry still reu
 
   const keys: string[] = [];
   page.on("request", (request) => {
-    if (request.url().endsWith("/api/me/loyalty-card/rotate")) keys.push(request.headers()["idempotency-key"]);
+    if (request.url().endsWith("/api/me/loyalty-card/rotate"))
+      keys.push(request.headers()["idempotency-key"]);
   });
 
   // Rotation commits on the server but its response is lost; card reads fail until the network is back.
@@ -164,19 +209,25 @@ test("lost rotation response followed by a failed card read: the retry still reu
     await route.abort("failed");
   });
   await page.route("**/api/me/loyalty-card", (route) =>
-    networkDown && route.request().method() === "GET" ? route.abort("failed") : route.continue(),
+    networkDown && route.request().method() === "GET"
+      ? route.abort("failed")
+      : route.continue(),
   );
 
   await page.getByRole("button", { name: "Wymień kod" }).click();
   await page.getByRole("button", { name: "Tak, wymień" }).click();
   // Wait until the card read has exhausted its retries and failed.
-  await expect(page.getByText("Nie udało się odświeżyć karty")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Nie udało się odświeżyć karty")).toBeVisible({
+    timeout: 15_000,
+  });
   // Nothing to cancel with an unknown outcome: only the safe retry is offered.
   await expect(page.getByRole("button", { name: "Anuluj" })).toHaveCount(0);
 
   networkDown = false;
   await page.getByRole("button", { name: "Ponów wymianę" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Nowy kod jest aktywny." })).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Nowy kod jest aktywny." }),
+  ).toBeVisible();
 
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);

@@ -4,7 +4,11 @@ import { toApiError } from "./api/problem";
 
 export type SseMessage = { event: string; data: string; id?: string };
 
-export async function* postSse(url: string, body: unknown, signal: AbortSignal): AsyncGenerator<SseMessage> {
+export async function* postSse(
+  url: string,
+  body: unknown,
+  signal: AbortSignal,
+): AsyncGenerator<SseMessage> {
   const response = await fetch(url, {
     method: "POST",
     credentials: "same-origin",
@@ -31,8 +35,13 @@ export async function* postSse(url: string, body: unknown, signal: AbortSignal):
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      const message = { event: value.event ?? "message", data: value.data, id: value.id };
-      if (message.event === "done" || message.event === "error") finished = true;
+      const message = {
+        event: value.event ?? "message",
+        data: value.data,
+        id: value.id,
+      };
+      if (message.event === "done" || message.event === "error")
+        finished = true;
       yield message;
     }
   } finally {

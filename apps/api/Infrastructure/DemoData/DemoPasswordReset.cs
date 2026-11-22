@@ -13,10 +13,16 @@ public static class DemoPasswordReset
 {
     public const string Command = "reset-demo-passwords";
 
-    public static async Task<int> RunAsync(IServiceProvider services, IHostEnvironment environment, IConfiguration configuration)
+    public static async Task<int> RunAsync(
+        IServiceProvider services,
+        IHostEnvironment environment,
+        IConfiguration configuration
+    )
     {
         using var scope = services.CreateScope();
-        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DemoPasswordReset));
+        var logger = scope
+            .ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger(typeof(DemoPasswordReset));
 
         if (!environment.IsDevelopment())
         {
@@ -27,7 +33,10 @@ public static class DemoPasswordReset
         var password = configuration[DemoAccountsSeeder.PasswordKey];
         if (string.IsNullOrWhiteSpace(password))
         {
-            logger.LogError("{Key} is not configured (set it in user-secrets).", DemoAccountsSeeder.PasswordKey);
+            logger.LogError(
+                "{Key} is not configured (set it in user-secrets).",
+                DemoAccountsSeeder.PasswordKey
+            );
             return 1;
         }
 
@@ -41,7 +50,10 @@ public static class DemoPasswordReset
             var user = await users.FindByEmailAsync(email);
             if (user is null)
             {
-                logger.LogWarning("Demo account {Email} does not exist; skipped (not created).", email);
+                logger.LogWarning(
+                    "Demo account {Email} does not exist; skipped (not created).",
+                    email
+                );
                 continue;
             }
 
@@ -52,7 +64,8 @@ public static class DemoPasswordReset
                 logger.LogError(
                     "Password reset failed for {Email}: {Codes}. No account was changed.",
                     email,
-                    string.Join(", ", result.Errors.Select(error => error.Code)));
+                    string.Join(", ", result.Errors.Select(error => error.Code))
+                );
                 return 1;
             }
 
@@ -60,7 +73,11 @@ public static class DemoPasswordReset
         }
 
         await transaction.CommitAsync();
-        logger.LogInformation("Demo passwords reset: {Count} of {Total}.", reset, DemoAccountsSeeder.Accounts.Length);
+        logger.LogInformation(
+            "Demo passwords reset: {Count} of {Total}.",
+            reset,
+            DemoAccountsSeeder.Accounts.Length
+        );
         return 0;
     }
 }

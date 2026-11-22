@@ -13,9 +13,13 @@ const database =
   "Host=localhost;Port=5434;Database=fuelclub_e2e;Username=fuelclub_test;Password=fuelclub_test";
 
 // The API migrates this database before the run: refuse anything but the dedicated e2e database.
-const databaseName = /(?:^|;)\s*Database\s*=\s*([^;]+)/i.exec(database)?.[1]?.trim();
+const databaseName = /(?:^|;)\s*Database\s*=\s*([^;]+)/i
+  .exec(database)?.[1]
+  ?.trim();
 if (databaseName !== "fuelclub_e2e")
-  throw new Error(`E2E must run on the database 'fuelclub_e2e', got '${databaseName ?? "(none)"}'. Check FUELCLUB_E2E_DATABASE.`);
+  throw new Error(
+    `E2E must run on the database 'fuelclub_e2e', got '${databaseName ?? "(none)"}'. Check FUELCLUB_E2E_DATABASE.`,
+  );
 
 export default defineConfig({
   testDir: "./e2e",
@@ -55,14 +59,20 @@ export default defineConfig({
     {
       command: "node e2e/fault-proxy.mjs",
       port: proxyPort,
-      env: { PROXY_PORT: String(proxyPort), PROXY_TARGET: `http://localhost:${apiPort}` },
+      env: {
+        PROXY_PORT: String(proxyPort),
+        PROXY_TARGET: `http://localhost:${apiPort}`,
+      },
       // Never reuse: a running server may skip the migration or point at another database.
       reuseExistingServer: false,
     },
     {
       command: `npx next dev --port ${webPort}`,
       url: `http://localhost:${webPort}/login`,
-      env: { NEXT_DIST_DIR: ".next-e2e", API_INTERNAL_URL: `http://localhost:${proxyPort}` },
+      env: {
+        NEXT_DIST_DIR: ".next-e2e",
+        API_INTERNAL_URL: `http://localhost:${proxyPort}`,
+      },
       // Never reuse: a running server may skip the migration or point at another database.
       reuseExistingServer: false,
       timeout: 180_000,

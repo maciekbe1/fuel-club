@@ -27,6 +27,16 @@ npm run typecheck
 npm run lint
 ```
 
+## Formatowanie
+
+Te same wersje co w rozszerzeniach VS Code przy zapisie: CSharpier (`dotnet-tools.json`) dla C#, Prettier (`apps/web/package.json`, domyślne ustawienia) dla frontendu. `lib/api/schema.d.ts` jest generowany, więc Prettier go pomija.
+
+```sh
+dotnet tool restore
+dotnet csharpier format apps          # check: dotnet csharpier check apps
+cd apps/web && npm run format         # check: npm run format:check
+```
+
 ## Testy E2E (Playwright)
 
 Prawdziwe API i osobna baza `fuelclub_e2e` w kontenerze `postgres-test`. Playwright sam uruchamia:

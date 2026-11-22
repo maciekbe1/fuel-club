@@ -4,7 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
-import { fieldA11y, fieldClass, FormAlert, FormField } from "@/components/form/FormField";
+import {
+  fieldA11y,
+  fieldClass,
+  FormAlert,
+  FormField,
+} from "@/components/form/FormField";
 import { Input } from "@/components/ui/input";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { AutoLoginError, useRegister } from "../hooks";
@@ -21,31 +26,46 @@ export function RegisterForm() {
   const registerAccount = useRegister();
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { displayName: "", email: "", password: "", confirmPassword: "" },
+    defaultValues: {
+      displayName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
   });
   const { errors, isSubmitting } = form.formState;
   const passwordValue = useWatch({ control: form.control, name: "password" });
 
-  const onSubmit = form.handleSubmit(async ({ displayName, email, password }) => {
-    try {
-      await registerAccount.mutateAsync({ displayName, email, password });
-      router.replace("/");
-    } catch (error) {
-      if (error instanceof AutoLoginError) {
-        router.replace("/login?registered=1");
-        return;
+  const onSubmit = form.handleSubmit(
+    async ({ displayName, email, password }) => {
+      try {
+        await registerAccount.mutateAsync({ displayName, email, password });
+        router.replace("/");
+      } catch (error) {
+        if (error instanceof AutoLoginError) {
+          router.replace("/login?registered=1");
+          return;
+        }
+        if (applyFieldErrors(error, form.setError, authMessages, FIELDS))
+          return;
+        const code = error instanceof ApiError ? error.code : undefined;
+        form.setError("root", {
+          message:
+            (code && authMessages[code]) ??
+            "Nie udało się utworzyć konta. Spróbuj ponownie.",
+        });
       }
-      if (applyFieldErrors(error, form.setError, authMessages, FIELDS)) return;
-      const code = error instanceof ApiError ? error.code : undefined;
-      form.setError("root", { message: (code && authMessages[code]) ?? "Nie udało się utworzyć konta. Spróbuj ponownie." });
-    }
-  });
+    },
+  );
 
   const passwordA11y = fieldA11y("password", errors.password);
 
   return (
     <div className="flex flex-col gap-6">
-      <AuthHeader title="Załóż konto" description="Dołącz do Fuel Club i zbieraj punkty za każde tankowanie." />
+      <AuthHeader
+        title="Załóż konto"
+        description="Dołącz do Fuel Club i zbieraj punkty za każde tankowanie."
+      />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-5" noValidate>
         <FormAlert message={errors.root?.message} />
@@ -77,13 +97,22 @@ export function RegisterForm() {
             autoComplete="new-password"
             className={fieldClass}
             {...passwordA11y}
-            aria-describedby={[passwordA11y["aria-describedby"], "password-rules"].filter(Boolean).join(" ")}
+            aria-describedby={[
+              passwordA11y["aria-describedby"],
+              "password-rules",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             {...form.register("password")}
           />
           <PasswordRequirements id="password-rules" value={passwordValue} />
         </FormField>
 
-        <FormField id="confirmPassword" label="Powtórz hasło" error={errors.confirmPassword}>
+        <FormField
+          id="confirmPassword"
+          label="Powtórz hasło"
+          error={errors.confirmPassword}
+        >
           <PasswordInput
             autoComplete="new-password"
             className={fieldClass}
@@ -99,7 +128,10 @@ export function RegisterForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Masz już konto?{" "}
-        <Link href="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
+        <Link
+          href="/login"
+          className="font-semibold text-primary underline-offset-4 hover:underline"
+        >
           Zaloguj się
         </Link>
       </p>

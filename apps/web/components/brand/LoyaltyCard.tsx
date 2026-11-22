@@ -17,10 +17,14 @@ export function LoyaltyCard({ className }: { className?: string }) {
           <span className="h-7 w-10 rounded-md bg-linear-to-br from-amber-200 to-amber-400" />
         </div>
         <div>
-          <p className="text-xs uppercase tracking-widest text-white/70">Saldo</p>
+          <p className="text-xs uppercase tracking-widest text-white/70">
+            Saldo
+          </p>
           <p className="text-3xl font-bold tabular-nums">1 250 pkt</p>
         </div>
-        <p className="font-mono text-sm tracking-[0.2em] text-white/80">•••• •••• 2048</p>
+        <p className="font-mono text-sm tracking-[0.2em] text-white/80">
+          •••• •••• 2048
+        </p>
       </div>
     </div>
   );
