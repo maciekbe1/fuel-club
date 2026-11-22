@@ -7,6 +7,7 @@ using FuelClub.Api.Modules.Assistant;
 using FuelClub.Api.Modules.Loyalty;
 using FuelClub.Api.Modules.Observability;
 using FuelClub.Api.Modules.Rewards;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,6 +62,8 @@ app.UseIdempotencyBodyBuffering();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    // Browser UI for trying endpoints: /scalar (reads /openapi/v1.json). Development only.
+    app.MapScalarApiReference(options => options.WithTitle("Fuel Club API"));
     app.MapDatabaseHealthEndpoint();
 }
 

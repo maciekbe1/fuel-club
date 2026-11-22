@@ -47,7 +47,11 @@ dotnet run --project apps/api --launch-profile http
 
 - Adres: `http://localhost:5271`.
 - Przy starcie API sprawdza, czy wszystkie migracje z kodu są w historii bazy, i tworzy role `User` i `Admin`.
-- W Development: dokument OpenAPI pod `/openapi/v1.json` i `/health/db`.
+- W Development: dokument OpenAPI pod `/openapi/v1.json`, `/health/db` i interfejs do próbowania endpointów **Scalar** pod `http://localhost:5271/scalar`.
+  - Logowanie: `POST /api/auth/login`. Ciasteczko sesji zostaje w przeglądarce.
+  - Metody zmieniające dane wymagają nagłówka `X-CSRF-TOKEN` z `GET /api/auth/csrf`; pobierz token po zalogowaniu.
+  - Operacje idempotentne wymagają też `Idempotency-Key` (dowolny UUID).
+  - Gotowe żądania dla IDE: `apps/api/FuelClub.Api.http`.
 
 ## 5. Frontend
 

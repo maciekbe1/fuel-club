@@ -40,7 +40,7 @@ dotnet user-secrets set "DemoAccounts:Enabled" "true" --project apps/api
 dotnet user-secrets set "DemoAccounts:Password" "<haslo-demo>" --project apps/api   # min. 10 znaków, cyfra, wielka i mała litera, znak specjalny
 
 dotnet ef database update --project apps/api  # API nie migruje bazy samo
-dotnet run --project apps/api --launch-profile http          # http://localhost:5271
+dotnet run --project apps/api --launch-profile http          # http://localhost:5271, UI endpointów: /scalar
 ```
 
 W drugim terminalu:
