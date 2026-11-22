@@ -3,15 +3,16 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE = ".AspNetCore.Identity.Application";
 
 /**
- * The API limits logins per client address from X-Forwarded-For. Next does not set that header on
- * the /api rewrite and passes a client-supplied one through, so it is dropped unless an edge proxy
- * in front of Next sets it (TRUST_FORWARDED_FOR=true, see ADR 0009). Without it every client shares
- * the Next server's address.
+ * The API trusts X-Forwarded-For (login limit per client) and X-Forwarded-Proto (Secure cookies).
+ * Next does not set the first on the /api rewrite and passes client-supplied values through, so both
+ * are dropped unless an edge proxy in front of Next sets them (TRUST_FORWARDED_FOR=true, ADR 0009).
+ * Without it every client shares the Next server's address and the API sees plain HTTP.
  */
 function forwardApi(request: NextRequest) {
   if (process.env.TRUST_FORWARDED_FOR === "true") return NextResponse.next();
   const headers = new Headers(request.headers);
   headers.delete("x-forwarded-for");
+  headers.delete("x-forwarded-proto");
   return NextResponse.next({ request: { headers } });
 }
 

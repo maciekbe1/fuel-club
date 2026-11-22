@@ -101,6 +101,14 @@ jobs:
           path: apps/web/test-results
           retention-days: 7
 
+  images:
+    name: Docker images (build only, no push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/api/Dockerfile -t fuelclub-api .
+      - run: docker build --build-arg API_INTERNAL_URL=http://api:8080 -t fuelclub-web apps/web
+
   docs:
     name: Docs build
     runs-on: ubuntu-latest

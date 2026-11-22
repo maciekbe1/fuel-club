@@ -23,6 +23,7 @@ Jeden `AppDbContext` (EF Core + Npgsql), dziedziczy po `IdentityDbContext<Applic
 | `*_CouponRedeemedPurchaseOwner` | złożony FK `Coupons (RedeemedPurchaseId, UserId)` → `FuelPurchases (Id, UserId)` zamiast FK po samym `Id`, `UNIQUE (Id, UserId)` w `FuelPurchases`; najpierw sprawdza dane - kupon odebrany na cudzy zakup zatrzymuje migrację, bez przepisywania |
 | `*_AssistantTurns` | `assistant_turns` - metadane tur czatu ([ADR 0008](/decyzje/0008-slady-i-evale-czatu/)) |
 | `*_Observability` | `security_events`; `assistant_turns.ReviewedAt`, `ReviewedBy` ([ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/)) |
+| `*_DataProtectionKeys` | `DataProtectionKeys` - klucze Data Protection ([ADR 0010](/decyzje/0010-obrazy-i-hosting/)) |
 
 ## Tabele
 
@@ -46,6 +47,7 @@ Jeden `AppDbContext` (EF Core + Npgsql), dziedziczy po `IdentityDbContext<Applic
 | `PointsLedgerEntries` | historia zmian salda, tylko dopisywana; `UNIQUE (Type, SourceId)`; kolejność po `Sequence` |
 | `LoyaltyCards` | karty; `UNIQUE (Code)`, `UNIQUE (UserId) WHERE RevokedAt IS NULL` |
 | `assistant_turns` | metadane tury czatu, bez treści: `CorrelationId` (`UNIQUE`), `UserPseudonym` (HMAC), dostawca, model, wersja promptu, `Demo`, `StartedAt`, `FirstEventMs`, `TotalMs` (`CHECK >= 0`), `Outcome` (`Done`/`Error`/`Cancelled`), `ErrorCode`, `ToolCalls` (`CHECK >= 0`), `Tools` (`jsonb`: nazwa, stan, czas), `InputTokens`/`OutputTokens` (`null` = nieznane). Indeksy `StartedAt` i `(UserPseudonym, StartedAt)`. `ReviewedAt`, `ReviewedBy` (kolejka przeglądu). Bez FK do użytkownika; retencja `Observability:TraceRetention` - [Assistant](/moduly/assistant/#dane) |
+| `DataProtectionKeys` | klucze Data Protection (`Id`, `FriendlyName`, `Xml`) dla ciasteczek, CSRF i potwierdzeń czatu, wspólne dla instancji. Poza Development szyfrowane certyfikatem - [ADR 0010](/decyzje/0010-obrazy-i-hosting/) |
 | `security_events` | odrzucone żądania: `OccurredAt`, `Kind` (`AccessDenied`, `LoginFailed`, `IdempotencyConflict`, `RepeatedRedemption`, `RateLimited`), `Status`, `Code`, `Route` (wzorzec trasy), `UserPseudonym`. Bez IP i treści. Indeksy `(Kind, OccurredAt)`, `OccurredAt`; retencja `Observability:SecurityEventRetention` - [Observability](/moduly/observability/) |
 | `IdempotencyRecords` | PK `(UserId, IdempotencyKey)`; `Fingerprint bytea` (`CHECK` 32 bajty), `StatusCode` (`CHECK 200-499`), `ContentType`, `Location`, `Body bytea`; FK `AspNetUsers` RESTRICT. Bez retencji w MVP. Szczegóły: [idempotencja](/wyjasnienia/idempotencja/) |
 

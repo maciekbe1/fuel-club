@@ -108,9 +108,11 @@ Zawiera moduły, referencję (endpointy, kody błędów, konfiguracja, baza), in
 - zdarzenia bezpieczeństwa, anomalie, kolejka przeglądu i retencja;
 - limity.
 
+**Obrazy:** `apps/api/Dockerfile`, `apps/web/Dockerfile`. Lokalna próba produkcyjna, kopia i odtworzenie bazy oraz instrukcja Railway są w docs, „Obrazy i hosting”.
+
 **Planowane / niewykonane:**
 
-- hosting (P9);
+- wdrożenie na hosting (wymaga konta);
 - ocena tur przez judge (P7c - wymaga klucza dostawcy);
 - adapter Gemini (opcjonalny);
 - alerty Slack.

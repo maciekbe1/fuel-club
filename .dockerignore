@@ -1,0 +1,13 @@
+**/bin
+**/obj
+**/node_modules
+**/.next*
+**/test-results
+**/playwright-report
+docs
+.git
+.github
+*.md
+!apps/web/**/*.md
+# Local env files must never end up in an image.
+**/.env*

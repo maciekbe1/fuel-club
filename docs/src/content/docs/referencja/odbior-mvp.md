@@ -41,7 +41,7 @@ Stan na 2026-11-22. Dowód to test, który przechodzi, albo opisany ręczny prze
 | Kolejka podejrzanych tur, dostęp rolą, retencja | `ObservabilityTests`, `e2e/observability.spec.ts` |
 | Limity logowania, realizacji, czatu | `ObservabilityTests` (logowanie, zakupy), `AssistantTests` (czat), `CouponPreviewTests` (podgląd) |
 
-:::caution[Niewykonane]
+:::caution[Planowane]
 - **Ocena próbek przez judge** (udział, budżet, osobna próbka błędów, kalibracja) - P7c wymaga klucza dostawcy modelu, którego w tym środowisku nie ma. Kolejka nie ma więc powodu „niska ocena”.
 - **Feedback klienta** - opcjonalny w specyfikacji, niezaimplementowany. Kolejka nie ma powodu „negatywny feedback”.
 - **Alerty Slack** - opcjonalne, wyłączone; alerty idą do logu.
@@ -57,10 +57,17 @@ Stan na 2026-11-22. Dowód to test, który przechodzi, albo opisany ręczny prze
 | README: świeży klon, konfiguracja, migracje, konta demo, start, kontrole | `README.md`. Świeży klon sprawdzony 2026-11-22 i znaleziony brak `dotnet restore` przed `dotnet ef` (poprawione) |
 | CI: API na PostgreSQL, typecheck/lint, E2E, evale, docs | `.github/workflows/ci.yml` |
 
-:::caution[Niezweryfikowane]
+:::caution[Planowane]
 CI nie było uruchomione na GitHubie: repozytorium nie jest wypychane bez zgody właściciela. Kroki workflow są uruchamiane lokalnie tymi samymi komendami.
 :::
 
-:::caution[Planowane - P9]
-Obrazy web/API, instrukcja hostingu (Railway), HTTPS, trwałe klucze Data Protection, backup/odtworzenie, test SSE i kamery na telefonie.
+## 5. Hosting (P9)
+
+| Kryterium | Dowód |
+| --- | --- |
+| Obrazy web/API, trwałe klucze Data Protection, migracje, backup/odtworzenie, SSE przez obraz | [Obrazy i hosting](/instrukcje/obrazy-i-hosting/) (lokalna próba produkcyjna), `DataProtectionTests` |
+| Instrukcja Railway | [Obrazy i hosting](/instrukcje/obrazy-i-hosting/#railway) |
+
+:::caution[Planowane]
+Wdrożenie na Railway, HTTPS na publicznej domenie, test SSE przez brzeg hostingu i kamery na telefonie. Wymaga konta; nie utworzono płatnych zasobów.
 :::

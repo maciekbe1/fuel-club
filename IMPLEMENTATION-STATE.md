@@ -207,6 +207,46 @@ Stabilność E2E:
 
 Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane przez `proxy.ts` na `/api`.
 
+## P9 - hosting w dostępnym zakresie (częściowo, 2026-11-22)
+
+ADR 0010, instrukcja „Obrazy i hosting”.
+- Obrazy: `apps/api/Dockerfile` (publish, bundle migracji `efbundle`, `tini`, `libgssapi-krb5-2`, bez roota) i `apps/web/Dockerfile` (standalone, `API_INTERNAL_URL` w buildzie i runtime, `.env*` wykluczone). Job CI buduje oba.
+- Klucze Data Protection w bazie, szyfrowane certyfikatem ze zmiennej środowiskowej. Wymagany poza Development, sprawdzany przy starcie hosta, więc bundle migracji go nie potrzebuje.
+- `X-Forwarded-For`/`Proto` od loopback, `KnownProxies` i `KnownNetworks`, parsowane przy starcie. `proxy.ts` usuwa oba nagłówki bez `TRUST_FORWARDED_FOR`.
+- Logi SQL EF: `Warning` poza Development.
+
+Lokalna próba produkcyjna (prywatna sieć Docker, `Production`):
+- migracja bundlem;
+- rejestracja i logowanie, ciasteczka `Secure`+`HttpOnly`;
+- czat SSE przez Next standalone;
+- `/` i `/karta` z danymi;
+- klucze zaszyfrowane, sesja po restarcie API;
+- bez certyfikatu kontener kończy się kodem 134;
+- `pg_dump` → `pg_restore`: te same liczby wierszy, a API na odtworzonej bazie przyjęło starą sesję.
+
+Kontenery, obrazy i pliki próby usunięte.
+
+Błędy znalezione próbą:
+- bundle uruchomiony bez `--entrypoint` startował API (moja pomyłka);
+- wymuszone `Secure` dawało `500` na `/api/auth/csrf` → `X-Forwarded-Proto`;
+- kontener bez `tini` zostawał „Up” po nieudanym starcie;
+- SQL EF w logach Production.
+
+Testy (2026-11-22): `dotnet test` passed 480/480 (`DataProtectionTests`: współdzielenie kluczy przez bazę, szyfrowanie certyfikatem, `Secure` za HTTPS, błędy konfiguracji); E2E 124/124; CSharpier, Prettier, typecheck, lint, docs build passed.
+
+Próby negatywne: bez `PersistKeysToDbContext` i bez szyfrowania certyfikatem - odpowiednie testy padają.
+
+Review (`/code-review high`, 7 uwag, wszystkie przyjęte):
+- brak `API_INTERNAL_URL` w runtime obrazu web - każda strona „Serwis chwilowo niedostępny”; poprzednia próba wołała tylko `/api`, teraz otwiera strony;
+- `.env*` w obrazie;
+- leniwe parsowanie `KnownNetworks` i komentarz w linii w `.env.example`;
+- `X-Forwarded-Proto` od klienta;
+- etykiety `Planowane`;
+- SQL EF wyciszony też w Development;
+- klucze niezaszyfrowane w bazie wbrew regule sekretów → certyfikat.
+
+Niewykonane (wymaga konta): wdrożenie Railway, HTTPS na domenie, SSE przez brzeg hostingu, kamera na telefonie. Punkty „sprawdź” w instrukcji.
+
 ## Następny krok
 
-P9 - hosting w dostępnym zakresie: obrazy, instrukcja; bez konta nie wdrażać.
+Plan P0-P9 zrealizowany w dostępnym zakresie. Otwarte: wdrożenie (konto hostingu), P7c judge (klucz dostawcy), P10 Gemini (opcjonalny), push (decyzja właściciela).

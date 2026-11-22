@@ -1,14 +1,18 @@
 using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Loyalty.Domain;
 using FuelClub.Api.Modules.Rewards.Domain;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelClub.Api.Infrastructure
 {
     public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-        : IdentityDbContext<ApplicationUser>(options)
+        : IdentityDbContext<ApplicationUser>(options),
+            IDataProtectionKeyContext
     {
+        /// <summary>Data Protection key ring (cookies, CSRF, chat confirmations) shared by all instances.</summary>
+        public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
         public DbSet<LoyaltyAccount> LoyaltyAccounts => Set<LoyaltyAccount>();
         public DbSet<FuelPurchase> FuelPurchases => Set<FuelPurchase>();
         public DbSet<PointsLedgerEntry> PointsLedgerEntries => Set<PointsLedgerEntry>();

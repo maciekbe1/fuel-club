@@ -33,7 +33,8 @@ sidebar:
 | `Assistant:ChatPermitLimit` / `ChatWindow` | nie | `20` / `00:01:00`; tur czatu na użytkownika w oknie, potem `429` |
 | `Assistant:PseudonymKey` | poza `Development` tak (inaczej API nie startuje) | sekret (env / user-secrets), base64 ≥ 32 bajty; klucz HMAC pseudonimów w śladach. W `Development` bez niego: losowy na czas procesu |
 | `Assistant:TraceSaveTimeout` | nie | `00:00:02` (do 30 s); jak długo koniec tury czeka na zapis śladu |
-| `ForwardedHeaders:KnownProxies` | nie | lista adresów IP proxy, którym API wierzy w `X-Forwarded-For` (poza loopback). Adres klienta służy limitom logowania - [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#limity) |
+| `DataProtection:Certificate` / `CertificatePassword` | poza Development | base64 PKCS#12 szyfrujący klucze Data Protection w bazie; bez niego start poza Development się nie powiedzie ([ADR 0010](/decyzje/0010-obrazy-i-hosting/)) |
+| `ForwardedHeaders:KnownProxies` / `KnownNetworks` | nie | adresy IP / zakresy CIDR proxy, którym API wierzy w `X-Forwarded-For` i `X-Forwarded-Proto` (poza loopback). Na hostingu zakres sieci prywatnej z Nextem ([ADR 0010](/decyzje/0010-obrazy-i-hosting/)). Adres klienta służy limitom logowania - [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#limity) |
 | `Observability:MaxSecurityEventsPerMinute` | nie | `600`; więcej zdarzeń bezpieczeństwa w minucie jest tylko liczonych w logu |
 | `RateLimits:AuthPermitLimit` / `AuthWindow` | nie | `10` / `00:01:00`; próby logowania i rejestracji na adres IP, potem `429` (blokada konta Identity działa niezależnie) |
 | `RateLimits:PurchasePermitLimit` / `PurchaseWindow` | nie | `60` / `00:01:00`; zakupy (z odbiorem kuponu) na kasjera, potem `429` |
@@ -49,7 +50,7 @@ sidebar:
 
 | Zmienna | Domyślnie | Opis |
 | --- | --- | --- |
-| `TRUST_FORWARDED_FOR` | brak | `true` tylko za proxy hostingu, które ustawia `X-Forwarded-For`; inaczej `proxy.ts` usuwa ten nagłówek z żądań `/api/*` ([ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#limity)) |
+| `TRUST_FORWARDED_FOR` | brak | `true` tylko za proxy hostingu, które ustawia `X-Forwarded-For` i `X-Forwarded-Proto`; inaczej `proxy.ts` usuwa oba nagłówki z żądań `/api/*` ([ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#limity)) |
 | `API_INTERNAL_URL` | `http://localhost:5271` | prywatny adres API dla rewrite i Server Components. Czytany przy buildzie. |
 | `OPENAPI_URL` | `http://localhost:5271/openapi/v1.json` | źródło dla `npm run api:types` |
 

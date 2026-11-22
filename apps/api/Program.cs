@@ -24,6 +24,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 );
 builder.Services.AddIdempotency(builder.Configuration);
 builder.Services.AddClientAddress(builder.Configuration);
+builder.Services.AddPersistentDataProtection(builder.Configuration, builder.Environment);
 builder.Services.AddApiRateLimiting(builder.Configuration);
 builder.Services.AddOpenApi(options => options.AddIdempotencyHeader());
 builder.Services.AddAccounts();
