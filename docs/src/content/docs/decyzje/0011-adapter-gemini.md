@@ -31,7 +31,7 @@ Lokalne testy i CI nie mogą zależeć od chmury.
   - Pętlę i czasy prowadzi `ChatService`.
 - **Podpisy wywołań:** Gemini 3 wymaga odesłania `thoughtSignature` z każdym `functionCall` bieżącej tury (inaczej `400`).
   - `ToolCall.ProviderPart` przechowuje oryginalną część odpowiedzi modelu, a `ToolCall.Step` - numer kroku.
-  - `ChatModelContext.ToolCalls` oddaje je w następnym kroku: wywołania jednego kroku w jednej wiadomości modelu, w kolejności, a ich wyniki w jednej wiadomości użytkownika.
+  - `ChatModelContext.ToolCalls` oddaje je w następnym kroku: wywołania jednego kroku w jednej wiadomości modelu, w kolejności, a ich wyniki w jednej wiadomości użytkownika. Odpowiedź nosi nazwę wywołania (także odrzuconego narzędzia spoza listy) i jego `id`, jeśli było.
 - Tokeny: wejście `promptTokenCount`; wyjście `candidatesTokenCount` + `thoughtsTokenCount` (rozumowanie jest płatne). Trafiają do śladu tury.
   - Nieudane albo przerwane wywołanie modelu mogło zostać naliczone, więc suma tury jest nieznana (`null`), nie częściowa. Podsumowanie liczy takie tury osobno.
 - Model `Assistant:Gemini:Model`, domyślnie `gemini-3.5-flash-lite` (kod z listy modeli Google, 2026-11). Przed zmianą sprawdź aktualną listę.

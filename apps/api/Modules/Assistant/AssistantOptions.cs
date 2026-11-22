@@ -92,6 +92,9 @@ public sealed class AssistantOptionsValidator(IHostEnvironment environment)
                 errors.Add(
                     "Assistant:Gemini:ApiKey is required when Assistant:Provider is gemini."
                 );
+            // Relative resolution drops the last segment of a base without a trailing slash.
+            if (!o.Gemini.Endpoint.IsAbsoluteUri || !o.Gemini.Endpoint.AbsolutePath.EndsWith('/'))
+                errors.Add("Assistant:Gemini:Endpoint must be an absolute URL ending with '/'.");
             if (string.IsNullOrWhiteSpace(o.Gemini.Model))
                 errors.Add("Assistant:Gemini:Model is required.");
             if (o.Gemini.RequestTimeout <= TimeSpan.Zero || o.Gemini.RequestTimeout > o.TurnTimeout)

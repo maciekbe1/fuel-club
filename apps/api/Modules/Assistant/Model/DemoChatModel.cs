@@ -37,7 +37,7 @@ public sealed partial class DemoChatModel : IChatModel
 
         var done = context.ToolResults;
         // An answer to "which coupon?" continues the activation even without the keyword.
-        var activation = Activation().IsMatch(text) || AnswersWhichCoupon(context.History);
+        var activation = Activation().IsMatch(text) || AnswersWhichCoupon(context.History, text);
 
         if (activation)
             return Task.FromResult(NextActivationStep(context, text, intro));
@@ -102,16 +102,35 @@ public sealed partial class DemoChatModel : IChatModel
         return new ModelStep.Reply(
             intro
                 + WhichCoupon
-                + " Do aktywacji masz: "
+                + Listed
                 + string.Join("; ", list.Select(c => c.OfferName))
-                + ". Napisz nazwę oferty."
+                + ListEnd
         );
     }
 
-    private static bool AnswersWhichCoupon(IReadOnlyList<Chat.ChatHistoryItem> history) =>
-        history.Count > 0
-        && history[^1] is { Role: "assistant", Text: { } last }
-        && last.Contains(WhichCoupon, StringComparison.Ordinal);
+    private const string Listed = " Do aktywacji masz: ";
+    private const string ListEnd = ". Napisz nazwę oferty.";
+
+    /// <summary>
+    /// The message answers the previous "which coupon?" only when it names one of the offers that
+    /// question listed; anything else ("ile mam punktów?") goes to the normal rules.
+    /// </summary>
+    private static bool AnswersWhichCoupon(IReadOnlyList<Chat.ChatHistoryItem> history, string text)
+    {
+        if (history.Count == 0 || history[^1] is not { Role: "assistant", Text: { } last })
+            return false;
+        var start = last.IndexOf(WhichCoupon + Listed, StringComparison.Ordinal);
+        var end = last.LastIndexOf(ListEnd, StringComparison.Ordinal);
+        if (start < 0 || end < start)
+            return false;
+        var from = start + WhichCoupon.Length + Listed.Length;
+        var names = last[from..end].Split("; ").Select(Normalize);
+        var answer = text.Trim().TrimEnd('.', '!', '?');
+        return names.Any(name =>
+            text.Contains(name, StringComparison.Ordinal)
+            || (answer.Length >= 3 && name.Contains(answer, StringComparison.Ordinal))
+        );
+    }
 
     private static ModelStep Propose(string couponId) =>
         new ModelStep.Tool(

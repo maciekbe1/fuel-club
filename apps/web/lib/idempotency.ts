@@ -114,6 +114,17 @@ export function keepsIdempotencyKey(error: unknown) {
   return true;
 }
 
+/**
+ * Whether an unfinished operation stays pending: an unknown outcome, or 401 - an expired session
+ * says nothing about the operation, and the same account retries it after signing in again.
+ */
+export function keepsPendingOperation(error: unknown) {
+  return (
+    keepsIdempotencyKey(error) ||
+    (error instanceof ApiError && error.status === 401)
+  );
+}
+
 type Options<TData, TVars> = Omit<
   UseMutationOptions<TData, Error, TVars>,
   "mutationFn"
@@ -160,7 +171,7 @@ export function useIdempotentMutation<TData, TVars = void>({
       return onSuccess?.(...args);
     },
     onError: (...args) => {
-      if (!keepsIdempotencyKey(args[0])) finish();
+      if (!keepsPendingOperation(args[0])) finish();
       return onError?.(...args);
     },
   });

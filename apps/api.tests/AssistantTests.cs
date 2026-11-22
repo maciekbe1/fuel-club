@@ -602,6 +602,24 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_step_with_no_calls_is_a_provider_error_not_a_tool_limit()
+    {
+        await using var host = Host(
+            model: new ScriptedModel(
+                (_, _) => Task.FromResult<ModelStep>(new ModelStep.Tool(Array.Empty<ToolCall>()))
+            )
+        );
+        var customer = await AccountAsync(host: host);
+
+        var stream = await ChatAsync(customer.Client, "saldo");
+
+        Assert.Equal(
+            "assistant.provider_error",
+            stream.Of("error").Single().GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
     public async Task Slow_turn_times_out_and_heartbeats_keep_the_connection_alive()
     {
         await using var host = Host(
@@ -726,6 +744,20 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
             weekend.Id,
             answer.Of("confirmation").Single().GetProperty("couponId").GetGuid()
         );
+
+        // An unrelated question after it gets its own answer, not the same question again.
+        var other = await ChatAsync(
+            customer.Client,
+            "ile mam punktów?",
+            history: new object[]
+            {
+                new { role = "user", text = "aktywuj kupon Super" },
+                new { role = "assistant", text = unknown.Text },
+            }
+        );
+        Assert.Empty(other.Of("confirmation"));
+        Assert.DoesNotContain("Który kupon", other.Text);
+        Assert.Contains("pkt", other.Text);
 
         // Without that question the same word is not an activation.
         var plain = await ChatAsync(customer.Client, "Weekend");

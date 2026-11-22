@@ -127,8 +127,10 @@ public sealed class ChatService(
                 }
 
                 var asked = ((ModelStep.Tool)step).Calls;
+                if (asked.Count == 0)
+                    throw new InvalidOperationException("The model asked for no tool calls.");
                 // The whole step or nothing: a partial run would hide calls the model expects answers to.
-                if (asked.Count == 0 || results.Count + asked.Count > settings.MaxToolCalls)
+                if (results.Count + asked.Count > settings.MaxToolCalls)
                 {
                     logger.LogWarning(
                         "Chat {CorrelationId} exceeded the tool limit ({Limit})",

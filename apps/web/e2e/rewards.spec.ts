@@ -323,8 +323,15 @@ test("lost response, then the session ends: signing in again keeps the key, one 
   );
   await page.unroute(EXCHANGE);
 
-  // The session ends (expired cookie) and the same person signs in again in this tab.
+  // The session ends (expired cookie); a retry now gets 401 and must not drop the key.
   await page.context().clearCookies();
+  const unknown = page
+    .getByRole("main")
+    .getByRole("alert")
+    .filter({ has: page.getByRole("button", { name: "Ponów wymianę" }) });
+  await unknown.getByRole("button", { name: "Ponów wymianę" }).click();
+  await expect(unknown).toContainText("Sesja wygasła");
+  // The same person signs in again in this tab.
   await loginAs(page, customer.email, PASSWORD);
   await page.goto("/oferty");
   const restored = page.getByRole("main").getByRole("alert");
@@ -334,8 +341,9 @@ test("lost response, then the session ends: signing in again keeps the key, one 
     page.getByRole("status").filter({ hasText: "Kupiono kupon" }),
   ).toBeVisible();
 
-  expect(keys).toHaveLength(2);
-  expect(keys[1]).toBe(keys[0]);
+  // Lost, 401 after the session ended, then the retry after signing in: one key throughout.
+  expect(keys).toHaveLength(3);
+  expect(new Set(keys).size).toBe(1);
   await expect(balance(page)).toContainText("100 pkt");
   expect(await couponCount(page)).toBe(1);
 });

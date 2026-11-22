@@ -257,6 +257,9 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
 
         Assert.Equal(["meta", "tool", "error"], events.Select(e => e.Name));
         Assert.Equal("rejected", events[1].Data.GetProperty("status").GetString());
+        // The response is named after the call, as Gemini pairs them by name.
+        var replayed = JsonNode.Parse(gemini.Sent[1].Body)!["contents"]![2]!["parts"]![0]!;
+        Assert.Equal("award_points", replayed["functionResponse"]!["name"]!.GetValue<string>());
         Assert.Equal("assistant.provider_error", events[2].Data.GetProperty("code").GetString());
         await using var scope = factory.Services.CreateAsyncScope();
         Assert.Equal(
@@ -291,6 +294,7 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
                                 {
                                     functionCall = new
                                     {
+                                        id = "call-2",
                                         name = "list_my_coupons",
                                         args = new { status = "Purchased" },
                                     },
@@ -331,6 +335,9 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
             ["get_my_balance", "list_my_coupons"],
             responses.Select(r => r!["functionResponse"]!["name"]!.GetValue<string>())
         );
+        // A call's id goes back with its response; a call without one gets none.
+        Assert.Null(responses[0]!["functionResponse"]!["id"]);
+        Assert.Equal("call-2", responses[1]!["functionResponse"]!["id"]!.GetValue<string>());
     }
 
     [Fact]
@@ -408,6 +415,8 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         );
         options.Gemini.ApiKey = "k";
         Assert.True(validator.Validate(null, options).Succeeded);
+        options.Gemini.Endpoint = new Uri("https://generativelanguage.googleapis.com/v1beta");
+        Assert.False(validator.Validate(null, options).Succeeded);
         Assert.False(
             validator.Validate(null, new AssistantOptions { Provider = "openai" }).Succeeded
         );

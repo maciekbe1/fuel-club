@@ -7,7 +7,7 @@ import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
-import { keepsIdempotencyKey, usePendingVars } from "@/lib/idempotency";
+import { keepsPendingOperation, usePendingVars } from "@/lib/idempotency";
 import { EXCHANGE_OPERATION, useExchange, useRewards } from "../hooks";
 import { formatPoints, formatTerms } from "@/lib/format";
 import type { ExchangeVars, Reward } from "../services";
@@ -30,8 +30,6 @@ const FINAL_MESSAGES: Record<string, string> = {
 };
 
 function finalMessage(error: unknown) {
-  if (error instanceof ApiError && error.status === 401)
-    return "Sesja wygasła. Zaloguj się ponownie.";
   const code = error instanceof ApiError ? error.code : undefined;
   return (
     (code && FINAL_MESSAGES[code]) ??
@@ -40,6 +38,8 @@ function finalMessage(error: unknown) {
 }
 
 function unknownMessage(error: Error) {
+  if (error instanceof ApiError && error.status === 401)
+    return "Sesja wygasła - zaloguj się ponownie i ponów wymianę: kupon nie zostanie kupiony dwa razy.";
   if (
     error instanceof ApiError &&
     (error.code === "loyalty.customer_busy" ||
@@ -75,7 +75,7 @@ export function RewardsCatalog() {
 
   // While the outcome is unknown only the same exchange may be retried (same offer, version, key).
   const unknown =
-    exchange.isError && keepsIdempotencyKey(exchange.error)
+    exchange.isError && keepsPendingOperation(exchange.error)
       ? exchange.error
       : null;
   const interrupted = restored !== null && exchange.isIdle;
@@ -90,7 +90,7 @@ export function RewardsCatalog() {
       setCleared(true);
       setOutcome({ kind: "success", offerName: vars.name });
     } catch (error) {
-      if (keepsIdempotencyKey(error)) return;
+      if (keepsPendingOperation(error)) return;
       setSelected(null);
       setCleared(true);
       setOutcome({ kind: "final", message: finalMessage(error) });

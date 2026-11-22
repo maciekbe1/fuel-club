@@ -86,7 +86,7 @@ Zamknięta lista. Nazwa spoza listy, argument nieznany, brakujący lub w złym f
 
 ### Adapter
 
-- `IChatModel.NextAsync(kontekst) → Tool(calls) | Reply(text)`. Pętlę (limity, wykonanie narzędzi, zdarzenia) prowadzi `ChatService`. Przyszły adapter Gemini wpina się w ten sam kontrakt (function calling).
+- `IChatModel.NextAsync(kontekst) → Tool(calls) | Reply(text)`. Pętlę (limity, wykonanie narzędzi, zdarzenia) prowadzi `ChatService`. Adapter Gemini wpina się w ten sam kontrakt ([ADR 0011](/decyzje/0011-adapter-gemini/)).
 - Domyślny `DemoChatModel` działa na regułach słów kluczowych i nie wymaga sekretów. Jest jawnie oznaczony: `meta.provider = "demo"`, `meta.demo = true`, a pierwsza wypowiedź mówi, że to tryb demo.
 - Prośby o naliczenie punktów, odbiór, wymianę lub administrację → odmowa tekstem, bez narzędzia.
 - Przy kilku kuponach demo pyta „Który kupon aktywować?”. Następna wiadomość jest odpowiedzią (ostatni wpis historii to to pytanie): nazwa lub jej fragment pasujący do dokładnie jednego kuponu daje propozycję, inaczej pytanie wraca.

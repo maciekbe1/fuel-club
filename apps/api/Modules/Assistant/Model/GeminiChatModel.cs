@@ -90,7 +90,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
             for (; i < count && context.ToolCalls[i].Step == step; i++)
             {
                 calls.Add(CallPart(context.ToolCalls[i]));
-                responses.Add(ResponsePart(context.ToolResults[i]));
+                responses.Add(ResponsePart(context.ToolCalls[i], context.ToolResults[i]));
             }
             contents.Add(new JsonObject { ["role"] = "model", ["parts"] = calls });
             contents.Add(new JsonObject { ["role"] = "user", ["parts"] = responses });
@@ -119,23 +119,34 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
                 },
             };
 
-    private static JsonObject ResponsePart(ToolResult result) =>
-        new()
+    /// <summary>
+    /// Named after the call, not the result (a rejected unknown tool is "unknown" there), and with
+    /// the call's id when it had one: Gemini pairs responses with calls by name and id.
+    /// </summary>
+    private static JsonObject ResponsePart(ToolCall call, ToolResult result)
+    {
+        var response = new JsonObject
         {
-            ["functionResponse"] = new JsonObject
-            {
-                ["name"] = result.Name,
-                ["response"] = JsonSerializer.SerializeToNode(
-                    new
-                    {
-                        status = result.Status,
-                        data = result.Data,
-                        reason = result.Reason,
-                    },
-                    Json
-                ),
-            },
+            ["name"] = call.Name,
+            ["response"] = JsonSerializer.SerializeToNode(
+                new
+                {
+                    status = result.Status,
+                    data = result.Data,
+                    reason = result.Reason,
+                },
+                Json
+            ),
         };
+        if (
+            call.ProviderPart is { } raw
+            && raw.TryGetProperty("functionCall", out var original)
+            && original.TryGetProperty("id", out var id)
+            && id.ValueKind == JsonValueKind.String
+        )
+            response["id"] = id.GetString();
+        return new JsonObject { ["functionResponse"] = response };
+    }
 
     private static JsonObject Text(string role, string text) =>
         new() { ["role"] = role, ["parts"] = new JsonArray(new JsonObject { ["text"] = text }) };
