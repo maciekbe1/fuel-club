@@ -358,16 +358,70 @@ test("a final 409 from another till stays in the panel with that station and til
       }),
     }),
   );
+  let previews = 0;
+  register.on("request", (request) => {
+    if (request.url().includes("/api/cashier/coupons/preview")) previews += 1;
+  });
   await register.getByLabel("Kod karty klienta").fill(card);
   await register.getByLabel("Kod kuponu").fill(codes[0]);
   const handover = register.getByTestId("reward-handover");
+  await expect(handover).toBeVisible();
+  const beforeHandover = previews;
   await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
   const alert = handover.getByRole("alert");
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(alert).toContainText("14:32");
-  // Not replaced by a refetched preview.
-  await register.waitForTimeout(500);
+  // Not replaced by a refetched preview: no preview request after the answer.
+  await register.waitForLoadState("networkidle");
+  expect(previews).toBe(beforeHandover);
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(register.getByLabel("Kod kuponu")).toBeEnabled();
+  await context.close();
+});
+
+test("leaving the till and coming back keeps an unknown handover locked", async ({
+  page,
+  browser,
+  customer,
+  staff,
+  baseURL,
+}) => {
+  void customer;
+  const name = offerName("Kawa");
+  const { card, codes } = await activeRewards(page, staff, baseURL!, [name]);
+  const { context, page: register } = await till(browser, baseURL!);
+  await register.route(HANDOVERS, async (route) => {
+    await route.fetch();
+    await route.abort("failed");
+  });
+  await register.getByLabel("Kod karty klienta").fill(card);
+  await register.getByLabel("Kod kuponu").fill(codes[0]);
+  const handover = register.getByTestId("reward-handover");
+  await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
+  await expect(handover.getByRole("alert")).toContainText("Nie dotarła");
+
+  // Client-side navigation: Next keeps the route hidden (Activity), effects clean up and re-run.
+  await register.getByRole("link", { name: "← Start" }).click();
+  await register.waitForURL("/");
+  await register.getByRole("link", { name: /Kasa/ }).click();
+  await register.waitForURL("/kasa");
+  await expect(register.getByLabel("Kod karty klienta")).toBeDisabled();
+  await expect(register.getByLabel("Kod kuponu")).toBeDisabled();
+  await expect(
+    register.getByTestId("reward-handover").getByRole("button", {
+      name: "Ponów wydanie",
+    }),
+  ).toBeEnabled();
+  await register.unroute(HANDOVERS);
+  await register
+    .getByTestId("reward-handover")
+    .getByRole("button", { name: "Ponów wydanie" })
+    .click();
+  await expect(
+    register
+      .getByRole("status")
+      .filter({ hasText: `Wydano nagrodę „${name}”` }),
+  ).toBeVisible();
+  await expect(register.getByLabel("Kod karty klienta")).toBeEnabled();
   await context.close();
 });

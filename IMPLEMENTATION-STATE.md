@@ -363,6 +363,12 @@ Szóste review (`/code-review high`, 5 uwag, wszystkie przyjęte):
 - regresja: E2E ostatecznego `409` z innej kasy (mutacja z ponownym podglądem wywraca test); pełne E2E 140/140 przed dopisaniem tego testu, który przechodzi osobno;
 - drobne: blokada nie ustawiana po odmontowaniu panelu; pola opcjonalne w `RewardsConflictProblem`; komentarz i dokumentacja blokady zgodne z kodem; nazwa i komentarze testu E2E.
 
+Siódme review (`/code-review high`, 5 uwag, wszystkie przyjęte). Stan „nierozstrzygnięte” przekazywany z panelu do formularza (efekt, ref, callback) rozjeżdżał się przy trasie ukrytej przez `Activity` (Next `cacheComponents`) i przy późnej odpowiedzi. Zamiast łatać, wyliczany z cache mutacji TanStack Query (`useHandoverUnresolved`), wspólnie dla panelu i blokady:
+- E2E: wyjście z kasy i powrót - blokada zostaje, ponowienie rozstrzyga;
+- test ostatecznego `409` liczy żądania podglądu zamiast czekać 500 ms;
+- dokumentacja: ponowne wpisanie kodu po ostatecznej odpowiedzi pokazuje warunki z pamięci, `409` dopiero po kliknięciu;
+- mutacje (bez blokady w formularzu, `429` jako rozstrzygnięcie) wywracają E2E; pełne E2E 144/144, API 502/502.
+
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
 ## Następny krok

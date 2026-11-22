@@ -7,7 +7,11 @@ import { useForm } from "react-hook-form";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { queryKeys } from "@/lib/query-keys";
-import { useForgetCouponPreviews, useRegisterPurchase } from "../hooks";
+import {
+  useForgetCouponPreviews,
+  useHandoverUnresolved,
+  useRegisterPurchase,
+} from "../hooks";
 import {
   purchaseMessages,
   purchaseSchema,
@@ -69,7 +73,7 @@ export function usePurchaseFlow() {
   // A handover with an unknown outcome locks the card and coupon fields, scanners and the purchase
   // submit, so the next customer cannot be served before it is resolved; "Ponów wydanie" stays
   // enabled (amount, liters, date and receipt too - they change nothing on their own).
-  const [handoverUnresolved, setHandoverUnresolved] = useState(false);
+  const handoverUnresolved = useHandoverUnresolved();
   const purchaseLocked = purchase.isPending || unknown !== null;
   // The whole form (fieldset): not the unresolved handover, whose retry button lives inside it.
   const formLocked = purchaseLocked || handingOver;
@@ -114,7 +118,6 @@ export function usePurchaseFlow() {
     purchaseLocked,
     formLocked,
     handoverUnresolved,
-    setHandoverUnresolved,
     purchase,
     pending,
     setPending,

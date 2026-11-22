@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useWatch } from "react-hook-form";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, NetworkError } from "@/lib/api/problem";
 import { benefitTerms, isProduct } from "@/lib/format";
-import { keepsIdempotencyKey, keepsPendingOperation } from "@/lib/idempotency";
 import { cn } from "@/lib/utils";
 import {
   useCashierStation,
   useCouponCalculation,
   useCouponTerms,
+  isCertainRefusal,
   useForgetCouponPreviews,
   useHandOverReward,
+  useHandoverUnresolved,
 } from "../hooks";
 import {
   looksLikeCardCode,
@@ -171,7 +172,6 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           couponCode={couponCode}
           locked={flow.purchaseLocked}
           station={station.data}
-          onUnresolvedChange={flow.setHandoverUnresolved}
           onDone={() => {
             setHandedOver({ offerName: terms.data.offerName, cardCode });
             form.setValue("couponCode", "", { shouldDirty: true });
@@ -268,6 +268,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
  * outcome stays unknown.
  */
 function busyMessage(error: unknown) {
+  if (!isCertainRefusal(error)) return null;
   if (error instanceof ApiError && error.status === 429)
     return "Limit prób na tej kasie został wyczerpany. Nagroda nie została wydana - spróbuj za chwilę.";
   if (error instanceof ApiError && error.code === "loyalty.customer_busy")
@@ -325,7 +326,6 @@ function RewardHandover({
   couponCode,
   locked,
   station,
-  onUnresolvedChange,
   onDone,
 }: {
   offerName: string;
@@ -334,51 +334,29 @@ function RewardHandover({
   /** Locked by the purchase; this panel's own unknown outcome keeps its retry enabled. */
   locked: boolean;
   station: CashierStation | undefined;
-  /** An unknown outcome locks the purchase form until it is resolved. */
-  onUnresolvedChange: (unresolved: boolean) => void;
   onDone: () => void;
 }) {
   const handOver = useHandOverReward();
   const forgetPreviews = useForgetCouponPreviews();
-  // An attempt in this panel ended without a known outcome: until a final answer, any non-final one
-  // (429, 503, 401) leaves it unknown. Nothing outlives the panel - after a remount the server's
-  // 409 says when and where the reward was handed over (handedOverMessage).
-  const [uncertain, setUncertainState] = useState(false);
-  // After unmount a late answer must not set the parent's lock: nothing could clear it.
-  const mounted = useRef(true);
-  const setUncertain = (value: boolean) => {
-    if (!mounted.current) return;
-    setUncertainState(value);
-    onUnresolvedChange(value);
-  };
-
+  // Unknown since the last final answer (429, 503 and 401 on a retry leave it unknown). Shared with
+  // the purchase form's lock through the mutation cache; after a remount the server's 409 says when
+  // and where the reward was handed over (handedOverMessage).
+  const unknown = useHandoverUnresolved({ cardCode, couponCode });
   const error = handOver.isError ? handOver.error : null;
   const busy = error ? busyMessage(error) : null;
   const expired = error instanceof ApiError && error.status === 401;
-  const unknown =
-    error !== null && (uncertain || (keepsIdempotencyKey(error) && !busy));
-  // Unmounted (e.g. after signing in again): the lock goes, the server's 409 resolves it.
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      onUnresolvedChange(false);
-    };
-  }, [onUnresolvedChange]);
   const refusal = unknown ? null : busy;
 
   const send = async () => {
     try {
       await handOver.mutateAsync({ cardCode, couponCode });
+      // The fields are locked while it runs, so the form still holds this pair; a route hidden by
+      // Activity keeps the same form, so the late result belongs there too.
       forgetPreviews();
       onDone();
-    } catch (failure) {
-      // Shown below from the mutation state.
-      // A final answer stays in this panel (no preview refetch: it would unmount the panel, hide
-      // the answer and spend the per-cashier preview limit); retyping the code gets the 409 again.
-      if (!keepsPendingOperation(failure)) setUncertain(false);
-      else if (keepsIdempotencyKey(failure) && !busyMessage(failure))
-        setUncertain(true);
+    } catch {
+      // Shown below from the mutation state. A final answer stays in this panel: no preview
+      // refetch, which would unmount it, hide the answer and spend the per-cashier preview limit.
     }
   };
 
