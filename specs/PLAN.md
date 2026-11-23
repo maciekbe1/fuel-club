@@ -16,7 +16,7 @@ Specyfikacja: specs/SPEC.md. Każdy krok osobno przechodzi pętlę z specs/LOOP.
 10. **P9 - hosting.** Obrazy, instrukcja i konfiguracja wdrożenia, następnie HTTPS i telefon, jeśli dostępne konto. Bez udawania ukończenia przy braku dostępu. Weryfikacja backup/restore i SSE.
 11. **P10 - opcjonalny Gemini.** Oddzielny zakres po MVP, bez zależności lokalnych testów od chmury. Pozostałe integracje: projekt, nie automatyczna rozbudowa.
 12. **P14 - regulamin i FAQ w czacie (RAG).** Po zamknięciu P11.
-    - **Dokument:** demonstracyjny regulamin zgodny z działaniem aplikacji (szkic: `specs/regulamin-szkic.md`). Zasady zatwierdza właściciel; agent nie wymyśla ich jako obowiązujących. Wersja `regulamin-v1` dopiero po akceptacji całej treści; ograniczenia demo opisane jako ograniczenia demo, nie ogólne zakazy.
+    - **Dokument:** demonstracyjny regulamin zgodny z działaniem aplikacji (`specs/regulamin-v1.md`, zaakceptowany). Zasady zatwierdza właściciel; agent nie wymyśla ich jako obowiązujących. Wersja `regulamin-v1` dopiero po akceptacji całej treści; ograniczenia demo opisane jako ograniczenia demo, nie ogólne zakazy.
     - **Narzędzie:** `search_program_rules(query)` zwraca fragmenty z numerem punktu (§) i wersją dokumentu.
     - **Wyszukiwanie:** PostgreSQL, bez osobnej bazy wektorowej. `simple` + `unaccent` + `pg_trgm` to wariant do sprawdzenia, nie decyzja. Usunięcie akcentów nie rozwiązuje odmiany, więc najpierw testy na polskich pytaniach: odmiana („punktów/punkty”, „nagrody/nagrodę”) i pytania bez trafnego źródła (brak wyniku zamiast słabego trafienia).
     - **Odpowiedzi:**

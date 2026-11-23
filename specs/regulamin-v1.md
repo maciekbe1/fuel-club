@@ -1,12 +1,10 @@
-# Regulamin programu Fuel Club - SZKIC do akceptacji właściciela
+# Regulamin programu Fuel Club
 
-Status: **szkic** (2026-11-23). Po zatwierdzeniu przez właściciela dostanie wersję `regulamin-v1`. Napisany na podstawie działania aplikacji. Do akceptacji całości nie trafia do czatu.
-
-Rozstrzygnięte przez właściciela: §3.7, §4.4, §8.3. Pozostała treść czeka na przeczytanie i akceptację.
+Wersja: `regulamin-v1` (2026-11-23). Zaakceptowany przez właściciela jako regulamin demonstracyjny i baza wiedzy czatu (P14). To nie jest ocena prawna regulaminu rzeczywistej usługi.
 
 ## §1. Postanowienia ogólne
 
-1. Fuel Club to program demonstracyjny. Nie jest prawdziwą usługą i nie daje roszczeń.
+1. Fuel Club jest aplikacją demonstracyjną. Punkty, rabaty i nagrody służą wyłącznie symulacji.
 2. Uczestnikiem jest osoba z kontem klienta w aplikacji Fuel Club.
 3. Regulamin rozstrzyga o zasadach programu. Odpowiedzi asystenta czatu i konsultanta wyjaśniają zasady, ale ich nie zmieniają.
 
@@ -22,10 +20,9 @@ Rozstrzygnięte przez właściciela: §3.7, §4.4, §8.3. Pozostała treść cze
 1. Za każdy pełny 1 zł zapłacony za paliwo uczestnik dostaje 1 punkt. Grosze się nie liczą: 123,99 zł daje 123 pkt, a 0,99 zł - 0 pkt.
 2. Punkty liczy się od kwoty zapłaconej po rabacie z kuponu, nie od ceny przed rabatem. Przykład: zakup 200,00 zł z rabatem 7,58 zł oznacza 192,42 zł do zapłaty i 192 pkt.
 3. Zakup w całości pokryty rabatem (0 zł do zapłaty) nie daje punktów.
-4. Punkty przyznaje kasa przy rejestracji zakupu z okazaną kartą. Jeden paragon można zarejestrować tylko raz.
-5. Jeden zakup może wynosić najwyżej 5000 zł.
+4. Punkty przyznaje kasa przy rejestracji zakupu z okazaną kartą. Jeden paragon można zarejestrować tylko raz. Demo nie obsługuje dopisywania punktów po zakupie.
+5. Jeden zakup może wynosić najwyżej 5000 zł. Limit dotyczy kwoty przed rabatem.
 6. Odebranie nagrody produktowej (np. kawy) nie daje punktów.
-7. Punkty przyznaje się tylko przy rejestracji zakupu z kartą. Demo nie obsługuje dopisywania punktów po zakupie.
 
 ## §4. Wymiana punktów na kupon
 
@@ -43,7 +40,7 @@ Rozstrzygnięte przez właściciela: §3.7, §4.4, §8.3. Pozostała treść cze
 3. Kupon jest jednorazowy. Po odbiorze ma stan „Wykorzystany”.
 4. Kupon rabatowy:
    - realizuje się przy zakupie paliwa, okazując kartę i kod kuponu;
-   - rabat to stawka × litry, najwyżej do limitu litrów z kuponu i nie więcej niż kwota zakupu;
+   - rabat to stawka × litry, najwyżej do limitu litrów z kuponu; wynik zaokrągla się do groszy (połówki w górę), a dopiero potem ogranicza do kwoty zakupu;
    - do jednego zakupu można użyć jednego kuponu.
 5. Nagrodę produktową kasjer wydaje bez tankowania, po okazaniu karty i kodu kuponu.
 6. Kuponu rabatowego nie można wymienić na nagrodę, a nagrody - na rabat.
@@ -63,7 +60,7 @@ Rozstrzygnięte przez właściciela: §3.7, §4.4, §8.3. Pozostała treść cze
 
 1. Rozmowę z konsultantem rozpoczyna się z czatu, po zgodzie na zapisanie i przechowywanie rozmowy.
 2. Do zgłoszenia można dołączyć wcześniejszą rozmowę z asystentem. To wybór uczestnika.
-3. Konsultant pomaga i wyjaśnia zasady oraz stan konta, ale nie zmienia salda ani kuponów.
+3. Konsultant pomaga i wyjaśnia zasady oraz informacje przekazane przez uczestnika. Nie ma dostępu do salda ani kuponów i ich nie zmienia.
 
 ## §9. Zmiany regulaminu
 
