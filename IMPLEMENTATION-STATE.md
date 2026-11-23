@@ -574,7 +574,8 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Ocena człowieka (właściciel, 19 par, oceny wpisane do arkusza v2): 16 pass / 14 fail; zgodność z judge'em 27/30, kappa 0,80. 3 rozbieżności (wszystkie judge pass, człowiek fail) z 2 przypadków - luki rubryki: dopytanie przy hot dogu (oba znaczenia = brak punktów), skarga bez przeprosin i kroku. Analiza w `symulacja-ruchu.md`.
 - `demo-rules-v9` (zgoda właściciela): hot dog - odpowiedź na oba znaczenia (§3.1, §3.6) bez dopytania; „zbieranie / za co dostaję punkty” - §3.1 (dwie regresje `demo-1` poprawione); skarga - przeprosiny, zakup, „odśwież aplikację”, propozycja konsultanta. Eval `rules-product-ambiguous`: demo dwa wyszukiwania, na Gemini opcjonalne (kryteria Gemini bez zmian). Regulamin bez zmian - §3 już opisuje naliczanie.
 - Review (`/code-review high`, 9 uwag): przyjęte 8 - zapytanie §3.1 tylko przy pytaniu o dostanie punktów, pytania o koszt/ważność produktu nie dostają „Nie”, produkt przed „zbieraniem”, pusty wynik wyszukiwania → „regulamin tego nie opisuje” z przyciskiem, skarga bez zakupu/z błędem bez „sprawdziłem”, węższy wzorzec skargi, przywrócona asercja „nie przewiduje”, komentarze i martwy `Pickup()`. Przyjęta jako przejściowa (opisana): odpowiedź na dopytanie z v8 w otwartej rozmowie.
-- Otwarte: prompt Gemini nadal każe dopytać przy hot dogu (decyzja + przebieg evali Gemini); rubryka v3 (dopytanie tylko przy różnych odpowiedziach, obsługa skargi).
+- Prompt Gemini: próba `gemini-v8` odrzucona - `gemini-v7` już odpowiada przy hot dogu na oba znaczenia (3/3, bez dopytania), v8 bez zysku, możliwe pogorszenie `rules-no-answer`. Szczegóły i raporty w `stan-wymagan.md`. Instancja demo zrestartowana na `demo-rules-v9`.
+- Otwarte: `own-coupon-proposal` na Gemini (1/3 fail na v7) - diagnoza; rubryka v3 (dopytanie tylko przy różnych odpowiedziach, obsługa skargi).
 
 ## Następny krok
 
