@@ -14,8 +14,8 @@ Stan na 2026-11-23. Poziomy:
 
 | Wymaganie | Zbudowane | Przetestowane | Wdrożone | Uwagi |
 | --- | --- | --- | --- | --- |
-| Gemini API (czat, wybór narzędzi) | tak | na atrapie odpowiedzi; na prawdziwym modelu jedna tura (saldo) | nie | Jakość wyboru narzędzi i argumentów nie jest jeszcze zmierzona - [evale Gemini](#evale-na-prawdziwym-modelu). [ADR 0011](/decyzje/0011-adapter-gemini/) |
-| RAG - regulamin | tak | tak, lokalnie i w CI (model demo); z Gemini na atrapie | nie | Wyszukiwanie leksykalne w PostgreSQL, bez embeddingów; znane pudła. [ADR 0016](/decyzje/0016-regulamin-w-czacie/) |
+| Gemini API (czat, wybór narzędzi) | tak | na atrapie odpowiedzi; na prawdziwym modelu: test salda i pilotaż evali 5×1 | nie | Pilotaż: 4/5, bezpieczeństwo 16/16 - [evale Gemini](#evale-na-prawdziwym-modelu). [ADR 0011](/decyzje/0011-adapter-gemini/) |
+| RAG - regulamin | tak | tak, lokalnie i w CI (model demo); na Gemini w pilotażu: pytanie z odpowiedzią zaliczone, bez odpowiedzi - nie | nie | Wyszukiwanie leksykalne w PostgreSQL, bez embeddingów; znane pudła. [ADR 0016](/decyzje/0016-regulamin-w-czacie/) |
 | Hosting - Cloud Run | obrazy Docker, próba produkcyjna lokalnie | obrazy budowane w CI | nie | [Instrukcja](/instrukcje/obrazy-i-hosting/#cloud-run) |
 | Vertex AI | nie | nie | nie | [Niżej](#vertex-ai) |
 | Agent Builder / Dialogflow CX | nie | nie | nie | Ewentualnie osobny eksperyment po ukończeniu aplikacji, bez przepisywania agenta. |
@@ -28,10 +28,12 @@ Stan na 2026-11-23. Poziomy:
 
 ## Evale na prawdziwym modelu
 
-Evale `assistant-evals-v2` są deterministyczne i używają modelu demo. Nie mówią, jak często prawdziwy model myli narzędzia.
+Evale `assistant-evals-v2` na modelu demo są deterministyczne i blokują CI. Na Gemini te same przypadki uruchamia się na żądanie - raport, bez blokowania CI ([instrukcja](/instrukcje/slady-i-evale/#evale-na-gemini)).
+
+- Pilotaż 5×1 (2026-11-23): 4/5 przypadków w pełni, bezpieczeństwo 16/16, ok. 0,005 USD. Wykryty błąd: pytanie spoza regulaminu dostaje słabo pasujący punkt zamiast „regulamin tego nie opisuje” i konsultanta.
 
 :::caution[Planowane]
-Pilotaż na Gemini (5 scenariuszy × 1) z pomiarem tokenów. Potem oszacowanie kosztu pełnego przebiegu i raport: skuteczność narzędzi, argumentów, odpowiedzi, naruszenia bezpieczeństwa. Bez blokowania CI. Klucz tylko w user-secrets.
+Pełny przebieg (wszystkie przypadki × 3, szacunkowo 0,05 USD) jako punkt odniesienia.
 :::
 
 ## Vertex AI
