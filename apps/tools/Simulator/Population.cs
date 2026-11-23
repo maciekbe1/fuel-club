@@ -52,10 +52,13 @@ public sealed class Population(Manifest manifest, Settings settings)
                     await AccountAsync(account, cashier, discount, product, token);
                     Console.WriteLine($"{account.Email}: {account.Profile} ok");
                 }
-                catch (ApiException e)
+                // One account's failure (API error, timeout, broken response) must not stop the
+                // others; its step stays Pending/Failed for the next run.
+                catch (Exception e)
+                    when (e is not OperationCanceledException || !token.IsCancellationRequested)
                 {
                     Interlocked.Increment(ref failures);
-                    Console.WriteLine($"{account.Email}: {e.Message}");
+                    Console.WriteLine($"{account.Email}: {e.GetType().Name}: {e.Message}");
                 }
             }
         );
@@ -96,9 +99,21 @@ public sealed class Population(Manifest manifest, Settings settings)
                     },
                     ct
                 );
-                // A rerun after an unknown outcome: the account may exist already; login proves it.
-                if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.Conflict)
-                    await ApiSession.EnsureAsync(response, "register", ct);
+                // A rerun after an unknown outcome: the first call may have created the account
+                // (the API then answers 400 email_already_exists). Signing in with the run's
+                // password proves it is ours; anything else fails the step.
+                if (!response.IsSuccessStatusCode)
+                {
+                    using var probe = new ApiSession(manifest.ApiUrl);
+                    await _auth.WaitAsync(ct);
+                    using var login = await probe.PostAsync(
+                        "/api/auth/login",
+                        new { email = account.Email, password },
+                        ct
+                    );
+                    if (!login.IsSuccessStatusCode)
+                        await ApiSession.EnsureAsync(response, "register", ct);
+                }
                 return null;
             }
         );
@@ -201,7 +216,7 @@ public sealed class Population(Manifest manifest, Settings settings)
                 cardCode = card,
                 amount,
                 liters = Math.Round(amount / 6.89m, 2),
-                saleDate = manifest.CreatedAt.ToString("yyyy-MM-dd"),
+                saleDate = manifest.SaleDate.ToString("yyyy-MM-dd"),
                 receiptNumber = Receipt(op.Key),
                 couponCode = coupon,
             },

@@ -14,7 +14,7 @@ public sealed class SimulatorTests : IDisposable
     [Fact]
     public void An_operation_keeps_its_idempotency_key_across_runs()
     {
-        var first = Manifest.Create(ManifestPath, "t-1", "http://localhost:5301");
+        var first = Manifest.Create(ManifestPath, "t-1", "http://localhost:5301", "Europe/Warsaw");
         var operation = first.Operation("a0000:purchase:0", "purchase", "a0000");
         operation.Status = OperationStatus.Pending;
         first.Save();
@@ -28,17 +28,22 @@ public sealed class SimulatorTests : IDisposable
     [Fact]
     public void A_manifest_is_never_created_over_an_existing_one()
     {
-        Manifest.Create(ManifestPath, "t-1", "http://localhost:5301");
+        Manifest.Create(ManifestPath, "t-1", "http://localhost:5301", "Europe/Warsaw");
 
         Assert.Throws<InvalidOperationException>(() =>
-            Manifest.Create(ManifestPath, "t-1", "http://localhost:5301")
+            Manifest.Create(ManifestPath, "t-1", "http://localhost:5301", "Europe/Warsaw")
         );
     }
 
     [Fact]
     public async Task Cleanup_refuses_any_database_but_the_demo_one()
     {
-        var manifest = Manifest.Create(ManifestPath, "t-1", "http://localhost:5301");
+        var manifest = Manifest.Create(
+            ManifestPath,
+            "t-1",
+            "http://localhost:5301",
+            "Europe/Warsaw"
+        );
         manifest.Accounts.Add(
             new SimAccount
             {

@@ -45,7 +45,7 @@ if (args[0] == "cleanup")
 var api = options.Get("api") ?? "http://localhost:5301";
 var manifest = File.Exists(manifestPath)
     ? Manifest.Load(manifestPath)
-    : Manifest.Create(manifestPath, run, api);
+    : Manifest.Create(manifestPath, run, api, options.Get("station-time-zone") ?? "Europe/Warsaw");
 if (manifest.RunId != run || manifest.ApiUrl != api)
     throw new ArgumentException(
         $"The manifest is for run '{manifest.RunId}' at {manifest.ApiUrl}, not '{run}' at {api}."

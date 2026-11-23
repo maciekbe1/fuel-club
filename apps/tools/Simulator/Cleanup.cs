@@ -1,10 +1,11 @@
+using System.Text.RegularExpressions;
 using Npgsql;
 
 namespace FuelClub.Simulator;
 
 /// <summary>
-/// Removes one run: its accounts (by id from the manifest, checked against the run's e-mail
-/// pattern) with everything that belongs to them, and the offers it created when nobody else
+/// Removes one run: its accounts (found by the run's exact e-mail addresses) with everything that
+/// belongs to them, the run's idempotency records, and the offers it created when nobody else
 /// uses them. Refuses any database other than the demo one. One transaction: all or nothing.
 /// </summary>
 public static class Cleanup
@@ -17,14 +18,20 @@ public static class Cleanup
         CancellationToken ct
     )
     {
-        var prefix = $"sim-{manifest.RunId}-";
-        var accounts = manifest
-            .Accounts.Where(a => a.UserId is not null)
-            .Where(a =>
-                a.Email.StartsWith(prefix, StringComparison.Ordinal)
-                && a.Email.EndsWith("@" + Population.EmailDomain, StringComparison.Ordinal)
-            )
-            .Select(a => a.UserId!)
+        // Exactly this run's addresses (a run id that prefixes another must not reach it). Users
+        // are found by address, so an account registered just before a crash, with no user id in
+        // the manifest yet, goes too.
+        var pattern =
+            $"^sim-{Regex.Escape(manifest.RunId)}-[0-9]{{4}}@{Regex.Escape(Population.EmailDomain)}$";
+        var emails = manifest.Accounts.Select(a => a.Email).ToArray();
+        if (emails.Any(e => !Regex.IsMatch(e, pattern)))
+        {
+            Console.WriteLine("Refused: the manifest lists an account outside this run.");
+            return 2;
+        }
+        var keys = manifest
+            .Operations.Select(o => Guid.TryParse(o.IdempotencyKey, out var key) ? key : Guid.Empty)
+            .Where(k => k != Guid.Empty)
             .ToArray();
 
         await using var connection = new NpgsqlConnection(connectionString);
@@ -42,26 +49,22 @@ public static class Cleanup
         }
 
         await using var tx = await connection.BeginTransactionAsync(ct);
-        // The ids must be this run's accounts: a manifest edited by hand cannot reach anyone else.
+        string[] accounts;
         await using (
-            var guard = new NpgsqlCommand(
-                """
-                SELECT count(*) FROM "AspNetUsers"
-                WHERE "Id" = ANY(@ids) AND ("Email" NOT LIKE @prefix OR "Email" NOT LIKE @domain)
-                """,
+            var find = new NpgsqlCommand(
+                """SELECT "Id" FROM "AspNetUsers" WHERE "Email" = ANY(@emails) AND "Email" ~ @pattern""",
                 connection,
                 tx
             )
         )
         {
-            guard.Parameters.AddWithValue("ids", accounts);
-            guard.Parameters.AddWithValue("prefix", prefix + "%");
-            guard.Parameters.AddWithValue("domain", "%@" + Population.EmailDomain);
-            if ((long)(await guard.ExecuteScalarAsync(ct))! > 0)
-            {
-                Console.WriteLine("Refused: the manifest lists an account outside this run.");
-                return 2;
-            }
+            find.Parameters.AddWithValue("emails", emails);
+            find.Parameters.AddWithValue("pattern", pattern);
+            var found = new List<string>();
+            await using var reader = await find.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+                found.Add(reader.GetString(0));
+            accounts = [.. found];
         }
 
         // Restrict everywhere: children before parents.
@@ -75,7 +78,9 @@ public static class Cleanup
             """DELETE FROM "FuelPurchases" WHERE "UserId" = ANY(@ids)""",
             """DELETE FROM "LoyaltyCards" WHERE "UserId" = ANY(@ids)""",
             """DELETE FROM "LoyaltyAccounts" WHERE "UserId" = ANY(@ids)""",
-            """DELETE FROM "IdempotencyRecords" WHERE "UserId" = ANY(@ids)""",
+            // The customers' own records, and the run's operations recorded under the cashier and
+            // the admin (purchases, redemptions, offers) by their keys.
+            """DELETE FROM "IdempotencyRecords" WHERE "UserId" = ANY(@ids) OR "IdempotencyKey" = ANY(@keys)""",
             """DELETE FROM "AspNetUsers" WHERE "Id" = ANY(@ids)""",
             """DELETE FROM "RewardOffers" o WHERE o."Id" = ANY(@offers) AND NOT EXISTS (SELECT 1 FROM "Coupons" c WHERE c."OfferId" = o."Id")""",
         ];
@@ -85,6 +90,7 @@ public static class Cleanup
             await using var command = new NpgsqlCommand(sql, connection, tx);
             command.Parameters.AddWithValue("ids", accounts);
             command.Parameters.AddWithValue("offers", manifest.OfferIds.ToArray());
+            command.Parameters.AddWithValue("keys", keys);
             var rows = await command.ExecuteNonQueryAsync(ct);
             counts.Add($"{sql.Split('"')[1]} {rows}");
         }

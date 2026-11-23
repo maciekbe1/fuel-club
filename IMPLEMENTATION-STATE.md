@@ -474,6 +474,7 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - `apps/tools/Simulator` (.NET, tylko HTTP): `populate` (konta `sim-<run>-<nr>@sim.fuelclub.test`, profile Zero/Low/Medium/High, karta, zakupy kasjera, oferty symulacji, wymiana, aktywacja, realizacja rabatu przy zakupie), manifest z kluczami idempotencji (bez haseł i kodów), tempo poniżej limitów + `Retry-After`; `cleanup` jednego przebiegu tylko na `fuelclub_demo`, jedna transakcja. Testy `SimulatorTests`.
 - `compose.yml`: `postgres-demo` (5435). Sekrety w `.simulation/demo.env` (gitignore).
 - Przebieg `pilot-1`, 5 kont: 26/26; ponowienie bez zmian; ponowienie z 3 operacjami `Pending` bez podwojeń; sprzątanie: odmowa na `fuelclub_test`, na demo usunięte tylko konta i oferty przebiegu.
+- Review (f302853..6e96a64): 7 uwag, 6 przyjętych i poprawionych (ponowienie rejestracji przez logowanie, błąd konta nie zatrzymuje przebiegu, sprzątanie po dokładnych adresach - także konta bez id, rekordy idempotencji kasjera/admina po kluczach, data sprzedaży w strefie stanowiska); 1 rozwiązana wpisem w ADR (`/api/simulation` poza `schema.d.ts` - zwykła instancja jej nie mapuje, front jej nie używa). Weryfikacja `pilot-2`: 26/26, ponowienie z rejestracjami `Pending` OK, sprzątanie z kontem bez id - 5/5 kont, 21 rekordów idempotencji.
 - API 638/638, docs build OK.
 - Następnie P16b: rozmowy (serwerowy `conversationId`, `Synthetic`/`RunId` przy turze i rozmowie) i scenariusze czatu.
 

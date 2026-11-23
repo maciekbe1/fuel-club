@@ -13,6 +13,12 @@ public sealed class Manifest
     public required string RunId { get; init; }
     public required string ApiUrl { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>
+    /// The station's local date when the run started (Loyalty:StationTimeZone): every purchase of
+    /// the run, rerun included, sends this one, so a replay has the same body.
+    /// </summary>
+    public required DateOnly SaleDate { get; init; }
     public DateTimeOffset? CleanedAt { get; set; }
     public List<SimAccount> Accounts { get; init; } = [];
     public List<Operation> Operations { get; init; } = [];
@@ -40,7 +46,7 @@ public sealed class Manifest
         return manifest;
     }
 
-    public static Manifest Create(string path, string runId, string apiUrl)
+    public static Manifest Create(string path, string runId, string apiUrl, string stationTimeZone)
     {
         if (File.Exists(path))
             throw new InvalidOperationException($"Manifest already exists: {path}");
@@ -52,6 +58,14 @@ public sealed class Manifest
             RunId = runId,
             ApiUrl = apiUrl,
             CreatedAt = DateTimeOffset.UtcNow,
+            SaleDate = DateOnly.FromDateTime(
+                TimeZoneInfo
+                    .ConvertTime(
+                        DateTimeOffset.UtcNow,
+                        TimeZoneInfo.FindSystemTimeZoneById(stationTimeZone)
+                    )
+                    .DateTime
+            ),
         };
         manifest.Path = path;
         manifest.Save();

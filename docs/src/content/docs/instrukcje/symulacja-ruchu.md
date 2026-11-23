@@ -69,7 +69,9 @@ dotnet run --project apps/tools/Simulator -- populate --run pilot-1 --accounts 5
 
 `.simulation/<run>/manifest.json`: konta (e-mail, profil, id użytkownika), oferty przebiegu i każda operacja z kluczem idempotencji, statusem (`Pending`, `Done`, `Failed`) i wynikiem (id kuponu albo zakupu). Bez haseł, ciasteczek, kodów karty i kodów kuponów - kod do realizacji jest czytany z API w chwili użycia.
 
-- Ponowne uruchomienie z tym samym `--run` pomija `Done`, a `Pending`/`Failed` wysyła ponownie z tym samym kluczem: API odtwarza odpowiedź, nic się nie podwaja. Paragon i data sprzedaży wynikają z klucza operacji i daty przebiegu, więc treść ponowienia jest identyczna.
+- Ponowne uruchomienie z tym samym `--run` pomija `Done`, a `Pending`/`Failed` wysyła ponownie z tym samym kluczem: API odtwarza odpowiedź, nic się nie podwaja. Paragon wynika z klucza operacji, a data sprzedaży (`saleDate` w manifeście) to lokalna data stanowiska z chwili założenia przebiegu (`--station-time-zone`, domyślnie `Europe/Warsaw` jak `Loyalty:StationTimeZone`), więc treść ponowienia jest identyczna.
+- Rejestracja bez klucza idempotencji: gdy ponowienie dostaje odmowę (konto już istnieje), symulator loguje się hasłem przebiegu - udane logowanie dowodzi, że konto jest tego przebiegu.
+- Błąd jednego konta (API, timeout, zła odpowiedź) nie zatrzymuje pozostałych; jego krok zostaje do ponowienia.
 - Klucze idempotencji API wygasają ([Idempotencja](/wyjasnienia/idempotencja/)) - ponowienie operacji `Pending` sprzed wygaśnięcia jest bezpieczne, później już nie.
 
 ## Sprzątanie przebiegu
@@ -80,9 +82,11 @@ dotnet run --project apps/tools/Simulator -- cleanup --run pilot-1
 ```
 
 - Działa tylko na bazie `fuelclub_demo` (`SIM_DEMO_DATABASE`); na każdej innej odmawia.
-- Usuwa konta z manifestu, gdy wszystkie mają e-mail tego przebiegu, wraz z ich zakupami, kuponami, wpisami punktów, kartami, zgłoszeniami i rekordami idempotencji, w jednej transakcji. Oferty przebiegu - gdy nie mają cudzych kuponów. Konta demo i katalog zostają.
+- Usuwa konta o dokładnych adresach tego przebiegu (`sim-<run>-NNNN@sim.fuelclub.test` - przebieg `pilot` nie sięga `pilot-1`), także te bez id użytkownika w manifeście, wraz z ich zakupami, kuponami, wpisami punktów, kartami i zgłoszeniami, oraz rekordy idempotencji przebiegu (klientów i operacji kasjera/admina, po kluczach z manifestu), w jednej transakcji. Oferty przebiegu - gdy nie mają cudzych kuponów. Konta demo i katalog zostają.
 - Manifest dostaje `cleanedAt`; ten `runId` nie da się już zapełnić - nowy przebieg to nowy `runId`.
 
-## Wynik pierwszego przebiegu (2026-11-23)
+## Wyniki (2026-11-23)
 
 `pilot-1`, 5 kont: 26/26 operacji. Ponowienie: bez zmian w bazie. Ponowienie z trzema operacjami oznaczonymi `Pending` (zakup, realizacja kuponu, wymiana): bez podwojeń. Sprzątanie na bazie testowej: odmowa; na demo: 5 kont, 7 zakupów, 5 kuponów, 2 oferty usunięte, konta demo zostały.
+
+`pilot-2` (po review): 26/26; ponowienie z dwiema rejestracjami `Pending` - bez błędów; sprzątanie z kontem bez id w manifeście - usunięte wszystkie 5 kont i 21 rekordów idempotencji.
