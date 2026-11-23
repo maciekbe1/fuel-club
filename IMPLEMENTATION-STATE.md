@@ -565,6 +565,8 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Wypełniony przeze mnie arkusz to przegląd pomocniczy drugim modelem, nie kalibracja; arkusz kalibracji wyczyszczony do oceny człowieka.
 - Review (`/code-review high`, 10 uwag): przyjęte 8 - wznowienie bierze wynik z manifestu i tylko dla tej samej rozmowy; dopasowanie nazwy po całych słowach z odmianą (nie „kawa” w „kawałek”), samodzielny myślnik i powitania to nie nazwa; sprawdzenie celu propozycji ze zdarzenia `confirmation` zamiast wzorca tekstu; `compare` bez przejścia odmawia; nieaktualny akapit docs; klucz w logu. Częściowo: luźniejsze dopasowanie („jedno słowo”) odrzucone - przywraca błąd v7 („SIM demo-1” pasuje do „hot dog”); zbyt ostra odmowa kończy się listą do wyboru. Pominięta: `screenshots.spec.ts` uruchamia się w `npm run e2e` - plik nie mój, nieśledzony.
 - Testy: API 689/689, E2E chat/demo/observability 40/40.
+- Porównanie kontrolowane wyboru kuponu (osobne świeże bazy, te same dane, 11 przypadków, cel z `confirmation`): v7 8/11, v8 11/11. `.simulation/coupon-cmp/`.
+- Następne: ocena człowieka w arkuszu kalibracji (`human_verdict`); rubryka v2 z oceną celu działania (cel propozycji jest już w transkrypcie; argumenty innych narzędzi nie - zdarzenie `tool` ma tylko nazwę i status), „nie można ocenić” przy braku dowodu.
 
 ## Następny krok
 

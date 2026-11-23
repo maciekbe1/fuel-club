@@ -202,6 +202,8 @@ Przejście `demo-1 / v8-same` (`demo-rules-v8`, test techniczny):
 - 1453/1460 rozmów, 2104 tury z `done`, 0 błędów strumienia. 7 rozmów z przekazaniem stanęło na limicie zgłoszeń (5 na konto na godzinę, te same konta co w `demo-1`): symulator przeczekiwał `Retry-After` do godziny - poprawione (limit 60 s, wznowienie bez powtarzania tur); 7 pozostaje do ponowienia po oknie limitu.
 - Porównanie: 2043 → 2050 z 2113 tur zgodnych, 7 poprawionych w `aktywacja`. 6 z nich to efekt danych (kupon „hot dog” aktywowany w `demo-1`, więc klient nie ma kuponów), zachowanie v8 widać tylko w 1 (`c01315`). 0 aktywacji: kupony do aktywacji zostały tylko tam, gdzie `demo-1` nie potwierdził, a decyzje są te same. Dlatego to nie jest porównanie jakości.
 
+Wybór kuponu v7/v8 - kontrolowane porównanie (porównanie jakości dla tej poprawki): dwie instancje na osobnych świeżych bazach, te same dane z jednego skryptu (4 oferty, 3 konta: jeden kupon, cztery, żaden), 11 przypadków, wynik z celu propozycji w zdarzeniu `confirmation`. v7 8/11, v8 11/11. Błędy v7: jedyny kupon podstawiony za nazwany, którego klient nie ma (2 przypadki, błąd z `demo-1`), i dopytanie zamiast propozycji przy „kawa duża”, gdy klient ma też „kawa”. Zestaw ułożył autor poprawki pod regułę właściciela; adapter demo, nie Gemini. Raport i skrypt: `.simulation/coupon-cmp/`.
+
 `demo-1` (P16c, 200 kont, adapter demo): 1460 rozmów, 2113 tur.
 - Technicznie: 1460/1460 rozmów, 2113/2113 tur z `done`, 0 błędów strumienia, 0 oczekiwań na `429`, 7,3 min; czas tury u klienta p50 21 ms, p95 36 ms. To czas aplikacji z adapterem reguł - nie pomiar wydajności ani kosztu Gemini.
 - Poprawność: scenariusze zwykłe 2050/2050 tur zgodnych; regresyjne 0/63 - trzy znane pomyłki bez zmian.
