@@ -66,7 +66,7 @@ Dozwolone znaki to założenie MVP. Wykluczają spacje w środku i znaki Unicode
 | Kasjer: stanowisko | `Domain/CashierStation.cs`, `Cashier/CashierStationEndpoint.cs` |
 | Kasjer: tworzenie konta | `Infrastructure/CashierProvisioning.cs` (`BootstrapCashier`) |
 | Trasy i rejestracja modułu | `LoyaltyModule.cs` |
-| Konta demo (wspólne) | `apps/api/Infrastructure/DemoData/DemoAccountsSeeder.cs`, `DemoPasswordReset.cs` (komenda `reset-demo-passwords`) |
+| Konta demo (wspólne) | `apps/api/Infrastructure/DemoData/DemoAccountsSeeder.cs`, `DemoPasswordReset.cs` (komenda `reset-demo-passwords`), `SimulationPasswordReset.cs` (komenda `reset-simulation-passwords` - hasła kont symulatora z nowego `Simulation:Secret`) |
 | Migracje | `apps/api/Migrations/*_LoyaltyModel.cs`, `*_LoyaltyReceiptNormalization.cs`, `*_CashierStations.cs`, `*_LoyaltyCards.cs`, `*_LedgerSequence.cs` |
 
 ## Przepływ
@@ -366,6 +366,7 @@ Niezmienność historii jest dziś regułą aplikacji. Wymuszenie w bazie (upraw
 | `LoyaltyRulesTests.cs` - `FuelPurchaseRulesTests` | zakres i precyzja kwoty i litrów (w tym 9 999 999,999 przyjęte, 10 000 000 odrzucone), zera na końcu, `default(DateOnly)`, normalizacja, odrzucenie postaci nieznormalizowanej i niedozwolonych znaków, wymagane części paragonu, długości |
 | `CashierTests.cs` | `/api/cashier/station`: `401` anonim, `403` User i samo Admin, `200` kasjer; tworzenie kasjera tylko z rolą `Cashier` i znormalizowanym stanowiskiem; aktualizacja stanowiska; odmowa awansu konta User i Admin; odrzucenie złego stanowiska bez tworzenia konta; `BootstrapCashier` wszystko albo nic; konta demo tworzone tylko w Development (w Production seeder ich nie tworzy), idempotentnie, z właściwymi rolami |
 | `DemoPasswordResetTests.cs` | reset haseł kont demo: zachowane ID, role i stanowisko; odmowa poza Development i bez hasła; hasło odrzucone przez Identity nie zmienia żadnego konta |
+| `SimulationPasswordResetTests.cs` | reset haseł kont symulatora: to samo wyprowadzenie co symulator, nowy znacznik bezpieczeństwa, inne konta bez zmian; odmowa poza Development i bez sekretu (min. 16 znaków) |
 | `LoyaltyRulesTests.cs` - `SaleDateRuleTests`, `StationClockTests` | dziś i przeszłość dozwolone, jutro odrzucone; granica doby w `Europe/Warsaw` zimą i latem (CET/CEST); nieznana strefa odrzucona przy starcie |
 | `LoyaltyCardCodeTests.cs` | kody poprawne i różne; kodowanie wszystkich 128 bitów (zera, same jedynki, ostatni bit); normalizacja wpisanych wariantów; odrzucenie złej długości, pierwszego znaku `8`, znaków spoza alfabetu, małych liter, końcowego `\n` |
 | `LoyaltyCardTests.cs` | `GET` nic nie tworzy; wydanie i odczyt; ponowienie wydania i wymiany z tym samym kluczem (jedna operacja); drugie wydanie innym kluczem → `409`; 6 równoległych wydań → jedna karta; 5 równoległych wymian różnymi kluczami → jedna aktywna; 5 równoległych wymian jednym kluczem → jedna wymiana; stara karta unieważniona; wymiana bez karty → zapisany `404`; odtworzenie wydania po wymianie; `no-store` na odczycie, `404`, wydaniu i odtworzeniu; izolacja kont (w tym ten sam klucz u dwóch osób); CSRF i klucz wymagane; `403` dla Cashier i Admin; `401` anonim; indeks jednej aktywnej karty, unikalny kod i format w bazie |

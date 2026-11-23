@@ -23,6 +23,8 @@ if (databaseName !== "fuelclub_e2e")
 
 export default defineConfig({
   testDir: "./e2e",
+  // The presentation walkthrough is not a behaviour test: only `npm run e2e:screenshots` runs it.
+  testIgnore: process.env.SCREENSHOTS ? [] : ["**/screenshots.spec.ts"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,

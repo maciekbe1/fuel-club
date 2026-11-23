@@ -59,6 +59,8 @@ Inna baza: `FUELCLUB_E2E_DATABASE`, ale nazwa bazy musi być `fuelclub_e2e` - in
 
 Raport po błędzie: `test-results/` (trace: `npx playwright show-trace ...`).
 
+Zrzuty ekranu do prezentacji (`e2e/screenshots.spec.ts`) nie są testem zachowania i domyślne `npm run e2e` (także w CI) je pomija (`testIgnore` bez `SCREENSHOTS`). Na żądanie: `npm run e2e:screenshots` (projekt desktop, wynik w `.presentation/screenshots`, poza gitem).
+
 :::caution[Planowane]
 Evals agenta nie są jeszcze zrealizowane.
 :::

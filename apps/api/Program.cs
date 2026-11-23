@@ -57,6 +57,15 @@ if (args is [DemoPasswordReset.Command])
     );
     return;
 }
+if (args is [SimulationPasswordReset.Command])
+{
+    Environment.ExitCode = await SimulationPasswordReset.RunAsync(
+        app.Services,
+        app.Environment,
+        app.Configuration
+    );
+    return;
+}
 
 app.UseForwardedHeaders();
 app.UseSecurityEvents();

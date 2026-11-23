@@ -34,6 +34,24 @@ EOF2
 - `SIM_SECRET` - z niego symulator wylicza hasła kont symulacji (te same przy każdym ponowieniu, nigdzie niezapisane).
 - `SIM_DEMO_PASSWORD` - hasło kont demo (kasjer, admin) tej instancji.
 
+### Rotacja po ujawnieniu sekretu
+
+Zmiana `demo.env` nie zmienia haseł istniejących kont. Po wygenerowaniu nowych wartości (jak wyżej, bez wypisywania):
+
+```sh
+source .simulation/demo.env    # nowe SIM_SECRET i SIM_DEMO_PASSWORD
+# zatrzymaj instancję 5301, potem:
+DEMO="ASPNETCORE_ENVIRONMENT=Development ConnectionStrings__DefaultConnection=$SIM_DEMO_DATABASE"
+env $DEMO DemoAccounts__Password="$SIM_DEMO_PASSWORD" dotnet run --project apps/api --no-launch-profile -- reset-demo-passwords
+env $DEMO Simulation__Secret="$SIM_SECRET" dotnet run --project apps/api --no-launch-profile -- reset-simulation-passwords
+psql "postgresql://fuelclub_demo:fuelclub_demo@localhost:5435/fuelclub_demo" -c 'delete from "DataProtectionKeys"'
+# start instancji jak wyżej
+```
+
+- `reset-simulation-passwords` ustawia każdemu kontu `@sim.fuelclub.test` hasło wyliczane przez symulator z nowego sekretu (przez Identity, nowy znacznik bezpieczeństwa). Tylko Development, wszystko albo nic, bez logowania haseł.
+- Identity sprawdza znacznik w ciasteczku co 30 min, więc reset haseł sam nie kończy sesji od razu. Usunięcie kluczy DataProtection instancji demo unieważnia wszystkie ciasteczka (oraz tokeny potwierdzeń i CSRF) przy starcie - tylko na tej bazie.
+- Sprawdzenie: logowanie starym hasłem 401, nowym 204.
+
 Migracje i start instancji. `Simulation:RunId` ustala środowisko instancji - klient nie może go zmienić:
 
 ```sh
