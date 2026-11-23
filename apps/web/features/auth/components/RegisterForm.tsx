@@ -4,12 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
-import {
-  fieldA11y,
-  fieldClass,
-  FormAlert,
-  FormField,
-} from "@/components/form/FormField";
+import { FormAlert } from "@/components/form/FormAlert";
+import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Input } from "@/components/ui/input";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { AutoLoginError, useRegister } from "../hooks";

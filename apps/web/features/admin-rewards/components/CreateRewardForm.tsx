@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { FormAlert } from "@/components/form/FormField";
+import { FormAlert } from "@/components/form/FormAlert";
 import { Button } from "@/components/ui/button";
 import { ApiError, applyFieldErrors, NetworkError } from "@/lib/api/problem";
 import { keepsPendingOperation, usePendingVars } from "@/lib/idempotency";

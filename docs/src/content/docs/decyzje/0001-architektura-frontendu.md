@@ -101,6 +101,8 @@ proxy.ts
 
 Reguły zależności: `app -> features -> lib`. Feature nie importuje innego feature, a wspólne rzeczy trafiają do `lib/` lub `components/`. `services.ts` nie importuje Reacta.
 
+Jeden komponent na plik (nazwa pliku = nazwa komponentu); stałe, teksty i formatery wspólne dla kilku komponentów - w sąsiednim module `.ts`. Wyjątek: `components/ui/` (konwencja shadcn). Elementy UI ogólnego przeznaczenia bierzemy z rejestru shadcn albo lekkich, popularnych bibliotek; własny kod tylko dla logiki domenowej (idempotencja, kursor, ProblemDetails).
+
 ## Stan globalny
 
 - Stan serwera trzyma TanStack Query. Sesja to `useMe()`, nie Context.

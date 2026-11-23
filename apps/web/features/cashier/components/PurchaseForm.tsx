@@ -1,12 +1,8 @@
 "use client";
 
 import { CircleCheck } from "lucide-react";
-import {
-  fieldA11y,
-  fieldClass,
-  FormAlert,
-  FormField,
-} from "@/components/form/FormField";
+import { FormAlert } from "@/components/form/FormAlert";
+import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

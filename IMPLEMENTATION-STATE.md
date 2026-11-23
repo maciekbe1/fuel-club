@@ -413,6 +413,8 @@ Krok 5 - UI i E2E: `/czat` (przycisk, zgoda, historia opcjonalna, rozmowa na ży
 - review (`/code-review high`, 7 uwag, przyjęte): zapamiętany `403` wyrzucał konsultanta po ponownym przejęciu (rozmowa usuwana z pamięci przy wyjściu); przewijanie do dołu nie działało ponad 60vh (limit na elemencie przewijanym przez bibliotekę); hub nie wracał po wyczerpaniu ponowień; drugie odrzucenie czatu nie pokazywało zgłoszenia; historia brana przy kliknięciu zamiast przy wysłaniu; ręczne typy żądania → z `schema.d.ts`; test zerwania sprawdza „pisze” (tylko hub), nie tylko dotarcie wiadomości.
 - audyt reszty kodu (podział plików, biblioteki zamiast własnego kodu) - raport przekazany właścicielowi, zmiany czekają na decyzję.
 
+Refaktor 1 - podział plików (audyt): 8 plików z kilkoma komponentami rozbite skryptem (przeniesienie deklaracji + `organizeImports` z TypeScript), wspólne stałe do `labels.ts`, `couponLabels.ts`, `historyFormat.ts`, `editRewardShared.ts`; `FormAlert` osobno; reguła w ADR 0001; E2E 148/148.
+
 ## Następny krok
 
 Otwarte:
