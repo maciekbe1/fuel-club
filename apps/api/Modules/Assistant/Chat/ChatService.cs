@@ -127,7 +127,9 @@ public sealed class ChatService(
             while (true)
             {
                 // The model sees results without the confirmation token: only the client gets it.
-                var seen = results.Select(r => r with { Confirmation = null }).ToList();
+                var seen = results
+                    .Select(r => r with { Confirmation = null, Handoff = null })
+                    .ToList();
                 ModelStep step;
                 try
                 {
@@ -191,6 +193,8 @@ public sealed class ChatService(
                     await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
                     if (result.Confirmation is { } confirmation)
                         await Send("confirmation", confirmation, turn.Token);
+                    if (result.Handoff is { } handoff)
+                        await Send("handoff", handoff, turn.Token);
                 }
             }
         }

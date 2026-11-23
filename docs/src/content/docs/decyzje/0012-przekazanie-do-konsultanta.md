@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-22), P11. W realizacji: API zrobione ([Support](/moduly/support/)); planowane `propose_handoff`, UI i E2E.
+Decyzja przyjęta (2026-11-22), P11. W realizacji: API i `propose_handoff` zrobione ([Support](/moduly/support/)); planowane SignalR ([ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)), UI i E2E.
 
 ## Problem
 

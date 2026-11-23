@@ -202,6 +202,48 @@ public sealed class SupportHandoffTurnTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(["meta", "delta", "done"], (await turn).Select(e => e.Name));
     }
 
+    [Fact]
+    public async Task The_model_only_proposes_a_handoff_and_nothing_is_handed_over()
+    {
+        var (client, userId) = await CustomerAsync(factory);
+
+        var events = await ChatAsync(client, "Chcę porozmawiać z konsultantem");
+
+        Assert.Equal(["meta", "tool", "handoff", "delta", "done"], events.Select(e => e.Name));
+        Assert.Equal(
+            (AssistantTools.ProposeHandoff, "ok"),
+            (
+                events[1].Data.GetProperty("name").GetString(),
+                events[1].Data.GetProperty("status").GetString()
+            )
+        );
+        Assert.Contains(
+            "Porozmawiaj z konsultantem",
+            events[3].Data.GetProperty("text").GetString()
+        );
+        // No case: the button with the consent opens it, not the model.
+        Assert.False(await DbAsync(db => db.SupportCases.AnyAsync(c => c.UserId == userId)));
+    }
+
+    [Fact]
+    public async Task A_handoff_proposal_with_arguments_is_rejected_without_the_event()
+    {
+        var model = new PausedModel(_ => new ModelStep.Tool(
+            new ToolCall(
+                AssistantTools.ProposeHandoff,
+                JsonSerializer.SerializeToElement(new { userId = "someone" })
+            )
+        ));
+        model.Release.SetResult();
+        await using var host = Host(model);
+        var (client, _) = await CustomerAsync(host);
+
+        var events = await ChatAsync(client, "konsultant");
+
+        Assert.Equal(["meta", "tool", "delta", "done"], events.Select(e => e.Name));
+        Assert.Equal("rejected", events[1].Data.GetProperty("status").GetString());
+    }
+
     private WebApplicationFactory<Program> Host(IChatModel model) =>
         factory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<IChatModel>(model))

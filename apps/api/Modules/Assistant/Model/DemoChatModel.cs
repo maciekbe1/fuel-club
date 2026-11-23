@@ -20,7 +20,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v2";
+    public string PromptVersion => "demo-rules-v3";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -34,6 +34,16 @@ public sealed partial class DemoChatModel : IChatModel
                     + "Nie mogę naliczać ani wymieniać punktów, realizować kuponów ani zmieniać ofert. "
                     + "Punkty nalicza kasa przy tankowaniu, a wymianę zrobisz w zakładce „Oferty”."
             );
+
+        // Asking for a person: only a proposal, the button opens the case.
+        if (Handoff().IsMatch(text))
+            return context.ToolResults.Any(r => r.Name == AssistantTools.ProposeHandoff)
+                ? Reply(
+                    intro
+                        + "Mogę przekazać rozmowę konsultantowi. Użyj przycisku „Porozmawiaj z "
+                        + "konsultantem” - przed wysłaniem zobaczysz, co zostanie zapisane."
+                )
+                : Call(AssistantTools.ProposeHandoff);
 
         // A question about awarded points; a request in the same message was refused above.
         if (ExplainPoints().IsMatch(text))
@@ -322,6 +332,9 @@ public sealed partial class DemoChatModel : IChatModel
         @"nalicz(\s|$|cie)|dopisz|dodaj\s+(mi\s+)?\d*\s*punkt|daj\s+(mi\s+)?\d*\s*punkt|odbierz|zrealizuj|wymien|kup\s+kupon|admin|zmien\s+ofert|usun"
     )]
     private static partial Regex Forbidden();
+
+    [GeneratedRegex(@"konsultant|czlowiek|pracownik|z\s+osoba|obsluga\s+klienta")]
+    private static partial Regex Handoff();
 
     // Imperative and noun forms only: "aktywne kupony" is a question, not a request.
     [GeneratedRegex(@"aktywuj|aktywowac|aktywacj")]

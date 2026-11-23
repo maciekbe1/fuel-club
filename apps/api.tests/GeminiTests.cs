@@ -232,7 +232,14 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         var response = contents[2]!["parts"]![0]!["functionResponse"]!;
         Assert.Equal("get_my_balance", response["name"]!.GetValue<string>());
         Assert.Equal(777, response["response"]!["data"]!["balance"]!.GetValue<int>());
-        Assert.Equal(6, second["tools"]![0]!["functionDeclarations"]!.AsArray().Count);
+        // Every tool of the closed list is declared, propose_handoff included (ADR 0012).
+        Assert.Equal(
+            AssistantTools.Names.Order(),
+            second["tools"]![0]!["functionDeclarations"]!
+                .AsArray()
+                .Select(d => d!["name"]!.GetValue<string>())
+                .Order()
+        );
 
         // Tokens reach the trace (thinking included in output).
         await using var scope = factory.Services.CreateAsyncScope();

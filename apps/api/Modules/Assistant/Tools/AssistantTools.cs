@@ -34,15 +34,20 @@ public static class ToolStatus
 
 /// <summary>
 /// The outcome for the model. <c>Reason</c> explains a rejection; <c>Confirmation</c> is set only by
-/// propose_coupon_activation and goes to the client as an event, not to the model.
+/// propose_coupon_activation and <c>Handoff</c> only by propose_handoff - both go to the client as
+/// events, not to the model.
 /// </summary>
 public sealed record ToolResult(
     string Name,
     string Status,
     object? Data = null,
     string? Reason = null,
-    ChatConfirmationEvent? Confirmation = null
+    ChatConfirmationEvent? Confirmation = null,
+    ChatHandoffEvent? Handoff = null
 );
+
+/// <summary>What the model sees of propose_handoff: only that the button is shown, nothing was handed over.</summary>
+public sealed record HandoffProposalData(bool ButtonShown);
 
 public sealed record BalanceData(int Balance);
 
@@ -110,7 +115,7 @@ public sealed record ProposalData(Guid ProposalId, Guid CouponId, string OfferNa
 
 /// <summary>
 /// The closed list of assistant tools. Every tool reads the session user's data only; none takes a
-/// user argument, none mutates. Unknown tools and bad arguments are rejected without running.
+/// user argument, none mutates (the two propose_* tools only show a button). Unknown tools and bad arguments are rejected without running.
 /// </summary>
 public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
 {
@@ -120,6 +125,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
     public const string ProposeCouponActivation = "propose_coupon_activation";
     public const string CompareCoupons = "compare_coupons";
     public const string ExplainPurchasePoints = "explain_purchase_points";
+    public const string ProposeHandoff = "propose_handoff";
 
     public const string PointsRule =
         "Obecna zasada naliczania: 1 pkt za każdą pełną złotówkę zapłaconą po rabacie "
@@ -136,6 +142,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
         ProposeCouponActivation,
         CompareCoupons,
         ExplainPurchasePoints,
+        ProposeHandoff,
     ];
 
     public Task<ToolResult> ExecuteAsync(
@@ -151,6 +158,17 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             ExplainPurchasePoints => NoArguments(call) ?? ExplainAsync(context, cancellationToken),
             ListMyCoupons => CouponsAsync(call, context, cancellationToken),
             ProposeCouponActivation => ProposeAsync(call, context, cancellationToken),
+            // Changes nothing (ADR 0012): the client gets a "talk to an agent" button; only its
+            // press, with the consent shown, opens a case.
+            ProposeHandoff => NoArguments(call)
+                ?? Task.FromResult(
+                    new ToolResult(
+                        ProposeHandoff,
+                        ToolStatus.Ok,
+                        new HandoffProposalData(true),
+                        Handoff: new ChatHandoffEvent()
+                    )
+                ),
             // The name is model output: it is not echoed back.
             _ => Task.FromResult(Reject("unknown", "unknown_tool")),
         };

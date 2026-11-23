@@ -2283,6 +2283,7 @@ export interface components {
             code: string;
             message: string;
         };
+        ChatHandoffEvent: Record<string, never>;
         ChatHistoryItem: {
             role: null | string;
             text: null | string;
@@ -2325,6 +2326,7 @@ export interface components {
             tool: components["schemas"]["ChatToolEvent"];
             delta: components["schemas"]["ChatDeltaEvent"];
             confirmation: components["schemas"]["ChatConfirmationEvent"];
+            handoff: components["schemas"]["ChatHandoffEvent"];
             done: components["schemas"]["ChatDoneEvent"];
             error: components["schemas"]["ChatErrorEvent"];
         };

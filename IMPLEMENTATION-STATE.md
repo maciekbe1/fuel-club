@@ -402,6 +402,10 @@ Krok 2 - API reszty P11 (kolejność od właściciela: endpointy → wygaszanie 
 - review (`/code-review high`, 8 uwag, przyjęte): bezczynność liczona od aktywności konsultanta (`AgentActivityAt`, nowa migracja) - wiadomości klienta nie trzymają zgłoszenia przy nieobecnym konsultancie; tura zatrzymana przekazaniem w śladzie jako `Cancelled`, nie błąd; odczyt usuniętego zgłoszenia `404` zamiast `500`; e-mail usunięty z komunikatów błędów zakładania kont; kolejka do 100; powtórzone oddanie `403` opisane jako wykonane; tabela testów i opis UI w docs poprawione;
 - mutacje: bez ponownego sprawdzenia w turze - 2 testy; bezczynność od dowolnej aktywności - 1 test; zapis konsultanta bez warunku opiekuna - 3 testy; API 526/526 (1 pominięty).
 
+Krok 3 - `propose_handoff`: narzędzie bez argumentów, niczego nie zmienia, zdarzenie SSE `handoff` (UI pokaże przycisk); deklaracja Gemini (`gemini-v4`), reguła w modelu demo (`demo-rules-v3`); testy: propozycja bez zgłoszenia, argumenty → odrzucone; test Gemini porównuje deklaracje z listą narzędzi. Eval dla przekazania nie dodany (zbiór `v1` wersjonowany).
+
+Transport rozmowy: właściciel zdecydował SignalR (status „pisze”, wiadomości od razu) - [ADR 0014](docs/src/content/docs/decyzje/0014-signalr-rozmowa-z-konsultantem.md), przed UI.
+
 ## Następny krok
 
 Otwarte:
@@ -410,4 +414,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: API gotowe; dalej `propose_handoff`, UI klienta i konsultanta, E2E.
+P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: API i `propose_handoff` gotowe; dalej hub SignalR (ADR 0014), UI klienta i konsultanta, E2E.

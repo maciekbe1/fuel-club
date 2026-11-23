@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie]
-Zrealizowane: `POST /api/chat` (SSE), sześć narzędzi, deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Metryki, anomalie, kolejka admina i retencja: [Observability](/moduly/observability/) (P7b). Adapter Gemini: [ADR 0011](/decyzje/0011-adapter-gemini/) (`Model/GeminiChatModel.cs`, testy `GeminiTests`). Planowane: ocena przez judge (P7c).
+Zrealizowane: `POST /api/chat` (SSE), siedem narzędzi (w tym `propose_handoff`, [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/)), deterministyczny adapter demo, potwierdzenie aktywacji, ekran `/czat`. Zrealizowane w P7a: ślady (metadane) i wersjonowane evale. Metryki, anomalie, kolejka admina i retencja: [Observability](/moduly/observability/) (P7b). Adapter Gemini: [ADR 0011](/decyzje/0011-adapter-gemini/) (`Model/GeminiChatModel.cs`, testy `GeminiTests`). Planowane: ocena przez judge (P7c).
 :::
 
 ## Co robi
@@ -42,7 +42,7 @@ Gdy klient ma otwarte zgłoszenie do konsultanta, czat i potwierdzenia odpowiada
 
 1. `POST /api/chat`: walidacja (`400`) i limit (`429`) przed strumieniem.
 2. Nagłówki SSE, zdarzenie `meta` (`correlationId` także w nagłówku `X-Correlation-Id`), heartbeat co `HeartbeatInterval`.
-3. Pętla: model zwraca `Tool` albo `Reply`. Narzędzie działa z `ToolContext.UserId` z sesji i z limitem `ToolTimeout`. Wynik idzie do modelu, a klient dostaje zdarzenie `tool` (nazwa i stan). Propozycja aktywacji daje dodatkowo `confirmation`.
+3. Pętla: model zwraca `Tool` albo `Reply`. Narzędzie działa z `ToolContext.UserId` z sesji i z limitem `ToolTimeout`. Wynik idzie do modelu, a klient dostaje zdarzenie `tool` (nazwa i stan). Propozycja aktywacji daje dodatkowo `confirmation`, propozycja rozmowy z konsultantem (`propose_handoff`, bez argumentów, niczego nie zmienia) - `handoff`: klient pokazuje przycisk, zgłoszenie tworzy dopiero jego naciśnięcie. Gemini dostaje deklarację tego narzędzia (prompt `gemini-v4`), bez nowych danych klienta.
 4. `Reply` → `delta` + `done`. Limit narzędzi, czas tury albo wyjątek → `error` bez `done`. Rozłączenie klienta anuluje turę.
 5. Przycisk potwierdzenia: `POST /api/chat/confirmations { token }` z `Idempotency-Key` → `CouponActivation` → kupon `Active` z kodem.
 
@@ -53,6 +53,7 @@ Adapter demo (`DemoChatModel`) rozpoznaje słowa kluczowe bez polskich znaków i
 - „kupon” → `list_my_coupons`;
 - „który kupon / opłaca / wybrać / porównaj” + litry (np. „40 l”, opcjonalnie „250 zł”) → `compare_coupons`; bez litrów - pytanie o litry;
 - „dostałem / naliczono / przyznano … punktów”, „punkty za tankowanie” → `explain_purchase_points` (po regule odmowy: „nalicz”, „dopisz” w tej samej wiadomości dają odmowę); kwota zakupu to liczba przy „zł”, nie cena za litr („po 6,20 zł/l”);
+- „konsultant/człowiek/pracownik/obsługa klienta” → `propose_handoff`, potem odpowiedź z nazwą przycisku;
 - „aktywuj/aktywacja” → lista kuponów `Purchased` (albo GUID z wiadomości) → `propose_coupon_activation` dla jedynego kuponu albo kuponu nazwanej oferty; przy kilku bez nazwy - pytanie, który. „Aktywne kupony” to pytanie o listę, nie prośba;
 - prośby o naliczenie, wymianę, odbiór i administrację → odmowa bez narzędzi.
 

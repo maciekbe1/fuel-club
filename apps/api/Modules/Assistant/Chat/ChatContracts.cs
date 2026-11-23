@@ -37,6 +37,12 @@ public sealed record ChatConfirmationEvent(
 /// <summary>The turn ended successfully; sent only then.</summary>
 public sealed record ChatDoneEvent(int ToolCalls);
 
+/// <summary>
+/// The model suggests talking to a person (propose_handoff). Nothing was handed over: the client
+/// shows the "Porozmawiaj z konsultantem" button next to the answer.
+/// </summary>
+public sealed record ChatHandoffEvent;
+
 /// <summary>The turn ended with an error; no <c>done</c> follows.</summary>
 public sealed record ChatErrorEvent(string Code, string Message);
 
@@ -49,6 +55,7 @@ public sealed record ChatStreamContract(
     ChatToolEvent Tool,
     ChatDeltaEvent Delta,
     ChatConfirmationEvent Confirmation,
+    ChatHandoffEvent Handoff,
     ChatDoneEvent Done,
     ChatErrorEvent Error
 );
