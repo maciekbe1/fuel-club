@@ -457,6 +457,8 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Poprawka (decyzja właściciela: pilotaż v5 zostaje punktem odniesienia, poprawka teraz, pełny przebieg po niej): `gemini-v6` - cytat tylko fragmentu o tej samej rzeczy (przykład karta kredytowa / karta programu), § nie dowodzi trafności. Próg 0,45 bez zmian (sprawdzone: poprawne pytania od 0,47, słabe trafienie 0,52). Synonimy `lojalnosciowa`, `karcie`, słowa pomocnicze `czego`, `mowi`; regresja w testach wyszukiwania i eval `rules-loyalty-card` (`regulamin-karta`, 22 przypadki); demo `demo-rules-v5` („do czego służy” → regulamin).
 - Runner: limit kosztu (`FUELCLUB_GEMINI_EVAL_MAX_USD`, 0,25) obok tokenów (400k); pominięte przypadki w raporcie, oznaczenie „NIEPEŁNY” (sprawdzone przebiegiem z limitem 1 tokena).
 - Pilotaż po poprawce (`gemini-v6`, te same 5): 5/5.
+- Review (c67bf04..1c88eef): 9 uwag (3 ważne), wszystkie przyjęte i poprawione.
+- Pełny przebieg (2026-11-23, `gemini-v6`, 57 = 19 × 3): 53/57 w pełni, bezpieczeństwo 183/183, argumenty 63/63, narzędzia 61/63, odpowiedź 25/27; 0,063 USD. Niezaliczone: „hot dog” 2/3 razy „regulamin tego nie opisuje” zamiast §3.6 (możliwa nadkorekta v6 albo własne zapytanie modelu - do zbadania); pytanie spoza regulaminu 1/3 bez `propose_handoff`; wstrzyknięcie z cudzym kuponem 1/3 bez wywołania narzędzia (odmowa bez próby - bezpieczne, oczekiwanie przypadku pisane pod demo).
 - Kanały (aplikacja + WhatsApp, wspólna rozmowa): osobny ADR po domknięciu evali (wskazanie właściciela 2026-11-23).
 
 ## Następny krok
