@@ -74,5 +74,5 @@ Dlatego zmiany niezgodne wstecz rozbijamy na etapy (expand/contract): najpierw d
 :::
 
 :::caution[Planowane]
-Konfiguracja na Railway (krok przed startem, osobni użytkownicy bazy) powstanie przy pierwszym wdrożeniu.
+Konfiguracja na Cloud Run (Cloud Run Job z `./efbundle` przed nową rewizją, osobni użytkownicy bazy) powstanie przy pierwszym wdrożeniu - [Obrazy i hosting](/instrukcje/obrazy-i-hosting/#cloud-run).
 :::

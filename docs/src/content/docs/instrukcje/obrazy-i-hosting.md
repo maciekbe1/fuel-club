@@ -1,6 +1,6 @@
 ---
 title: Obrazy i hosting
-description: Budowa obrazów, lokalna próba produkcyjna, kopia i odtworzenie bazy, wdrożenie na Railway.
+description: Budowa obrazów, lokalna próba produkcyjna, kopia i odtworzenie bazy, wdrożenie na Cloud Run.
 sidebar:
   order: 7
 ---
@@ -74,25 +74,27 @@ Sprawdzone:
 
 Kopia zawiera dane osobowe i zaszyfrowane klucze - przechowuj ją jak bazę, a certyfikat osobno.
 
-## Railway
+## Cloud Run
 
 :::caution[Planowane]
-Wdrożenie wymaga konta i decyzji o kosztach. Nie zostało wykonane. Punkty oznaczone „sprawdź” trzeba potwierdzić w aktualnej dokumentacji i panelu Railway przy wdrożeniu.
+Docelowy hosting od 2026-11-23 (zamiast Railway). Wdrożenie wymaga projektu Google Cloud i decyzji o kosztach - nie zostało wykonane. Punkty oznaczone „sprawdź” trzeba potwierdzić w aktualnej dokumentacji Google Cloud przy wdrożeniu.
 :::
 
-Usługi w jednym projekcie:
+Cloud Run to tylko hosting aplikacji. Model nadal idzie przez Gemini API z kluczem (`Assistant:Gemini:ApiKey`); dostęp przez Vertex AI to osobna decyzja - [Stan wymagań](/referencja/stan-wymagan/#vertex-ai).
 
-1. **PostgreSQL**: baza Railway, bez publicznego dostępu. Kopie: wbudowane (sprawdź plan) albo `pg_dump` jak wyżej.
-2. **api**: obraz z `apps/api/Dockerfile`, bez publicznej domeny, tylko sieć prywatna. Zmienne:
-   - `ConnectionStrings__DefaultConnection` - z referencji do bazy, w formacie Npgsql (`Host=…;Database=…;Username=…;Password=…`), nie URL;
-   - `Assistant__PseudonymKey` - `openssl rand -base64 32`, stały;
-   - `DataProtection__Certificate`, `DataProtection__CertificatePassword` - jak wyżej, stałe;
-   - `BootstrapAdmin__*`, `BootstrapCashier__*` - konta personelu;
-   - `ForwardedHeaders__KnownNetworks__0` - zakres sieci prywatnej, w której działa web (sprawdź adresację, prawdopodobnie IPv6);
-   - migracje: polecenie przed wdrożeniem `./efbundle` (sprawdź „pre-deploy command”).
-3. **web**: obraz z `apps/web/Dockerfile` z `API_INTERNAL_URL=http://<api>.railway.internal:8080` (sprawdź nazwę hosta prywatnego), publiczna domena z HTTPS. Zmienne:
-   - `TRUST_FORWARDED_FOR=true` - tylko gdy brzeg Railway ustawia `X-Forwarded-For` z adresem klienta i `X-Forwarded-Proto` (sprawdź). Bez tego limit logowań jest wspólny, a ciasteczka nie mają `Secure`;
-   - `API_INTERNAL_URL` także w czasie działania, jeśli inny niż przy buildzie.
+Zasoby w jednym projekcie i regionie:
+
+1. **Cloud SQL for PostgreSQL**: prywatny adres IP, bez publicznego. Rozszerzenie `pg_trgm` (regulamin, [ADR 0016](/decyzje/0016-regulamin-w-czacie/)) - sprawdź listę obsługiwanych rozszerzeń. Kopie: automatyczne Cloud SQL (sprawdź retencję) albo `pg_dump` jak wyżej.
+2. **api**: usługa Cloud Run z obrazem `apps/api/Dockerfile`, ingress „internal” (bez publicznego adresu). Zmienne jak w próbie produkcyjnej; sekrety (`ConnectionStrings__DefaultConnection`, `Assistant__PseudonymKey`, `Assistant__Gemini__ApiKey`, `DataProtection__Certificate*`, `BootstrapAdmin__*`, `BootstrapCashier__*`) z Secret Managera, nie w zmiennych jawnych. `ForwardedHeaders__KnownNetworks__0` - zakres podsieci, z której wychodzi web (sprawdź).
+3. **migracje**: Cloud Run Job z `./efbundle`, uruchamiany przed nową rewizją api. API nie migruje samo.
+4. **web**: usługa Cloud Run z obrazem `apps/web/Dockerfile`, publiczny adres HTTPS (albo własna domena). Ruch do api przez Direct VPC egress na wewnętrzny adres usługi api (`API_INTERNAL_URL`, sprawdź format adresu przy ingress „internal”). `TRUST_FORWARDED_FOR=true` tylko po sprawdzeniu, że brzeg Google ustawia `X-Forwarded-For` i `X-Forwarded-Proto`.
+
+Do sprawdzenia przed wdrożeniem:
+
+- **SSE czatu**: odpowiedź strumieniowa bez buforowania, limit czasu żądania powyżej `Assistant:TurnTimeout` (sprawdź limit Cloud Run i ustawienie timeoutu usługi).
+- **SignalR** (konsultant, [ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)): WebSocket przez Cloud Run; przy więcej niż jednej instancji api potrzebne „session affinity” albo backplane - na start jedna instancja (`max-instances=1`) albo affinity (sprawdź).
+- **Data Protection**: klucze w bazie, certyfikat stały z Secret Managera - restart rewizji nie wylogowuje.
+- **Skala do zera**: worker zgłoszeń i retencji działa tylko w uruchomionej instancji; na demo `min-instances=1` dla api albo akceptacja opóźnień (sprawdź koszt).
 
 Po wdrożeniu, na telefonie:
 

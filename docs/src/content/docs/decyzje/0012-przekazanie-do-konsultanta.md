@@ -23,7 +23,7 @@ Model nie może sam przekazać rozmowy ani dawać konsultantowi uprawnień, któ
 
 ### Rola i uprawnienia
 
-- Nowa rola `Support`. Konto demo `konsultant@demo.fuelclub.test`. Na innych środowiskach, także Railway: `BootstrapSupport:Email`/`Password`.
+- Nowa rola `Support`. Konto demo `konsultant@demo.fuelclub.test`. Na innych środowiskach, także na hostingu: `BootstrapSupport:Email`/`Password`.
   - Sekrety tylko w zmiennych środowiskowych / user-secrets.
   - Bootstrap tworzy tylko nowe konto. Istniejące konto z tym e-mailem **nie** dostaje roli: ostrzeżenie w logu, konto bez zmian.
 - `Support` nie ma uprawnień `User`, `Cashier` ani `Admin`: nie nalicza punktów, nie realizuje kuponów, nie zmienia ofert, nie widzi salda, kart ani kuponów klienta.

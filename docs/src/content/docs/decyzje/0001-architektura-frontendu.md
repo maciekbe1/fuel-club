@@ -18,7 +18,7 @@ Next.js 16 (App Router, `cacheComponents`) i ASP.NET Core działają jako dwa pr
 `next.config.ts` przepisuje `/api/:path*` na `API_INTERNAL_URL`. Przeglądarka nie zna adresu API, nie potrzeba CORS, a cookie przechodzi bez zmian.
 
 - Rewrite (tablica) działa po sprawdzeniu plików, więc `app/api/**/route.ts` ma pierwszeństwo. Jeśli rewrite buforuje SSE, czat dostaje własny route handler przepuszczający strumień.
-- `API_INTERNAL_URL` jest czytany przy buildzie i starcie. Na Railway ustaw go przed buildem obrazu.
+- `API_INTERNAL_URL` jest czytany przy buildzie i starcie. Na hostingu (Cloud Run) ustaw go przed buildem obrazu.
 
 ### 2. Dane przez TanStack Query, mutacje z klienta
 

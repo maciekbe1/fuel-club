@@ -66,8 +66,8 @@ CI nie było uruchomione na GitHubie: repozytorium nie jest wypychane bez zgody 
 | Kryterium | Dowód |
 | --- | --- |
 | Obrazy web/API, trwałe klucze Data Protection, migracje, backup/odtworzenie, SSE przez obraz | [Obrazy i hosting](/instrukcje/obrazy-i-hosting/) (lokalna próba produkcyjna), `DataProtectionTests` |
-| Instrukcja Railway | [Obrazy i hosting](/instrukcje/obrazy-i-hosting/#railway) |
+| Instrukcja hostingu (Cloud Run) | [Obrazy i hosting](/instrukcje/obrazy-i-hosting/#cloud-run) |
 
 :::caution[Planowane]
-Wdrożenie na Railway, HTTPS na publicznej domenie, test SSE przez brzeg hostingu i kamery na telefonie. Wymaga konta; nie utworzono płatnych zasobów.
+Wdrożenie na Cloud Run, HTTPS na publicznej domenie, test SSE przez brzeg hostingu i kamery na telefonie. Wymaga konta; nie utworzono płatnych zasobów.
 :::

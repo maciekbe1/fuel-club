@@ -114,7 +114,7 @@ Zawiera moduły, referencję (endpointy, kody błędów, konfiguracja, baza), in
 - zdarzenia bezpieczeństwa, anomalie, kolejka przeglądu i retencja;
 - limity.
 
-**Obrazy:** `apps/api/Dockerfile`, `apps/web/Dockerfile`. Lokalna próba produkcyjna, kopia i odtworzenie bazy oraz instrukcja Railway są w docs, „Obrazy i hosting”.
+**Obrazy:** `apps/api/Dockerfile`, `apps/web/Dockerfile`. Lokalna próba produkcyjna, kopia i odtworzenie bazy oraz instrukcja Cloud Run są w docs, „Obrazy i hosting”.
 
 **Planowane / niewykonane:**
 

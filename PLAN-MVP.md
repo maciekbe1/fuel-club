@@ -237,6 +237,8 @@ Powyższy zapis jest historyczny, nie jest instrukcją uruchomienia obecnego pro
 - SDK Gemini: https://googleapis.github.io/js-genai/index.html
 ## Hosting MVP - Railway
 
+> Zmiana 2026-11-23: docelowy hosting to Cloud Run (decyzja właściciela). Instrukcja: `docs/src/content/docs/instrukcje/obrazy-i-hosting.md` (sekcja Cloud Run). Poniżej pierwotny plan.
+
 - Jeden projekt Railway: Next.js, .NET API i PostgreSQL z trwałym dyskiem.
 - Publiczny adres HTTPS frontendu pozwala testować na telefonie. Frontend przekazuje /api/* do prywatnego API; baza pozostaje prywatna.
 - Lokalnie Docker Compose; na hostingu te same obrazy Docker.

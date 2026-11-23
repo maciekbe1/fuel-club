@@ -450,7 +450,7 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 
 Otwarte:
 - P7c judge na próbkach;
-- publiczny hosting i telefon (konto Railway);
+- publiczny hosting i telefon - docelowo Cloud Run (decyzja 2026-11-23, instrukcja w docs; Vertex osobno); strona „Stan wymagań” w referencji;
 - kolejność uzgodniona z właścicielem (2026-11-23): 1) push i zielone CI, 2) evale Gemini (te same scenariusze, powtórzenia, narzędzia i argumenty, izolacja, handoff, RAG, znane pudła RAG jako jawne braki; raport jako punkt odniesienia), 3) P15a-d, 4) judge offline (rubryka, kalibracja na ręcznie ocenionej próbce), potem online, 5) publiczne wdrożenie (Cloud Run jako hosting i Vertex jako dostęp do modelu - osobne decyzje właściciela); porównanie RAG leksykalny vs hybrydowy na tym samym zbiorze po evalach; Slack i voice na końcu.
 
 P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11: API, `propose_handoff`, hub, UI i E2E gotowe; dalej refaktor z audytu (zgoda właściciela): podziały plików, wspólny błąd wczytywania, shadcn `skeleton`/`alert`, martwy kod; potem osobno skaner QR i API.

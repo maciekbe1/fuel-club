@@ -66,7 +66,7 @@ Pozostałe wymagania obowiązkowe opisano poniżej. Gemini, RAG, voice, Slack, V
 - Utrata odpowiedzi oraz drugi odbiór nie podwajają efektu. Drugie konto nie dostaje pierwszego konta w UI, HTTP ani narzędziach.
 - README: świeży klon, konfiguracja, migracje, konta demo, start i wszystkie komendy kontroli. Dokumentacja odróżnia stan gotowy od planowanego.
 - CI dla API na PostgreSQL, typecheck/lint, E2E, evals i build docs. Nie używa bazy dev ani kluczy chmurowych.
-- Przygotuj obrazy web/API i instrukcję hostingu Railway z prywatną bazą/API, HTTPS przez web, trwałymi kluczami Data Protection, migracjami, backupem/odtworzeniem oraz testem SSE i kamery na telefonie. Wdrożenie wymaga dostępnego konta i konfiguracji; nie twórz płatnych zasobów w ciemno. Aktualne ustawienia i ceny sprawdź przy wdrożeniu.
+- Przygotuj obrazy web/API i instrukcję hostingu Cloud Run (od 2026-11-23, wcześniej Railway) z prywatną bazą/API, HTTPS przez web, trwałymi kluczami Data Protection, migracjami, backupem/odtworzeniem oraz testem SSE i kamery na telefonie. Wdrożenie wymaga dostępnego konta i konfiguracji; nie twórz płatnych zasobów w ciemno. Aktualne ustawienia i ceny sprawdź przy wdrożeniu.
 
 ## Opcjonalne po lokalnym MVP
 

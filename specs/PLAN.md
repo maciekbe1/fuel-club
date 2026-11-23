@@ -13,7 +13,7 @@ Specyfikacja: specs/SPEC.md. Każdy krok osobno przechodzi pętlę z specs/LOOP.
 7. **P6 - transport i ekran czatu.** Streaming, anulowanie, błędy, potwierdzenie. Test podzielonych ramek SSE i E2E zgody/odmowy/utraty odpowiedzi. Narzędzia wyświetlają tylko dane dozwolone użytkownikowi.
 8. **P7 - evals i obserwowalność.** Wersjonowane scenariusze, ślady, retencja, anomalie, ograniczony widok admina. Testy progów, redakcji i izolacji. Uzupełnienie brakujących limitów.
 9. **P8 - CI i odbiór lokalnego MVP.** Pełne testy, docs, świeży start według README i scenariusz demonstracji. Wszystkie kryteria specyfikacji mają dowód lub jawny blocker.
-10. **P9 - hosting.** Obrazy, instrukcja i konfiguracja wdrożenia, następnie HTTPS i telefon, jeśli dostępne konto. Bez udawania ukończenia przy braku dostępu. Weryfikacja backup/restore i SSE.
+10. **P9 - hosting** (od 2026-11-23 docelowo Cloud Run). Obrazy, instrukcja i konfiguracja wdrożenia, następnie HTTPS i telefon, jeśli dostępne konto. Bez udawania ukończenia przy braku dostępu. Weryfikacja backup/restore i SSE.
 11. **P10 - opcjonalny Gemini.** Oddzielny zakres po MVP, bez zależności lokalnych testów od chmury. Pozostałe integracje: projekt, nie automatyczna rozbudowa.
 12. **P14 - regulamin i FAQ w czacie (RAG).** Po zamknięciu P11. Zrealizowany 2026-11-23 ([ADR 0016](../docs/src/content/docs/decyzje/0016-regulamin-w-czacie.md)).
     - **Dokument:** demonstracyjny regulamin zgodny z działaniem aplikacji (`apps/api/Modules/Knowledge/Documents/regulamin-v1.md`, zaakceptowany). Zasady zatwierdza właściciel; agent nie wymyśla ich jako obowiązujących. Wersja `regulamin-v1` dopiero po akceptacji całej treści; ograniczenia demo opisane jako ograniczenia demo, nie ogólne zakazy.
@@ -37,7 +37,7 @@ Specyfikacja: specs/SPEC.md. Każdy krok osobno przechodzi pętlę z specs/LOOP.
 2. Evale Gemini: te same scenariusze, kilka powtórzeń; poprawność narzędzi i argumentów, izolacja, handoff, RAG; znane pudła wyszukiwania jako jawne braki. Zapisany raport jako punkt odniesienia; bez blokowania CI.
 3. P15a-d.
 4. Judge offline (rubryka, kalibracja na ręcznie ocenionej próbce), potem online (P15e).
-5. Publiczne wdrożenie. Hosting (np. Cloud Run) i dostęp do modelu (klucz API albo Vertex) to osobne decyzje.
+5. Publiczne wdrożenie na Cloud Run (decyzja właściciela 2026-11-23, zamiast Railway). Dostęp do modelu przez Vertex AI to osobna decyzja; Cloud Run nie oznacza Vertex ani Agent Buildera. Stan: `docs/.../referencja/stan-wymagan.md`.
 
 Po evalach: porównanie wyszukiwania leksykalnego z hybrydowym na tym samym zbiorze. Slack i voice na końcu.
 
