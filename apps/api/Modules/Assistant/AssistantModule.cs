@@ -9,7 +9,9 @@ using FuelClub.Api.Modules.Assistant.Tools;
 using FuelClub.Api.Modules.Assistant.Tracing;
 using FuelClub.Api.Modules.Rewards.Coupons;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
+using Polly;
 
 namespace FuelClub.Api.Modules.Assistant;
 
@@ -31,7 +33,47 @@ public static class AssistantModule
         services.AddSingleton<TracePseudonyms>();
         // The demo model is the default; Assistant:Provider=gemini switches to the Gemini adapter.
         // Chosen from the bound options when resolved, so every configuration source counts.
-        services.AddHttpClient(GeminiChatModel.ClientName);
+        // Transient answers (429, 5xx, 408, connection errors) are retried with backoff and a short
+        // Retry-After; other 4xx are not. GeminiChatModel's RequestTimeout bounds all attempts of a step.
+        services
+            .AddHttpClient(GeminiChatModel.ClientName)
+            .AddResilienceHandler(
+                "gemini",
+                (pipeline, context) =>
+                {
+                    var logger = context
+                        .ServiceProvider.GetRequiredService<ILoggerFactory>()
+                        .CreateLogger<GeminiChatModel>();
+                    pipeline.AddRetry(
+                        new HttpRetryStrategyOptions
+                        {
+                            MaxRetryAttempts = 2,
+                            BackoffType = DelayBackoffType.Exponential,
+                            Delay = TimeSpan.FromMilliseconds(500),
+                            MaxDelay = GeminiRetryMaxDelay,
+                            UseJitter = true,
+                            ShouldHandle = args =>
+                                ValueTask.FromResult(
+                                    HttpClientResiliencePredicates.IsTransient(args.Outcome)
+                                        && !LongRetryAfter(args.Outcome.Result)
+                                ),
+                            OnRetry = args =>
+                            {
+                                // Status or exception type only: bodies may echo the request.
+                                logger.LogWarning(
+                                    "Gemini attempt {Attempt} failed ({Status}); retrying in {Delay}.",
+                                    args.AttemptNumber + 1,
+                                    args.Outcome.Result is { } r
+                                        ? (int)r.StatusCode
+                                        : args.Outcome.Exception?.GetType().Name,
+                                    args.RetryDelay
+                                );
+                                return default;
+                            },
+                        }
+                    );
+                }
+            );
         services.AddSingleton<DemoChatModel>();
         services.AddTransient<IChatModel>(provider =>
         {
@@ -64,6 +106,19 @@ public static class AssistantModule
             )
         );
         return services;
+    }
+
+    private static readonly TimeSpan GeminiRetryMaxDelay = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// A Retry-After past the backoff cap (quota) is not waited for: the step fails at once
+    /// instead of sleeping until RequestTimeout.
+    /// </summary>
+    private static bool LongRetryAfter(HttpResponseMessage? response)
+    {
+        var after = response?.Headers.RetryAfter;
+        var delay = after?.Delta ?? (after?.Date - DateTimeOffset.UtcNow);
+        return delay > GeminiRetryMaxDelay;
     }
 
     public static IEndpointRouteBuilder MapAssistantEndpoints(this IEndpointRouteBuilder app)

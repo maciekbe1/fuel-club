@@ -44,7 +44,10 @@ public sealed class GeminiOptions
     public string Model { get; set; } = "gemini-3.5-flash-lite";
     public Uri Endpoint { get; set; } = new("https://generativelanguage.googleapis.com/v1beta/");
 
-    /// <summary>One model call; the whole turn is still bounded by TurnTimeout.</summary>
+    /// <summary>
+    /// One model step, all retry attempts and backoff included; the whole turn is still bounded by
+    /// TurnTimeout.
+    /// </summary>
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(20);
 }
 

@@ -51,6 +51,7 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
     {
         private readonly Queue<(HttpStatusCode, string)> _answers = new(answers);
         public List<(HttpRequestMessage Request, string Body)> Sent { get; } = [];
+        public TimeSpan? RetryAfter { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -59,10 +60,13 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         {
             Sent.Add((request, await request.Content!.ReadAsStringAsync(cancellationToken)));
             var (status, body) = _answers.Dequeue();
-            return new HttpResponseMessage(status)
+            var response = new HttpResponseMessage(status)
             {
                 Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
             };
+            if (RetryAfter is { } after)
+                response.Headers.RetryAfter = new(after);
+            return response;
         }
     }
 
@@ -255,6 +259,9 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
     {
         var gemini = new FakeGemini(
             (HttpStatusCode.OK, CallBody("award_points", new { points = 1000 }, "sig-X")),
+            // A lasting failure: the first try and both retries.
+            (HttpStatusCode.InternalServerError, "{}"),
+            (HttpStatusCode.InternalServerError, "{}"),
             (HttpStatusCode.InternalServerError, "{}")
         );
         await using var host = Host(gemini);
@@ -417,10 +424,62 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_transient_gemini_failure_is_retried_and_the_turn_succeeds()
+    {
+        var gemini = new FakeGemini(
+            (HttpStatusCode.ServiceUnavailable, "{}"),
+            (HttpStatusCode.TooManyRequests, "{}"),
+            (HttpStatusCode.OK, TextBody("Masz 7 pkt."))
+        );
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 7);
+
+        var events = await ChatAsync(client, "Cześć");
+
+        Assert.Equal("done", events[^1].Name);
+        Assert.Equal(3, gemini.Sent.Count);
+        // Each attempt carries the whole request.
+        Assert.All(gemini.Sent, s => Assert.Equal(gemini.Sent[0].Body, s.Body));
+    }
+
+    [Fact]
+    public async Task A_rejected_gemini_request_is_not_retried()
+    {
+        var gemini = new FakeGemini((HttpStatusCode.BadRequest, "{}"));
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 7);
+
+        var events = await ChatAsync(client, "Cześć");
+
+        Assert.Equal("error", events[^1].Name);
+        Assert.Single(gemini.Sent);
+    }
+
+    [Fact]
+    public async Task A_quota_answer_with_a_long_retry_after_fails_at_once()
+    {
+        var gemini = new FakeGemini((HttpStatusCode.TooManyRequests, "{}"))
+        {
+            RetryAfter = TimeSpan.FromSeconds(30),
+        };
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 7);
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var events = await ChatAsync(client, "Cześć");
+
+        Assert.Equal("assistant.provider_error", events[^1].Data.GetProperty("code").GetString());
+        Assert.Single(gemini.Sent);
+        Assert.True(started.Elapsed < TimeSpan.FromSeconds(5), started.Elapsed.ToString());
+    }
+
+    [Fact]
     public async Task A_failed_model_call_leaves_the_turn_tokens_unknown_not_partial()
     {
         var gemini = new FakeGemini(
             (HttpStatusCode.OK, CallBody("get_my_balance", new { }, "sig-U")),
+            (HttpStatusCode.ServiceUnavailable, "{}"),
+            (HttpStatusCode.ServiceUnavailable, "{}"),
             (HttpStatusCode.ServiceUnavailable, "{}")
         );
         await using var host = Host(gemini);

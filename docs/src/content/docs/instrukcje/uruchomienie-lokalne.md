@@ -74,7 +74,7 @@ npm run dev
 
 ## Sprawdzenie
 
-- `curl http://localhost:5271/health/db` zwraca `{"database":"connected"}`.
+- `curl http://localhost:5271/health/db` zwraca `Healthy` (`503` i `Unhealthy`, gdy baza nie odpowiada).
 - `http://localhost:3000` przekierowuje na `/login`.
 
 Konto administratora: [Utworzenie administratora](/instrukcje/administrator/).

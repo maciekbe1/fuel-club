@@ -15,6 +15,21 @@ Specyfikacja: specs/SPEC.md. Każdy krok osobno przechodzi pętlę z specs/LOOP.
 9. **P8 - CI i odbiór lokalnego MVP.** Pełne testy, docs, świeży start według README i scenariusz demonstracji. Wszystkie kryteria specyfikacji mają dowód lub jawny blocker.
 10. **P9 - hosting.** Obrazy, instrukcja i konfiguracja wdrożenia, następnie HTTPS i telefon, jeśli dostępne konto. Bez udawania ukończenia przy braku dostępu. Weryfikacja backup/restore i SSE.
 11. **P10 - opcjonalny Gemini.** Oddzielny zakres po MVP, bez zależności lokalnych testów od chmury. Pozostałe integracje: projekt, nie automatyczna rozbudowa.
+12. **P14 - regulamin i FAQ w czacie (RAG).** Po zamknięciu P11.
+    - **Dokument:** demonstracyjny regulamin zgodny z działaniem aplikacji (szkic: `specs/regulamin-szkic.md`). Zasady zatwierdza właściciel; agent nie wymyśla ich jako obowiązujących.
+    - **Narzędzie:** `search_program_rules(query)` zwraca fragmenty z numerem punktu (§) i wersją dokumentu.
+    - **Wyszukiwanie:** PostgreSQL, bez osobnej bazy wektorowej.
+    - **Odpowiedzi:**
+      - czat odpowiada na podstawie fragmentów i podaje źródło („Regulamin, §4.2”);
+      - gdy dokument nie odpowiada, mówi to wprost i proponuje konsultanta;
+      - saldo, stan kuponu i szczegóły zakupu nadal pochodzą z narzędzi konta.
+    - **Evals:**
+      - punkty po rabacie;
+      - aktywacja a odbiór;
+      - nagrody produktowe;
+      - brak terminu ważności;
+      - pytanie bez odpowiedzi w dokumencie;
+      - sprzeczna instrukcja zaszyta w dokumencie (fragment nie jest poleceniem).
 
 ### Rozbicie P7
 

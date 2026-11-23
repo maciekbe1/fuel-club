@@ -50,7 +50,7 @@ Pełny, aktualny kontrakt: `GET /openapi/v1.json` (Development). Ta tabela opisu
 | `GET /api/admin/observability?hours=` | rola `Admin` | - | `200`: metryki czatu, zdarzenia bezpieczeństwa, stan reguł ([ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/)) | `400 observability.validation_failed`, `401`, `403` |
 | `GET /api/admin/observability/review` | rola `Admin` | - | `200 { items[] }`: tury do przejrzenia (pseudonimy, metadane) | `401`, `403` |
 | `POST /api/admin/observability/review/{id}` | rola `Admin`, CSRF | - | `204` (powtórzenie zachowuje pierwszy przegląd) | `401`, `403`, `403 csrf.invalid`, `404 observability.turn_not_found` |
-| `GET /health/db` | brak, tylko Development | - | `200 { database }` | `503` |
+| `GET /health/db` | brak, tylko Development | - | `200 Healthy` (tekst, wbudowany health check EF Core) | `503 Unhealthy` |
 | `GET /openapi/v1.json` | brak, tylko Development | - | `200` | - |
 
 ## Treść żądań

@@ -34,7 +34,7 @@ sidebar:
 | `Assistant:ChatPermitLimit` / `ChatWindow` | nie | `20` / `00:01:00`; tur czatu na użytkownika w oknie, potem `429` |
 | `Assistant:Provider` | nie | `demo` (domyślnie, bez sieci) albo `gemini` ([ADR 0011](/decyzje/0011-adapter-gemini/)) |
 | `Assistant:Gemini:ApiKey` | przy `gemini` | klucz Gemini API - sekret: user-secrets / `Assistant__Gemini__ApiKey` |
-| `Assistant:Gemini:Model` / `RequestTimeout` | nie | `gemini-3.5-flash-lite` / `00:00:20` (≤ `TurnTimeout`) |
+| `Assistant:Gemini:Model` / `RequestTimeout` | nie | `gemini-3.5-flash-lite` / `00:00:20` (≤ `TurnTimeout`; łącznie z ponowieniami, [ADR 0011](/decyzje/0011-adapter-gemini/)) |
 | `Assistant:Gemini:Endpoint` | nie | `https://generativelanguage.googleapis.com/v1beta/` - musi kończyć się `/` |
 | `Assistant:PseudonymKey` | poza `Development` tak (inaczej API nie startuje) | sekret (env / user-secrets), base64 ≥ 32 bajty; klucz HMAC pseudonimów w śladach. W `Development` bez niego: losowy na czas procesu |
 | `Assistant:TraceSaveTimeout` | nie | `00:00:02` (do 30 s); jak długo koniec tury czeka na zapis śladu |

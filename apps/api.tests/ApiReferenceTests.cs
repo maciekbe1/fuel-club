@@ -17,4 +17,15 @@ public sealed class ApiReferenceTests(ApiFactory factory)
         var document = await client.GetAsync("/openapi/v1.json");
         Assert.Equal(HttpStatusCode.OK, document.StatusCode);
     }
+
+    [Fact]
+    public async Task Development_reports_database_health()
+    {
+        var client = factory.CreateClient();
+
+        var health = await client.GetAsync("/health/db");
+
+        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+        Assert.Equal("Healthy", await health.Content.ReadAsStringAsync());
+    }
 }

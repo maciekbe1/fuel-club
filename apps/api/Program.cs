@@ -71,7 +71,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     // Browser UI for trying endpoints: /scalar (reads /openapi/v1.json). Development only.
     app.MapScalarApiReference(options => options.WithTitle("Fuel Club API"));
-    app.MapDatabaseHealthEndpoint();
+    app.MapHealthChecks("/health/db");
 }
 
 app.MapCsrfEndpoint();

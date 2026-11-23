@@ -379,7 +379,7 @@ Dziewiąte review (`/code-review high`): bez błędów blokujących, 5 drobnych 
 
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
-## P11 - przekazanie do konsultanta (2026-11-23), w realizacji
+## P11 - przekazanie do konsultanta (done, 2026-11-23)
 
 Doprecyzowanie P13 przed startem (właściciel): `409` odebranej nagrody nie dowodzi, że wcześniejsza próba się nie udała. Kasa pokazuje stan („Nagroda jest odebrana: zapisano wydanie … na tej kasie / na stanowisku X, kasa Y”), bez czerwonego błędu i bez przycisku „Wydaj nagrodę”; E2E `product-rewards`, `cashier-coupon`, `demo` 26/26.
 
@@ -422,6 +422,16 @@ Refaktor 3 - czat na AI Elements ([ADR 0015](docs)): `conversation`, `message` (
 Refaktor 4 - martwy kod i shadcn: usunięty nieużywany `lib/sse.ts`; formatery (kwota, liczba, litry, godzina, data z godziną) wspólne w `lib/format.ts` zamiast kopii w 9 plikach (zostają tylko specyficzne: procenty i sekundy w obserwowalności, znak punktów i data sprzedaży UTC w historii); shadcn `badge` (statusy kuponów i ofert, narzędzia czatu, powody przeglądu), `toggle-group` (okno czasu), `radio-group` + `checkbox` + `textarea` w formularzu oferty (przez `Controller`; E2E przez `getByRole`, bo Base UI dodaje ukryte pole z tą samą etykietą); E2E 148/148.
 - review refaktoru (`/code-review high`, 8 uwag, przyjęte): checkbox i radio Base UI nie respektowały zablokowanego `fieldset` (formularz oferty po nieznanym wyniku zapisu) - teraz `disabled` wprost; `streamdown` przepuszczał obrazki z dowolnego adresu - odpowiedź bez `img` i `a` (`AssistantAnswer.tsx`); puste okno czatu nad otwartym zgłoszeniem; `remark-breaks` dla pojedynczych nowych linii; zawijanie długich słów w dymkach i znaczkach; angielskie przyciski `streamdown` wyłączone; ADR 0001 opisywał usunięty `lib/sse.ts`. Nowe E2E: markdown bez obrazków i linków (nic nie wychodzi do obcego adresu), zablokowany checkbox, brak pustego okna; mutacje: bez `disallowedElements` i bez `disabled` - testy padają; E2E 150/150.
 - zostaje z audytu (osobno, za zgodą): skaner QR na `barcode-detector`, API: walidacja ustawień przez DataAnnotations, `Http.Resilience` dla Gemini, wbudowany health check.
+
+Audyt - API i skaner (2026-11-23):
+- Gemini: ponowienia przejściowych błędów (`429`, `5xx`, `408`, połączenie) przez `Microsoft.Extensions.Http.Resilience` - 2 ponowienia, odstęp od 0,5 s z rozrzutem, `Retry-After`, `4xx` bez ponowień; `RequestTimeout` obejmuje wszystkie próby. Testy: `503`, `429`, sukces → 3 identyczne żądania; `400` → jedno; mutacja (1 ponowienie) - test pada.
+- `/health/db`: wbudowany health check EF Core (`AddDbContextCheck`) zamiast własnego endpointu; odpowiedź `Healthy`/`Unhealthy` (tekst), nadal tylko Development; zniknął z OpenAPI (`schema.d.ts`). Test w `ApiReferenceTests`.
+- Skaner QR na `@yudiel/react-qr-scanner` (`barcode-detector`) - próba odrzucona: domyślnie pobiera WASM (924 KB) z `fastly.jsdelivr.net`, domyślne ograniczenia (min. 640 px wysokości) odrzucają kamerę 640x480 (`overconstrained`), po wyjściu z kasy kamera zostawała włączona (E2E `leaving the register stops the camera`). Zostaje `jsqr` z własną obsługą kamery (wyścigi pokryte E2E).
+- Walidacja ustawień przez DataAnnotations - pominięta: około połowa reguł zależy od innych pól, środowiska albo słownika reguł, więc zasady byłyby w dwóch miejscach (atrybuty i walidator) bez realnego zysku.
+- review (`/code-review high`, 7 uwag): przyjęte - długi `Retry-After` czekał do `RequestTimeout` i kończył turę jako `timeout` (teraz > 5 s → od razu `provider_error`; mutacja: 20 s i test pada), atrapa Gemini powtarzała ostatnią odpowiedź (osłabiała inne testy - wycofane, porażki podane jawnie), opis `RequestTimeout`, ostrzeżenie w logu przy ponowieniu; częściowo - `TurnTimeout` przy wielu krokach (bez zmian w kodzie, poprawione zdanie w ADR 0011), testy pozostałych ścieżek (dodany `Retry-After`); odrzucone - rozpoznawanie limitu dziennego `429` (tylko z treści odpowiedzi, koszt ok. 1,5 s).
+- API 540/540 (1 pominięty: Gemini na żywo).
+
+P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`; szkic regulaminu `specs/regulamin-szkic.md` czeka na akceptację właściciela (punkty `[DECYZJA]`).
 
 ## Następny krok
 

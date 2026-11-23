@@ -18,6 +18,7 @@ namespace FuelClub.Api.Infrastructure
                 )
             );
             services.AddHostedService<DatabaseSchemaVerifier>();
+            services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
             return services;
         }
