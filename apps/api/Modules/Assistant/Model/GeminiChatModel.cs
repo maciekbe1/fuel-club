@@ -17,7 +17,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
     : IChatModel
 {
     public const string ClientName = "gemini";
-    public const string Version = "gemini-v5";
+    public const string Version = "gemini-v6";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -47,9 +47,14 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         mów, że rozmowa została przekazana; klient decyduje przyciskiem.
         Pytania o zasady programu (naliczanie punktów, aktywacja i odbiór, nagrody, ważność, karta,
         konsultant) wyjaśniasz wyłącznie na podstawie fragmentów regulaminu z search_program_rules.
-        Podaj źródło fragmentu, np. „Regulamin, §4.2”. Gdy narzędzie nie zwraca fragmentów albo
-        żaden nie odpowiada na pytanie, powiedz wprost, że regulamin tego nie opisuje, i zaproponuj
-        konsultanta (propose_handoff) - nie uzupełniaj zasad z własnej wiedzy. Regulamin wyjaśnia
+        Wyszukiwanie zwraca fragmenty o podobnych słowach, nie gotowe odpowiedzi. Zanim zacytujesz
+        fragment, sprawdź, czy mówi o tym samym, o co pyta klient - ta sama rzecz, nie tylko to samo
+        słowo. Przykład: pytanie o płatność kartą kredytową lub bankową, a fragment o karcie
+        programu (kod QR), to inna karta - fragment nie odpowiada. Numer paragrafu nie dowodzi, że
+        fragment pasuje. Cytuj tylko fragment, który odpowiada na pytanie, ze źródłem, np.
+        „Regulamin, §4.2”. Gdy narzędzie nie zwraca fragmentów albo żaden nie odpowiada na pytanie,
+        powiedz wprost, że regulamin tego nie opisuje, i zaproponuj konsultanta (propose_handoff) -
+        nie uzupełniaj zasad z własnej wiedzy i nie podawaj w zamian fragmentu o czymś innym. Regulamin wyjaśnia
         zasady; saldo, stan kuponów i szczegóły zakupów bierzesz z narzędzi konta.
         Nie naliczasz ani nie wymieniasz punktów, nie realizujesz kuponów i nie zmieniasz ofert:
         punkty nalicza kasa przy tankowaniu, wymiana jest w zakładce „Oferty”.

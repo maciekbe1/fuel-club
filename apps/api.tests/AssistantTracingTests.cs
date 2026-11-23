@@ -276,7 +276,7 @@ public sealed class AssistantTracingTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(expected, (await TraceAsync(again)).UserPseudonym);
         Assert.NotEqual(expected, (await TraceAsync(otherUser)).UserPseudonym);
         Assert.Equal(
-            ("demo", "demo-rules", "demo-rules-v4", true),
+            ("demo", "demo-rules", "demo-rules-v5", true),
             (trace.Provider, trace.Model, trace.PromptVersion, trace.Demo)
         );
         Assert.Equal(TurnOutcome.Done, trace.Outcome);

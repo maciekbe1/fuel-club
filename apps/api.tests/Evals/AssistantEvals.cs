@@ -59,6 +59,7 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         "regulamin-nagrody",
         "regulamin-waznosc",
         "regulamin-brak-odpowiedzi",
+        "regulamin-karta",
         "regulamin-wstrzykniecie",
     ];
 
@@ -165,7 +166,10 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
     /// The same cases on Gemini (FUELCLUB_GEMINI_EVALS=pilot: 5 cases once; full: every case without
     /// a scripted model, FUELCLUB_GEMINI_EVAL_REPEATS times, default 3). Never fails on quality: it
     /// writes a report (Evals/reports) with every check, tokens and an estimate for the full run.
-    /// Stops when FUELCLUB_GEMINI_EVAL_TOKEN_BUDGET (input + output, default 150000) is used up.
+    /// Two run limits, checked before each case: FUELCLUB_GEMINI_EVAL_TOKEN_BUDGET (input + output,
+    /// default 400000) and FUELCLUB_GEMINI_EVAL_MAX_USD (default 0.25, prices in GeminiReport). A
+    /// case is never cut short, so a run can pass a limit by at most one case (per-case caps
+    /// below). Cases not run are listed as skipped and the report is marked incomplete.
     /// Limits per case: MaxToolCalls (steps), the token caps above, no case retries; the HTTP
     /// client retries a transient answer at most twice (ADR 0011).
     /// </summary>
@@ -182,12 +186,22 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                     ? Math.Clamp(r, 1, 10)
                     : 3
                 : 1;
-        var budget = int.TryParse(
-            Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_EVAL_TOKEN_BUDGET"),
-            out var b
-        )
-            ? b
-            : 150_000;
+        var budget = new GeminiReport.Budget(
+            int.TryParse(
+                Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_EVAL_TOKEN_BUDGET"),
+                out var b
+            )
+                ? b
+                : 400_000,
+            decimal.TryParse(
+                Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_EVAL_MAX_USD"),
+                System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var usd
+            )
+                ? usd
+                : 0.25m
+        );
         var model = Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_MODEL") is { Length: > 0 } m
             ? m
             : "gemini-3.5-flash-lite";
@@ -202,20 +216,27 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             mode == "full" ? applicable : applicable.Where(c => PilotCases.Contains(c.Id)).ToList();
 
         var runs = new List<CaseReport>();
-        var used = 0;
-        var stopped = false;
+        var skipped = new List<string>();
+        string? stoppedBy = null;
+        long usedInput = 0,
+            usedOutput = 0;
         foreach (var round in Enumerable.Range(1, repeats))
         foreach (var evalCase in selected)
         {
-            if (used >= budget)
+            stoppedBy ??=
+                usedInput + usedOutput >= budget.Tokens ? "tokens"
+                : GeminiReport.CostUsd(usedInput, usedOutput) >= budget.MaxUsd ? "cost"
+                : null;
+            if (stoppedBy is not null)
             {
-                stopped = true;
-                break;
+                skipped.Add($"{evalCase.Id}#{round}");
+                continue;
             }
             var report = await RunAsync(evalCase, settings);
             var input = report.InputTokens ?? 0;
             var outputTokens = report.OutputTokens ?? 0;
-            used += input + outputTokens;
+            usedInput += input;
+            usedOutput += outputTokens;
             report.Checks.Add(
                 new(
                     "budget",
@@ -238,7 +259,8 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             Suite.Value.Version,
             model,
             runs,
-            stopped,
+            skipped,
+            stoppedBy,
             budget,
             fullRunCases: applicable.Count * 3
         );

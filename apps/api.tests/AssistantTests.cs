@@ -1121,6 +1121,7 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
     [InlineData("Czy mam aktywne kupony?", "list_my_coupons:ok")]
     [InlineData("Czy konsultant widzi moje saldo?", "search_program_rules:ok")]
     [InlineData("Czy mogę cofnąć aktywację kuponu?", "search_program_rules:ok")]
+    [InlineData("Do czego służy karta lojalnościowa?", "search_program_rules:ok")]
     public async Task Demo_sends_only_rule_questions_to_the_rules(string message, string tools)
     {
         var customer = await AccountAsync(balance: 1000);

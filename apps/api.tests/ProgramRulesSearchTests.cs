@@ -94,6 +94,10 @@ public sealed class ProgramRulesSearchTests(ApiFactory factory)
     [InlineData("Czy konsultant widzi moje saldo?", "8.3")]
     [InlineData("Jak liczony jest rabat na litr?", "5.4")]
     [InlineData("Czy asystent może mi dopisać punkty?", "7.2")]
+    // Regression (Gemini pilot 2026-11-23): the program card, not a payment card.
+    [InlineData("karta lojalnościowa", "2.1|2.2|2.3")]
+    [InlineData("Do czego służy karta lojalnościowa?", "2.3")]
+    [InlineData("Co regulamin mówi o karcie lojalnościowej?", "2.1|2.2|2.3")]
     public async Task A_question_finds_its_point_among_the_results(string question, string sections)
     {
         var found = await SearchAsync(question);
@@ -105,6 +109,8 @@ public sealed class ProgramRulesSearchTests(ApiFactory factory)
     }
 
     [Theory]
+    [InlineData("karta kredytowa")]
+    [InlineData("czy mogę płacić kartą kredytową")]
     [InlineData("Ile kosztuje benzyna?")]
     [InlineData("Jakie są godziny otwarcia stacji?")]
     [InlineData("Jak zmienić hasło?")]

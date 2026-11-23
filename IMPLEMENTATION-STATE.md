@@ -454,6 +454,10 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Wykryty błąd (3/3 przebiegów): „Co regulamin mówi o płatności kartą kredytową?” - Gemini wyszukuje własnym zapytaniem, dostaje §2.3 i cytuje go zamiast „regulamin tego nie opisuje” + `propose_handoff`. Do decyzji: próg wyszukiwania dla zapytań modelu i/lub reguła w prompcie (fragment musi odpowiadać na pytanie).
 - `answerPatterns` w `assistant-cases.v2.json` dla 3 przypadków (wzorce zamiast dokładnego tekstu na prawdziwym modelu).
 - Narzędzia jednego kroku po kolei: świadoma decyzja, opis w ADR 0011.
+- Poprawka (decyzja właściciela: pilotaż v5 zostaje punktem odniesienia, poprawka teraz, pełny przebieg po niej): `gemini-v6` - cytat tylko fragmentu o tej samej rzeczy (przykład karta kredytowa / karta programu), § nie dowodzi trafności. Próg 0,45 bez zmian (sprawdzone: poprawne pytania od 0,47, słabe trafienie 0,52). Synonimy `lojalnosciowa`, `karcie`, słowa pomocnicze `czego`, `mowi`; regresja w testach wyszukiwania i eval `rules-loyalty-card` (`regulamin-karta`, 22 przypadki); demo `demo-rules-v5` („do czego służy” → regulamin).
+- Runner: limit kosztu (`FUELCLUB_GEMINI_EVAL_MAX_USD`, 0,25) obok tokenów (400k); pominięte przypadki w raporcie, oznaczenie „NIEPEŁNY” (sprawdzone przebiegiem z limitem 1 tokena).
+- Pilotaż po poprawce (`gemini-v6`, te same 5): 5/5.
+- Kanały (aplikacja + WhatsApp, wspólna rozmowa): osobny ADR po domknięciu evali (wskazanie właściciela 2026-11-23).
 
 ## Następny krok
 

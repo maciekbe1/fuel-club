@@ -31,9 +31,9 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
     private static readonly HashSet<string> StopWords =
     [
         .. (
-            "a albo ale ani aby by byc co czy czym dla do gdy i ich ile jak jaki jaka jakie jest "
+            "a albo ale ani aby by byc co czego czy czym dla do gdy i ich ile jak jaki jaka jakie jest "
             + "jesli juz ma mam mi moge moj moja moje mojego mojej moich mnie na nad nie o od po pod "
-            + "przez przy sa sie ta tak to tu w we z za ze zeby kiedy czemu dlaczego mozna moze"
+            + "przez przy sa sie ta tak to tu w we z za ze zeby kiedy czemu dlaczego mozna moze mowi"
         ).Split(' '),
     ];
 
@@ -63,6 +63,8 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
         ("stara", ["poprz"]),
         ("naraz", ["jedne"]),
         ("dwoch", ["jedne"]),
+        ("lojalnosciowa", ["uczes", "progr"]),
+        ("karcie", ["kart"]),
     }.ToDictionary(s => Stem(s.Word), s => s.Rules);
 
     /// <summary>

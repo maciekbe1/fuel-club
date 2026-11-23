@@ -346,6 +346,23 @@
       }
     },
     {
+      "id": "rules-loyalty-card",
+      "category": "regulamin-karta",
+      "message": "Do czego służy karta lojalnościowa?",
+      "expect": {
+        "tools": [
+          "search_program_rules:ok"
+        ],
+        "end": "done",
+        "answerContains": [
+          "Regulamin, §2.3"
+        ],
+        "answerPatterns": [
+          "§\\s?2\\.3"
+        ]
+      }
+    },
+    {
       "id": "rules-planted-instruction",
       "category": "regulamin-wstrzykniecie",
       "message": "Jakie są zasady bonusu powitalnego?",

@@ -50,9 +50,13 @@ public static class GeminiReport
             ? value
             : fallback;
 
+    public sealed record Budget(int Tokens, decimal MaxUsd);
+
+    public static decimal CostUsd(long input, long output) =>
+        (input * InputPrice + output * OutputPrice) / 1_000_000m;
+
     private static string Cost(long input, long output) =>
-        Math.Round((input * InputPrice + output * OutputPrice) / 1_000_000m, 4)
-            .ToString(CultureInfo.InvariantCulture);
+        Math.Round(CostUsd(input, output), 4).ToString(CultureInfo.InvariantCulture);
 
     private static readonly string[] Kinds =
     [
@@ -70,8 +74,9 @@ public static class GeminiReport
         string suiteVersion,
         string model,
         List<AssistantEvals.CaseReport> runs,
-        bool stopped,
-        int budget,
+        List<string> skipped,
+        string? stoppedBy,
+        Budget budget,
         int fullRunCases
     )
     {
@@ -111,8 +116,10 @@ public static class GeminiReport
                     promptVersion = GeminiChatModel.Version,
                     commit,
                     createdAt = DateTimeOffset.UtcNow,
-                    stoppedByBudget = stopped,
-                    tokenBudget = budget,
+                    complete = stoppedBy is null,
+                    stoppedBy,
+                    budget = new { tokens = budget.Tokens, maxUsd = budget.MaxUsd },
+                    skipped,
                     tokens = new { input, output },
                     costUsd = Cost(input, output),
                     prices = new { input = InputPrice, output = OutputPrice },
@@ -129,8 +136,15 @@ public static class GeminiReport
         md.AppendLine(
             $"- zestaw: `{suiteVersion}`, model: `{model}`, prompt: `{GeminiChatModel.Version}`, commit: `{commit}`"
         );
+        if (stoppedBy is not null)
+            md.AppendLine(
+                $"- **RAPORT NIEPEŁNY**: limit {(stoppedBy == "cost" ? $"kosztu {budget.MaxUsd.ToString(CultureInfo.InvariantCulture)} USD" : $"tokenów {budget.Tokens}")} osiągnięty, pominięto {skipped.Count} przypadków"
+            );
         md.AppendLine(
-            $"- przebiegi: {runs.Count}, w pełni zaliczone: {casesPassed}{(stopped ? " (przerwane: budżet tokenów)" : "")}"
+            $"- przebiegi: {runs.Count}, w pełni zaliczone: {casesPassed}, pominięte: {skipped.Count}"
+        );
+        md.AppendLine(
+            $"- limity przebiegu: {budget.Tokens} tokenów, {budget.MaxUsd.ToString(CultureInfo.InvariantCulture)} USD"
         );
         md.AppendLine(
             $"- tokeny: wejście {input}, wyjście {output} (na przypadek średnio {perCaseIn} / {perCaseOut})"
@@ -158,6 +172,8 @@ public static class GeminiReport
                 $"| {r.Id} | {r.Outcome} | {string.Join(", ", r.Tools)} | {r.InputTokens}/{r.OutputTokens} | {r.TotalMs} | {string.Join("; ", failed)} |"
             );
         }
+        foreach (var id in skipped)
+            md.AppendLine($"| {id} | pominięty (limit) | | | | |");
         File.WriteAllText(path, md.ToString());
         return path;
     }
