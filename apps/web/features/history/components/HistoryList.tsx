@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { QueryError } from "@/components/query/QueryError";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { RetryButton } from "@/components/ui/retry-button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { readErrorMessage } from "@/lib/api/problem";
 import { useHistory } from "../hooks";
 import { HistoryItem } from "./HistoryItem";
@@ -15,28 +16,19 @@ export function HistoryList() {
       <div role="status" aria-busy="true" className="flex flex-col gap-3">
         <span className="sr-only">Ładowanie historii…</span>
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-24 animate-pulse rounded-2xl bg-muted" />
+          <Skeleton key={i} className="h-24 rounded-2xl" />
         ))}
       </div>
     );
 
   if (history.isError && !history.data)
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-start gap-3 rounded-2xl border p-5"
-      >
-        <p>
-          {readErrorMessage(
-            history.error,
-            "Nie udało się pobrać historii. Spróbuj ponownie.",
-          )}
-        </p>
-        <RetryButton
-          busy={history.isFetching}
-          onClick={() => history.refetch()}
-        />
-      </div>
+      <QueryError
+        error={history.error}
+        fallback="Nie udało się pobrać historii. Spróbuj ponownie."
+        retrying={history.isFetching}
+        onRetry={() => history.refetch()}
+      />
     );
 
   const items = history.data.pages.flatMap((page) => page.items);

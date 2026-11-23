@@ -1,3 +1,4 @@
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { benefitTerms } from "@/lib/format";
 import type { AdminReward } from "../services";
@@ -15,10 +16,10 @@ export function ConflictPanel({
   onRetryRead: () => void;
 }) {
   return (
-    <div
-      role="alert"
+    <Alert
       data-testid="offer-conflict"
-      className="flex flex-col items-start gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-50"
+      className="flex flex-col items-start gap-3 rounded-2xl border p-4 text-sm"
+      variant="warning"
     >
       <p className="font-medium">
         Oferta została zmieniona w międzyczasie. Twoje zmiany nie zostały
@@ -55,6 +56,6 @@ export function ConflictPanel({
           </Button>
         </>
       )}
-    </div>
+    </Alert>
   );
 }

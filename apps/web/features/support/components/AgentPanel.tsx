@@ -2,6 +2,7 @@
 
 import { CircleAlert } from "lucide-react";
 import { useCallback, useState } from "react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useClaimCase, useSupportHub, useSupportQueue } from "../hooks";
 import { agentActionError } from "../texts";
@@ -42,9 +43,9 @@ export function AgentPanel() {
         </p>
       )}
       {claim.isError && (
-        <p role="alert" className="rounded-2xl border px-4 py-2 text-sm">
+        <Alert className="rounded-2xl px-4 py-2 text-sm">
           {agentActionError(claim.error)}
-        </p>
+        </Alert>
       )}
       <AgentCaseList
         title="Moje rozmowy"

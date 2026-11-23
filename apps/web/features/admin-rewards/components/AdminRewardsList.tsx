@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { QueryError } from "@/components/query/QueryError";
 import { buttonVariants } from "@/components/ui/button";
-import { RetryButton } from "@/components/ui/retry-button";
-import { readErrorMessage } from "@/lib/api/problem";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatPoints, benefitTerms } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAdminRewards } from "../hooks";
@@ -16,28 +16,19 @@ export function AdminRewardsList() {
       <div role="status" aria-busy="true" className="flex flex-col gap-3">
         <span className="sr-only">Ładowanie ofert…</span>
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-20 animate-pulse rounded-2xl bg-muted" />
+          <Skeleton key={i} className="h-20 rounded-2xl" />
         ))}
       </div>
     );
 
   if (rewards.data === undefined)
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-start gap-3 rounded-2xl border p-5"
-      >
-        <p>
-          {readErrorMessage(
-            rewards.error,
-            "Nie udało się pobrać ofert. Spróbuj ponownie.",
-          )}
-        </p>
-        <RetryButton
-          busy={rewards.isFetching}
-          onClick={() => rewards.refetch()}
-        />
-      </div>
+      <QueryError
+        error={rewards.error}
+        fallback="Nie udało się pobrać ofert. Spróbuj ponownie."
+        retrying={rewards.isFetching}
+        onRetry={() => rewards.refetch()}
+      />
     );
 
   const items = rewards.data.items;

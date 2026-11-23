@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, NetworkError } from "@/lib/api/problem";
 
@@ -34,9 +35,9 @@ export function UnknownOutcome({
   const [unlocking, setUnlocking] = useState(false);
 
   return (
-    <div
-      role="alert"
-      className="flex flex-col items-start gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 p-4 text-amber-950 dark:bg-amber-950 dark:text-amber-50"
+    <Alert
+      className="flex flex-col items-start gap-3 rounded-2xl p-4"
+      variant="warning"
     >
       <p className="text-sm">{unknownMessage(error)}</p>
       {!unlocking ? (
@@ -76,6 +77,6 @@ export function UnknownOutcome({
           </div>
         </div>
       )}
-    </div>
+    </Alert>
   );
 }

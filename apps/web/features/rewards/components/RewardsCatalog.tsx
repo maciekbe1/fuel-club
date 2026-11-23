@@ -1,11 +1,13 @@
 "use client";
 
+import { QueryError } from "@/components/query/QueryError";
+import { Alert } from "@/components/ui/alert";
 import Link from "next/link";
 import { useState } from "react";
-import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
-import { ApiError, NetworkError, readErrorMessage } from "@/lib/api/problem";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ApiError, NetworkError } from "@/lib/api/problem";
 import { keepsPendingOperation, usePendingVars } from "@/lib/idempotency";
 import { EXCHANGE_OPERATION, useExchange, useRewards } from "../hooks";
 import { isProduct } from "@/lib/format";
@@ -107,32 +109,19 @@ export function RewardsCatalog() {
       <div role="status" aria-busy="true" className="flex flex-col gap-3">
         <span className="sr-only">Ładowanie ofert…</span>
         {[0, 1].map((i) => (
-          <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />
+          <Skeleton key={i} className="h-36 rounded-2xl" />
         ))}
       </div>
     );
 
   if (rewards.data === undefined)
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-start gap-3 rounded-2xl border p-5"
-      >
-        <p>
-          {readErrorMessage(
-            rewards.error,
-            "Nie udało się pobrać ofert. Spróbuj ponownie.",
-          )}
-        </p>
-        {rewards.error instanceof ApiError && rewards.error.status === 401 ? (
-          <LoginAgainLink />
-        ) : (
-          <RetryButton
-            busy={rewards.isFetching}
-            onClick={() => rewards.refetch()}
-          />
-        )}
-      </div>
+      <QueryError
+        error={rewards.error}
+        fallback="Nie udało się pobrać ofert. Spróbuj ponownie."
+        retrying={rewards.isFetching}
+        onRetry={() => rewards.refetch()}
+      />
     );
 
   const offers = rewards.data.items;
@@ -140,9 +129,9 @@ export function RewardsCatalog() {
   return (
     <div className="flex flex-col gap-4">
       {rewards.isError && (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-2 rounded-2xl border border-destructive/40 p-4 text-sm"
+        <Alert
+          className="flex flex-col items-start gap-2 rounded-2xl p-4 text-sm"
+          variant="destructive"
         >
           <p>
             Nie udało się odświeżyć ofert - pokazane warunki mogą być
@@ -155,7 +144,7 @@ export function RewardsCatalog() {
           >
             Odśwież
           </RetryButton>
-        </div>
+        </Alert>
       )}
 
       {outcome?.kind === "success" && (
@@ -184,17 +173,14 @@ export function RewardsCatalog() {
         </p>
       )}
       {outcome?.kind === "final" && (
-        <p
-          role="alert"
-          className="rounded-2xl border border-destructive/40 p-4 text-sm"
-        >
+        <Alert className="rounded-2xl p-4 text-sm" variant="destructive">
           {outcome.message}
-        </p>
+        </Alert>
       )}
       {(unknown || interrupted) && retryVars && (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 p-4 text-amber-950 dark:bg-amber-950 dark:text-amber-50"
+        <Alert
+          className="flex flex-col items-start gap-3 rounded-2xl p-4"
+          variant="warning"
         >
           <p className="text-sm">
             {unknown
@@ -207,7 +193,7 @@ export function RewardsCatalog() {
           >
             Ponów wymianę
           </Button>
-        </div>
+        </Alert>
       )}
 
       {offers.length === 0 ? (

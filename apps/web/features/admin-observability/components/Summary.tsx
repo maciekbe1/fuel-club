@@ -1,7 +1,9 @@
+import { QueryError } from "@/components/query/QueryError";
+import { Alert } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useObservabilitySummary } from "../hooks";
 import { Counts } from "./Counts";
-import { LoadError } from "./LoadError";
 import { Rule } from "./Rule";
 import { Tile } from "./Tile";
 import { RULES, SECURITY, ms, number } from "./labels";
@@ -10,20 +12,17 @@ export function Summary({ hours }: { hours: number }) {
   const summary = useObservabilitySummary(hours);
   if (summary.isPending)
     return (
-      <div
-        role="status"
-        aria-busy="true"
-        className="h-64 animate-pulse rounded-3xl bg-muted"
-      >
+      <Skeleton role="status" aria-busy="true" className="h-64 rounded-3xl">
         <span className="sr-only">Ładowanie metryk…</span>
-      </div>
+      </Skeleton>
     );
   if (summary.data === undefined)
     return (
-      <LoadError
+      <QueryError
         error={summary.error}
-        busy={summary.isFetching}
-        retry={() => summary.refetch()}
+        fallback="Nie udało się pobrać danych. Spróbuj ponownie."
+        retrying={summary.isFetching}
+        onRetry={() => summary.refetch()}
       />
     );
   const { chat, security, anomalies } = summary.data;
@@ -99,14 +98,14 @@ export function Summary({ hours }: { hours: number }) {
           Każda reguła liczy we własnym oknie, niezależnie od okna wyżej.
         </p>
         {triggered.length > 0 && (
-          <p
-            role="alert"
-            className="flex items-center gap-2 rounded-2xl border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-50"
+          <Alert
+            className="flex items-center gap-2 rounded-2xl p-3 text-sm"
+            variant="warning"
           >
             <AlertTriangle className="size-4 shrink-0" />
             Przekroczone progi:{" "}
             {triggered.map((a) => RULES[a.rule] ?? a.rule).join(", ")}.
-          </p>
+          </Alert>
         )}
         <ul
           aria-label="Reguły"

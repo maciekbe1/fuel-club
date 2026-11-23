@@ -1,9 +1,11 @@
 "use client";
 
+import { QueryError } from "@/components/query/QueryError";
+import { Alert } from "@/components/ui/alert";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
-import { readErrorMessage } from "@/lib/api/problem";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useActivateCoupon, useCoupons } from "../hooks";
 import { CouponItem } from "./CouponItem";
 import { LoginLink, sessionExpired } from "./couponLabels";
@@ -18,32 +20,19 @@ export function CouponsList() {
       <div role="status" aria-busy="true" className="flex flex-col gap-3">
         <span className="sr-only">Ładowanie kuponów…</span>
         {[0, 1].map((i) => (
-          <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />
+          <Skeleton key={i} className="h-36 rounded-2xl" />
         ))}
       </div>
     );
 
   if (coupons.data === undefined)
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-start gap-3 rounded-2xl border p-5"
-      >
-        <p>
-          {readErrorMessage(
-            coupons.error,
-            "Nie udało się pobrać kuponów. Spróbuj ponownie.",
-          )}
-        </p>
-        {sessionExpired(coupons.error) ? (
-          <LoginLink />
-        ) : (
-          <RetryButton
-            busy={coupons.isFetching}
-            onClick={() => coupons.refetch()}
-          />
-        )}
-      </div>
+      <QueryError
+        error={coupons.error}
+        fallback="Nie udało się pobrać kuponów. Spróbuj ponownie."
+        retrying={coupons.isFetching}
+        onRetry={() => coupons.refetch()}
+      />
     );
 
   const items = coupons.data.items;
@@ -69,9 +58,9 @@ export function CouponsList() {
   return (
     <div className="flex flex-col gap-4">
       {coupons.isError && (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-2 rounded-2xl border border-destructive/40 p-4 text-sm"
+        <Alert
+          className="flex flex-col items-start gap-2 rounded-2xl p-4 text-sm"
+          variant="destructive"
         >
           <p>
             Nie udało się odświeżyć kuponów - pokazany stan może być
@@ -88,7 +77,7 @@ export function CouponsList() {
               Odśwież
             </RetryButton>
           )}
-        </div>
+        </Alert>
       )}
       <ul aria-label="Kupony" className="flex flex-col gap-4">
         {items.map((coupon) => (

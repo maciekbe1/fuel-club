@@ -1,6 +1,7 @@
 "use client";
 
 import { Bot, CircleAlert, Headset } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { Turn } from "../hooks";
 import { ConfirmationCard } from "./ConfirmationCard";
@@ -72,13 +73,13 @@ export function ChatTurn({
           </div>
         )}
         {turn.status === "error" && (
-          <p
-            role="alert"
-            className="flex items-start gap-2 rounded-2xl border border-destructive/40 px-4 py-2 text-sm"
+          <Alert
+            className="flex items-start gap-2 rounded-2xl px-4 py-2 text-sm"
+            variant="destructive"
           >
             <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
             {turn.error}
-          </p>
+          </Alert>
         )}
         {turn.status === "cancelled" && (
           <p className="text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
+import { QueryError } from "@/components/query/QueryError";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useMarkReviewed, useReviewQueue } from "../hooks";
-import { LoadError } from "./LoadError";
 import { QueueItem } from "./QueueItem";
 
 export function Queue() {
@@ -17,18 +18,15 @@ export function Queue() {
         trafia tutaj.
       </p>
       {queue.isPending ? (
-        <div
-          role="status"
-          aria-busy="true"
-          className="h-32 animate-pulse rounded-2xl bg-muted"
-        >
+        <Skeleton role="status" aria-busy="true" className="h-32 rounded-2xl">
           <span className="sr-only">Ładowanie kolejki…</span>
-        </div>
+        </Skeleton>
       ) : queue.data === undefined ? (
-        <LoadError
+        <QueryError
           error={queue.error}
-          busy={queue.isFetching}
-          retry={() => queue.refetch()}
+          fallback="Nie udało się pobrać danych. Spróbuj ponownie."
+          retrying={queue.isFetching}
+          onRetry={() => queue.refetch()}
         />
       ) : queue.data.items.length === 0 ? (
         <p className="flex items-center gap-2 text-sm">

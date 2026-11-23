@@ -415,6 +415,8 @@ Krok 5 - UI i E2E: `/czat` (przycisk, zgoda, historia opcjonalna, rozmowa na ży
 
 Refaktor 1 - podział plików (audyt): 8 plików z kilkoma komponentami rozbite skryptem (przeniesienie deklaracji + `organizeImports` z TypeScript), wspólne stałe do `labels.ts`, `couponLabels.ts`, `historyFormat.ts`, `editRewardShared.ts`; `FormAlert` osobno; reguła w ADR 0001; E2E 148/148.
 
+Refaktor 2 - wspólne elementy: `components/query/QueryError.tsx` (shadcn `alert`) zamiast 7 kopii bloku błędu wczytywania (przy okazji: 401 wszędzie daje „Zaloguj się ponownie”); shadcn `skeleton` w 10 miejscach (karta salda zostaje - ciemne tło marki); ramki komunikatów jako `Alert` (wariant projektu `warning` dla niepewnego wyniku, `destructive`); E2E 148/148.
+
 ## Następny krok
 
 Otwarte:

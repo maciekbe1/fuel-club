@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EditRewardForm } from "@/features/admin-rewards/components/EditRewardForm";
 
 export default function EditOfferPage({
@@ -16,9 +17,7 @@ export default function EditOfferPage({
         </Link>
         <h1 className="text-2xl font-semibold">Edycja oferty</h1>
       </div>
-      <Suspense
-        fallback={<div className="h-96 animate-pulse rounded-3xl bg-muted" />}
-      >
+      <Suspense fallback={<Skeleton className="h-96 rounded-3xl" />}>
         <Editor params={params} />
       </Suspense>
     </div>

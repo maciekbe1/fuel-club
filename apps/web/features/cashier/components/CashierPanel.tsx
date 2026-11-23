@@ -1,6 +1,8 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { RetryButton } from "@/components/ui/retry-button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api/problem";
 import { useCashierStation } from "../hooks";
 import { PurchaseForm } from "./PurchaseForm";
@@ -16,13 +18,9 @@ export function CashierPanel() {
 
   if (station.data === undefined && station.isPending)
     return (
-      <div
-        role="status"
-        aria-busy="true"
-        className="h-96 animate-pulse rounded-3xl bg-muted"
-      >
+      <Skeleton role="status" aria-busy="true" className="h-96 rounded-3xl">
         <span className="sr-only">Ładowanie stanowiska…</span>
-      </div>
+      </Skeleton>
     );
 
   if (station.data === undefined) {
@@ -31,10 +29,7 @@ export function CashierPanel() {
       error instanceof ApiError &&
       (error.status === 403 || error.status === 404);
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-start gap-3 rounded-2xl border p-5"
-      >
+      <Alert className="flex flex-col items-start gap-3 rounded-2xl p-5">
         <p>
           {forbidden
             ? "To konto nie ma przypisanego stanowiska kasjera."
@@ -46,16 +41,16 @@ export function CashierPanel() {
             onClick={() => station.refetch()}
           />
         )}
-      </div>
+      </Alert>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
       {station.isError && (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-2 rounded-2xl border border-destructive/40 p-4 text-sm"
+        <Alert
+          className="flex flex-col items-start gap-2 rounded-2xl p-4 text-sm"
+          variant="destructive"
         >
           <p>
             Nie udało się odświeżyć stanowiska. Pokazane dane mogą być
@@ -68,7 +63,7 @@ export function CashierPanel() {
           >
             Odśwież
           </RetryButton>
-        </div>
+        </Alert>
       )}
       <dl
         className="grid grid-cols-2 gap-3 rounded-2xl border bg-card p-4 text-sm"

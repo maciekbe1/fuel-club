@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { FormAlert } from "@/components/form/FormAlert";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, applyFieldErrors, NetworkError } from "@/lib/api/problem";
 import { keepsPendingOperation, usePendingVars } from "@/lib/idempotency";
@@ -68,9 +69,9 @@ export function CreateRewardForm() {
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
       <FormAlert message={form.formState.errors.root?.message} />
       {restored && (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-50"
+        <Alert
+          className="flex flex-col items-start gap-3 rounded-2xl p-4 text-sm"
+          variant="warning"
         >
           <p>
             Tworzenie oferty „{restored.name}” (
@@ -81,12 +82,12 @@ export function CreateRewardForm() {
           <Button type="button" onClick={() => send(restored)}>
             Ponów utworzenie
           </Button>
-        </div>
+        </Alert>
       )}
       {unknown && (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-50"
+        <Alert
+          className="flex flex-col items-start gap-3 rounded-2xl p-4 text-sm"
+          variant="warning"
         >
           <p>
             {unknown instanceof ApiError && unknown.status === 401
@@ -104,7 +105,7 @@ export function CreateRewardForm() {
           >
             Ponów utworzenie
           </Button>
-        </div>
+        </Alert>
       )}
       <fieldset
         disabled={locked}

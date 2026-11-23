@@ -1,7 +1,9 @@
 "use client";
 
+import { QueryError } from "@/components/query/QueryError";
+import { Alert } from "@/components/ui/alert";
 import { RetryButton } from "@/components/ui/retry-button";
-import { readErrorMessage } from "@/lib/api/problem";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useIssueCard, useLoyaltyCard, useRotateCard } from "../hooks";
 import { ActiveCard } from "./ActiveCard";
 import { NoCard } from "./NoCard";
@@ -17,37 +19,31 @@ export function LoyaltyCardPanel() {
 
   if (card.isPending)
     return (
-      <div
+      <Skeleton
         role="status"
         aria-busy="true"
-        className="aspect-[1.586] w-full max-w-md animate-pulse rounded-3xl bg-muted"
+        className="aspect-[1.586] w-full max-w-md rounded-3xl"
       >
         <span className="sr-only">Ładowanie karty…</span>
-      </div>
+      </Skeleton>
     );
 
   if (card.data === undefined)
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-start gap-3 rounded-2xl border p-5"
-      >
-        <p>
-          {readErrorMessage(
-            card.error,
-            "Nie udało się pobrać karty. Spróbuj ponownie.",
-          )}
-        </p>
-        <RetryButton busy={card.isFetching} onClick={() => card.refetch()} />
-      </div>
+      <QueryError
+        error={card.error}
+        fallback="Nie udało się pobrać karty. Spróbuj ponownie."
+        retrying={card.isFetching}
+        onRetry={() => card.refetch()}
+      />
     );
 
   return (
     <div className="flex flex-col gap-4">
       {card.isError && (
-        <div
-          role="alert"
-          className="flex max-w-md flex-col items-start gap-2 rounded-2xl border border-destructive/40 p-4 text-sm"
+        <Alert
+          className="flex max-w-md flex-col items-start gap-2 rounded-2xl p-4 text-sm"
+          variant="destructive"
         >
           <p>
             Nie udało się odświeżyć karty - pokazany stan może być nieaktualny.
@@ -59,7 +55,7 @@ export function LoyaltyCardPanel() {
           >
             Odśwież
           </RetryButton>
-        </div>
+        </Alert>
       )}
       {card.data ? (
         <ActiveCard card={card.data} rotate={rotate} />

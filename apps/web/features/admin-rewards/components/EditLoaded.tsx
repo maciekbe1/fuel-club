@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { FormAlert } from "@/components/form/FormAlert";
+import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { useFetchCurrentReward, useUpdateReward } from "../hooks";
@@ -124,9 +125,9 @@ export function EditLoaded({ initial }: { initial: AdminReward }) {
       )}
 
       {problem?.kind === "unknown" && (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-50"
+        <Alert
+          className="flex flex-col items-start gap-3 rounded-2xl p-4 text-sm"
+          variant="warning"
         >
           <p>
             Wynik zapisu nieznany - zmiana mogła zostać zapisana. Sprawdź
@@ -135,7 +136,7 @@ export function EditLoaded({ initial }: { initial: AdminReward }) {
           <Button type="button" onClick={check} disabled={problem.checking}>
             {problem.checking ? "Sprawdzanie…" : "Sprawdź aktualny stan"}
           </Button>
-        </div>
+        </Alert>
       )}
 
       {problem?.kind === "not-saved" && (
