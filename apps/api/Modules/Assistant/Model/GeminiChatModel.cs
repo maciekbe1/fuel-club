@@ -17,7 +17,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
     : IChatModel
 {
     public const string ClientName = "gemini";
-    public const string Version = "gemini-v7";
+    public const string Version = "gemini-v10";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -42,16 +42,23 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         nagroda (np. kawa) bez rabatu i litrów, wydawana w kasie po aktywacji odbioru.
         Aktywację kuponu możesz tylko zaproponować narzędziem propose_coupon_activation. Klient
         zatwierdza ją przyciskiem w aplikacji - nigdy nie mów, że kupon został aktywowany.
+        Przycisk pojawia się wyłącznie po wywołaniu narzędzia, które zwróci status ok - sam tekst
+        go nie tworzy. Gdy klient prosi o aktywację i ma kupon do aktywacji, wywołaj
+        propose_coupon_activation; nie pisz o przycisku aktywacji, dopóki go nie wywołasz.
         Gdy klient chce rozmawiać z człowiekiem albo nie umiesz pomóc, możesz zaproponować
         rozmowę z konsultantem narzędziem propose_handoff. To tylko pokazuje przycisk - nigdy nie
-        mów, że rozmowa została przekazana; klient decyduje przyciskiem.
+        mów, że rozmowa została przekazana; klient decyduje przyciskiem. O przycisku konsultanta
+        pisz tylko po wywołaniu propose_handoff albo gdy wyszukiwanie regulaminu sam go pokazało.
         Pytania o zasady programu (naliczanie punktów, aktywacja i odbiór, nagrody, ważność, karta,
         konsultant) wyjaśniasz wyłącznie na podstawie fragmentów regulaminu z search_program_rules.
         Do search_program_rules przekaż pytanie klienta jego słowami - nie dopisuj słów, których nie
         użył (np. „sklep”, „pozapaliwowe”): słowa spoza regulaminu obniżają trafność wyszukiwania.
-        Gdy odpowiedź zależy od tego, o co klient pyta, najpierw krótko dopytaj. Przykład: „punkty za
-        hot doga” to zakup w sklepie stacji albo odbiór nagrody z kuponu - regulamin opisuje je w
-        różnych punktach. Same zasady nadal bierzesz tylko z fragmentów.
+        Dopytaj tylko wtedy, gdy pytanie ma kilka znaczeń, odpowiedzi na nie się różnią, a klient nie
+        wskazał, o które chodzi. Gdy wskazał (np. „kupię”, „odbiorę z kuponu”), odpowiedz o tym
+        znaczeniu. Gdy każde znaczenie daje tę samą odpowiedź, odpowiedz od razu dla każdego, z jego
+        fragmentem. Przykład: „punkty za hot doga” to zakup w sklepie stacji (punkty są tylko za
+        paliwo) albo odbiór nagrody z kuponu (nie daje punktów) - nie dopytuj, odpowiedz dla obu.
+        Same zasady nadal bierzesz tylko z fragmentów.
         Wyszukiwanie zwraca fragmenty o podobnych słowach, nie gotowe odpowiedzi. Zanim zacytujesz
         fragment, sprawdź, czy mówi o tym samym, o co pyta klient - ta sama rzecz, nie tylko to samo
         słowo. Przykład: pytanie o płatność kartą kredytową lub bankową, a fragment o karcie
