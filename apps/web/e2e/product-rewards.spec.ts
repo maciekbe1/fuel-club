@@ -121,7 +121,7 @@ test("a product reward: exchange, activate pickup, the cashier hands it over onc
   // Shown as the reward's state, not as a failed operation: no error, no button to hand it over.
   const collected = register
     .getByRole("status")
-    .filter({ hasText: "Nagroda jest odebrana" })
+    .filter({ hasText: "Wydanie zostało już zarejestrowane" })
     .filter({ hasText: "na tej kasie" });
   await expect(collected).toBeVisible();
   await expect(register.locator("form").getByRole("alert")).toHaveCount(0);
@@ -374,7 +374,7 @@ test("a final 409 from another till stays in the panel with that station and til
   const beforeHandover = previews;
   await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
   const alert = handover.getByRole("status");
-  await expect(alert).toContainText("Nagroda jest odebrana");
+  await expect(alert).toContainText("Wydanie zostało już zarejestrowane");
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(alert).toContainText("14:32");
   await expect(handover.getByRole("alert")).toHaveCount(0);

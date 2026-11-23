@@ -288,8 +288,8 @@ const clock = new Intl.DateTimeFormat("pl-PL", {
 
 /**
  * The current state of a handed-over product reward: when and where (station and till) the server
- * recorded it. A 409 says the reward is collected, not that an earlier attempt failed - after a lost
- * answer that attempt may be the one recorded. Null without a usable time.
+ * recorded it. A 409 says the handover is registered, not that an earlier attempt failed, nor that
+ * the product was or was not physically given - even on this till. Null without a usable time.
  */
 function handedOverMessage(error: unknown, own: CashierStation | undefined) {
   if (!(error instanceof ApiError) || error.code !== "rewards.coupon_redeemed")
@@ -304,16 +304,16 @@ function handedOverMessage(error: unknown, own: CashierStation | undefined) {
     problem.stationCode === own.stationCode &&
     problem.registerCode === own.registerCode;
   if (here)
-    return `Nagroda jest odebrana: zapisano wydanie ${when} na tej kasie. Jeśli klient nie dostał jeszcze produktu, przekaż mu go.`;
+    return `Wydanie zostało już zarejestrowane ${when} na tej kasie. Przed przekazaniem produktu sprawdź, czy klient go otrzymał.`;
   const where = problem.stationCode
     ? ` na stanowisku ${problem.stationCode}${problem.registerCode ? `, kasa ${problem.registerCode}` : ""}`
     : "";
-  return `Nagroda jest odebrana: zapisano wydanie ${when}${where}.`;
+  return `Wydanie zostało już zarejestrowane ${when}${where}.`;
 }
 
 function handoverError(error: unknown) {
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
-    return "Ta nagroda jest już odebrana.";
+    return "Wydanie tej nagrody zostało już zarejestrowane.";
   if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
     return "Nie znaleziono aktywnej nagrody tego klienta o tym kodzie.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
