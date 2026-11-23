@@ -370,10 +370,12 @@ Siódme review (`/code-review high`, 5 uwag, wszystkie przyjęte). Stan „niero
 - mutacje (bez blokady w formularzu, `429` jako rozstrzygnięcie) wywracają E2E; pełne E2E 144/144, API 502/502.
 
 Ósme review (`/code-review high`, 5 uwag): pamięć nieznanego wyniku w cache mutacji znikała po 5 min (GC), kasa mogła zablokować się bez przycisku ponowienia, a po przemontowaniu ponowienie szło nowym kluczem. Właściciel wybrał uproszczenie:
-- nieznany wynik tylko w panelu pary (stan komponentu, przetrwa `Activity`), ponowienie tym samym kluczem, dopóki para jest w formularzu;
+- nieznany wynik tylko w panelu pary (stan komponentu, przetrwa `Activity`), ponowienie tym samym kluczem, dopóki panel jest zamontowany (próba zakupu albo odświeżony podgląd zaczynają od nowa);
 - bez blokady formularza przy nieznanym wyniku (zostaje blokada w trakcie żądania); rozstrzyga serwer: `409` z czasem, stanowiskiem i kasą;
 - usunięte `useHandoverUnresolved` i podział blokady; test podglądu sprawdza okno 1 s; dokumentacja i tabela testów zgodne z kodem.
 - wynik: API 502/502; pełne E2E 143/144 - jeden test (`cashier-coupon` skan QR) padł na `ECONNRESET` w sprzątaniu fixture (`PUT` oferty), po powtórzeniu plik 12/12.
+
+Dziewiąte review (`/code-review high`): bez błędów blokujących, 5 drobnych uwag przyjętych - dokumentacja (ponowienie tym samym kluczem dopóki panel zamontowany; `409` przy świeżym podglądzie, nie z pamięci), komentarze komponentu, kolejność kroku z komunikatem w E2E, test podglądu z jawnym oknem 2 s.
 
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
@@ -385,4 +387,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-Dalej: P11 przekazanie do konsultanta (ADR 0012 przyjęty).
+P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). Dalej: P11 przekazanie do konsultanta (ADR 0012 przyjęty).

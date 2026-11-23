@@ -239,17 +239,19 @@ test("an unknown handover stays in its panel; the next code starts clean and the
     .filter({ hasText: `Wydano nagrodę „${second}”` });
   await expect(banner).toBeVisible();
 
+  // The card field changes (cleared like after a reset): the banner goes.
+  const cardField = register.getByLabel("Kod karty klienta");
+  await cardField.fill("");
+  await expect(banner).toHaveCount(0);
+
   // Back to the first code: nothing remembered on the client; the fresh preview (previews are
   // dropped after a handover) gets the server's 409 with when and where.
+  await cardField.fill(card);
   await coupon.fill(codes[0]);
   await expect(
     register.getByRole("alert").filter({ hasText: "na tej kasie" }),
   ).toBeVisible();
   await expect(handover).toHaveCount(0);
-
-  // The next customer: the card field changes (cleared like after a reset), the banner goes.
-  await register.getByLabel("Kod karty klienta").fill("");
-  await expect(banner).toHaveCount(0);
   await context.close();
 });
 
@@ -370,11 +372,8 @@ test("a final 409 from another till stays in the panel with that station and til
   const alert = handover.getByRole("alert");
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(alert).toContainText("14:32");
-  // Not replaced by a refetched preview: none within a second of the answer (it would start at once).
-  await expect
-    .poll(() => previews, { intervals: [100], timeout: 1000 })
-    .not.toBe(beforeHandover)
-    .catch(() => undefined);
+  // Not replaced by a refetched preview: none within 2 s of the answer (a refetch starts at once).
+  await register.waitForTimeout(2000);
   expect(previews).toBe(beforeHandover);
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(register.getByLabel("Kod kuponu")).toBeEnabled();

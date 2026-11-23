@@ -317,7 +317,10 @@ function handoverError(error: unknown, own: CashierStation | undefined) {
 
 /**
  * A product reward (ADR 0013): handed over instead of a purchase - no amount, no points. After an
- * unknown outcome only "Ponów wydanie" with the same key is offered, so it is never handed over twice.
+ * unknown outcome this panel offers "Ponów wydanie" with the same key while it stays mounted. The
+ * form is not locked for it: once the panel is gone (another code, a purchase attempt, a refreshed
+ * preview) a new attempt has a new key, and the server's 409 with the time, station and till settles
+ * it - a reward is never handed over twice.
  */
 function RewardHandover({
   offerName,
@@ -330,7 +333,7 @@ function RewardHandover({
   offerName: string;
   cardCode: string;
   couponCode: string;
-  /** Locked by the purchase; this panel's own unknown outcome keeps its retry enabled. */
+  /** A purchase in flight or with an unknown outcome. */
   locked: boolean;
   station: CashierStation | undefined;
   onDone: () => void;
