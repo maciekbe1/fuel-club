@@ -33,7 +33,7 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
 
 ## Przepływ
 
-1. Klient: `POST /api/support/cases` z pierwszą wiadomością i - jeśli zaznaczył - historią czatu. Transakcja idempotencji, potem **blokada klienta** (`CustomerLock`, ta sama co przy zakupie i wymianie), sprawdzenie otwartego zgłoszenia, zapis zgłoszenia `Waiting` i wiadomości.
+1. Klient: `POST /api/support/cases` z pierwszą wiadomością i - jeśli zaznaczył - historią czatu. Transakcja idempotencji, potem **blokada klienta** (`CustomerLock`, ta sama co przy zakupie i wymianie), sprawdzenie otwartego zgłoszenia, zapis zgłoszenia `Waiting` i wiadomości. Z `conversationId` (tylko własna rozmowa, inaczej `400 support.conversation_not_found` przed zapisem) zgłoszenie wiąże rozmowę czatu raz i kończy ją jako `Handoff` - przekazanie liczone raz na rozmowę, ponowienie go nie podwaja ([ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/)).
 2. Konsultant: `POST /api/support/agent/cases/{id}/claim` - warunkowy `UPDATE ... WHERE "Status" = 'Waiting'`. Przegrany czeka na blokadę wiersza zwycięzcy, potem warunek już nie pasuje → `409 support.case_taken`. Zwycięzca przy ponowieniu dostaje `200`. Przejęcie dopisuje wiadomość systemową `claimed`.
 3. Czat przy otwartym zgłoszeniu (`Waiting` albo `Assigned`):
    - `POST /api/chat` → `409 assistant.handoff_active` przed strumieniem (zwykły odczyt: tura niczego nie zmienia);

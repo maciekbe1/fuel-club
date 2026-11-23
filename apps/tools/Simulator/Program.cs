@@ -5,7 +5,9 @@ using FuelClub.Simulator;
 // Synthetic traffic for the demo instance (ADR 0017). Public HTTP API only.
 //
 //   populate --run <id> [--accounts 5] [--api http://localhost:5301] [--manifest path]
+//   converse --run <id> [--conversations 10] [--chat-per-minute 60]   (after populate)
 //   cleanup  --run <id> [--manifest path]     (SIM_DEMO_DATABASE: connection string)
+//   prune    [--days 14]                      (deletes transcripts older than the retention)
 //
 // Secrets come from the environment, never from arguments or the manifest:
 //   SIM_SECRET (derives the accounts' passwords), SIM_CASHIER_EMAIL/PASSWORD, SIM_ADMIN_EMAIL/PASSWORD.
@@ -17,15 +19,25 @@ Console.CancelKeyPress += (_, e) =>
     cancel.Cancel();
 };
 
-if (args.Length == 0 || args[0] is not ("populate" or "cleanup"))
+if (args.Length == 0 || args[0] is not ("populate" or "converse" or "cleanup" or "prune"))
 {
     Console.WriteLine(
-        "usage: populate|cleanup --run <id> [--accounts N] [--api URL] [--manifest PATH]"
+        "usage: populate|converse|cleanup --run <id> [--accounts N] [--conversations N] [--api URL] [--manifest PATH] | prune [--days 14]"
     );
     return 64;
 }
 
 var options = Options.Parse(args[1..]);
+if (args[0] == "prune")
+{
+    var removed = ChatScenarios.Prune(
+        ".simulation",
+        TimeSpan.FromDays(options.Int("days", 14)),
+        DateTimeOffset.UtcNow
+    );
+    Console.WriteLine($"removed {removed} transcripts");
+    return 0;
+}
 var run = options.Get("run") ?? throw new ArgumentException("--run is required");
 if (!Regex.IsMatch(run, "^[a-z0-9][a-z0-9-]{0,39}$"))
     throw new ArgumentException("--run: 1-40 characters a-z, 0-9, '-'");
@@ -43,6 +55,8 @@ if (args[0] == "cleanup")
 }
 
 var api = options.Get("api") ?? "http://localhost:5301";
+if (args[0] == "converse" && !File.Exists(manifestPath))
+    throw new ArgumentException("No manifest for this run: run populate first.");
 var manifest = File.Exists(manifestPath)
     ? Manifest.Load(manifestPath)
     : Manifest.Create(manifestPath, run, api, options.Get("station-time-zone") ?? "Europe/Warsaw");
@@ -81,17 +95,25 @@ using (var probe = new HttpClient { BaseAddress = new Uri(api) })
     Console.WriteLine($"run {run} at {api}: {simulation.Provider}/{simulation.Model}");
 }
 
+var conversing = args[0] == "converse";
 var settings = new Settings(
     Secret: Required("SIM_SECRET"),
-    CashierEmail: Required("SIM_CASHIER_EMAIL"),
-    CashierPassword: Required("SIM_CASHIER_PASSWORD"),
-    AdminEmail: Required("SIM_ADMIN_EMAIL"),
-    AdminPassword: Required("SIM_ADMIN_PASSWORD"),
+    CashierEmail: conversing ? "" : Required("SIM_CASHIER_EMAIL"),
+    CashierPassword: conversing ? "" : Required("SIM_CASHIER_PASSWORD"),
+    AdminEmail: conversing ? "" : Required("SIM_ADMIN_EMAIL"),
+    AdminPassword: conversing ? "" : Required("SIM_ADMIN_PASSWORD"),
     Parallel: options.Int("parallel", 4),
     AuthPerMinute: options.Int("auth-per-minute", 8),
     PurchasesPerMinute: options.Int("purchases-per-minute", 50)
 );
-await new Population(manifest, settings).RunAsync(options.Int("accounts", 5), cancel.Token);
+if (conversing)
+    // Below the API's chat limit (20/min per user) per account, see ChatScenarios.
+    await new ChatScenarios(manifest, settings, options.Int("chat-per-minute", 60)).RunAsync(
+        options.Int("conversations", 10),
+        cancel.Token
+    );
+else
+    await new Population(manifest, settings).RunAsync(options.Int("accounts", 5), cancel.Token);
 return Environment.ExitCode;
 
 static string Required(string name) =>

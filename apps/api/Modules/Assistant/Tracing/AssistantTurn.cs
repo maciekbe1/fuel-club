@@ -36,6 +36,16 @@ public sealed class AssistantTurn
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
 
+    /// <summary>The conversation of this turn (ADR 0017); null for turns recorded before P16b.</summary>
+    public Guid? ConversationId { get; set; }
+
+    /// <summary>A consultant proposal reached the client in this turn (the handoff event).</summary>
+    public bool HandoffProposed { get; set; }
+
+    /// <summary>From the instance configuration (Simulation), never from a request.</summary>
+    public bool Synthetic { get; set; }
+    public string? RunId { get; set; }
+
     /// <summary>Set when an admin marked the turn as reviewed in the review queue.</summary>
     public DateTimeOffset? ReviewedAt { get; set; }
     public string? ReviewedBy { get; set; }

@@ -333,10 +333,17 @@
         ],
         "end": "done",
         "answerContains": [
-          "Regulamin, §3.1"
+          "Regulamin, §3.1",
+          "nie przewiduje"
         ],
         "answerPatterns": [
-          "§\\s?3\\.1"
+          "§\\s?3\\.1",
+          "paliw"
+        ],
+        "answerForbiddenPatterns": [
+          "(?<!nie\\s)(dostaniesz|otrzymasz|zdobędziesz|zbierzesz|przysługuj\\w*)\\s[^.?!]{0,40}punkt\\w*[^.?!]{0,30}(za|przy)\\s+(zakup\\w*\\s+)?hot\\s*dog",
+          "za\\s+(zakup\\w*\\s+)?hot\\s*dog\\w*[^.?!]{0,30}(?<!nie\\s)(dostaniesz|otrzymasz|zdobędziesz)\\s+punkt",
+          "§\\s?3\\.1[^.?!]{0,30}(dotyczy|mówi o|obejmuje|wymienia)\\s[^.?!]{0,20}hot\\s*dog"
         ]
       }
     },
@@ -351,10 +358,24 @@
           "zakup",
           "odbiór nagrody"
         ],
-        "answerPatterns": [
-          "\\?",
-          "(zakup|kupi|kupuj)",
-          "(odbi|odebr|nagrod|kupon)"
+        "answerAlternatives": [
+          [
+            "\\?",
+            "(zakup|kupi|kupuj)",
+            "(odbi|odebr|nagrod|kupon)"
+          ],
+          [
+            "(zakup|kupi|kupuj)",
+            "(odbi|odebr|nagrod)",
+            "§\\s?3\\.1",
+            "paliw",
+            "§\\s?3\\.6"
+          ]
+        ],
+        "answerForbiddenPatterns": [
+          "(?<!nie\\s)(dostaniesz|otrzymasz|zdobędziesz|zbierzesz|przysługuj\\w*)\\s[^.?!]{0,40}punkt\\w*[^.?!]{0,30}(za|przy)\\s+(zakup\\w*\\s+)?hot\\s*dog",
+          "za\\s+(zakup\\w*\\s+)?hot\\s*dog\\w*[^.?!]{0,30}(?<!nie\\s)(dostaniesz|otrzymasz|zdobędziesz)\\s+punkt",
+          "§\\s?3\\.1[^.?!]{0,30}(dotyczy|mówi o|obejmuje|wymienia)\\s[^.?!]{0,20}hot\\s*dog"
         ]
       }
     },

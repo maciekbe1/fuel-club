@@ -17,3 +17,6 @@ TestResults/
 
 # Simulator runs (manifests, transcripts): local only, never in Git
 .simulation/
+
+# Presentation screenshots (local only)
+.presentation/

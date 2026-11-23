@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { buyCoupon, expect, newCustomer, test } from "./fixtures";
+import { buyCoupon, csrf, expect, newCustomer, test } from "./fixtures";
 
 const CONFIRM = "**/api/chat/confirmations";
 
@@ -244,6 +244,64 @@ test("a stream cut before done is an error, never a finished answer", async ({
     "Połączenie zostało przerwane",
   );
   await expect(page.getByRole("button", { name: "Wyślij" })).toBeVisible();
+});
+
+test("a lost conversation start is retried with the same key: one conversation, the turn goes on", async ({
+  page,
+  customer,
+}) => {
+  void customer;
+  const keys: string[] = [];
+  const ids: string[] = [];
+  await page.route("**/api/chat/conversations", async (route) => {
+    keys.push((await route.request().headerValue("idempotency-key")) ?? "");
+    const response = await route.fetch();
+    ids.push(((await response.json()) as { id: string }).id);
+    // The server created it, the answer never arrives.
+    if (keys.length === 1) return route.abort();
+    return route.fulfill({ response });
+  });
+  await openChat(page);
+
+  const lost = await ask(page, "saldo");
+  await expect(lost).toHaveAttribute("data-status", "error");
+  const turn = await ask(page, "saldo");
+
+  await expect(turn).toHaveAttribute("data-status", "done");
+  expect(keys).toHaveLength(2);
+  expect(keys[1]).toBe(keys[0]);
+  expect(ids[1]).toBe(ids[0]);
+});
+
+test("an ended conversation starts a new one and the turn is asked once more", async ({
+  page,
+  customer,
+}) => {
+  void customer;
+  const started: string[] = [];
+  page.on("response", async (response) => {
+    if (
+      response.url().endsWith("/api/chat/conversations") &&
+      response.request().method() === "POST"
+    )
+      started.push(((await response.json()) as { id: string }).id);
+  });
+  await openChat(page);
+  const first = await ask(page, "saldo");
+  await expect(first).toHaveAttribute("data-status", "done");
+  await expect.poll(() => started.length).toBe(1);
+  // Ended elsewhere (as an idle timeout would): the next question still gets its answer.
+  const ended = await page.request.post(
+    `/api/chat/conversations/${started[0]}/end`,
+    { headers: { "X-CSRF-TOKEN": await csrf(page.request) } },
+  );
+  expect(ended.ok()).toBe(true);
+
+  const second = await ask(page, "Pokaż kupony");
+
+  await expect(second).toHaveAttribute("data-status", "done");
+  expect(started).toHaveLength(2);
+  expect(started[1]).not.toBe(started[0]);
 });
 
 test("an error event ends the turn without success", async ({

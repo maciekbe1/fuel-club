@@ -16,7 +16,9 @@ public sealed record SupportHistoryItem(string? Role, string? Text);
 /// <summary><c>History</c> only when the customer ticked "attach the conversation"; it stays untrusted text.</summary>
 public sealed record CreateSupportCaseRequest(
     string? Message,
-    IReadOnlyList<SupportHistoryItem>? History
+    IReadOnlyList<SupportHistoryItem>? History,
+    // The chat conversation handed over (ADR 0017): linked once, so a retry never counts twice.
+    Guid? ConversationId = null
 );
 
 public sealed record SupportCaseResponse(
@@ -37,7 +39,9 @@ public static class CreateCaseEndpoint
 
     public const string Description =
         "Opens a support case with the customer's first message and, when the customer chose to attach it, "
-        + "the chat history (stored as untrusted client-provided text). While a case is open the chat and its "
+        + "the chat history (stored as untrusted client-provided text). conversationId links the chat "
+        + "conversation once (handoff counted once; it ends as Handoff); someone else's or unknown -> 400 "
+        + "support.conversation_not_found. While a case is open the chat and its "
         + "confirmations return 409 assistant.handoff_active. An open case already exists -> 409 "
         + "support.case_open with its caseId.";
 
@@ -48,6 +52,7 @@ public static class CreateCaseEndpoint
         AppDbContext db,
         CustomerLock customerLock,
         IOptions<AssistantOptions> assistant,
+        Assistant.Conversations.Conversations conversations,
         CancellationToken cancellationToken
     )
     {
@@ -56,6 +61,14 @@ public static class CreateCaseEndpoint
             return SupportProblems.Validation(errors);
 
         var userId = users.GetUserId(http.User)!;
+        // Someone else's or unknown: refused before anything is created (no link to a foreign row).
+        if (
+            request.ConversationId is { } conversationId
+            && !await conversations.IsOwnAsync(conversationId, userId, cancellationToken)
+        )
+            return SupportProblems.Validation([
+                new("conversationId", SupportErrorCodes.ConversationNotFound),
+            ]);
         if (!await customerLock.TryAcquireAsync(userId, cancellationToken))
             return LoyaltyProblems.CustomerBusy(http);
 
@@ -87,6 +100,13 @@ public static class CreateCaseEndpoint
             .Append(new NewSupportMessage(SupportAuthor.Customer, request.Message!.Trim()))
             .ToList();
         await SupportCases.AppendAsync(db, supportCase.Id, messages, cancellationToken);
+        if (request.ConversationId is { } handedOver)
+            await conversations.LinkCaseAsync(
+                handedOver,
+                userId,
+                supportCase.Id,
+                cancellationToken
+            );
 
         SupportNotifier.AfterResponse(http, notifier => notifier.QueueChangedAsync());
         var created = await db

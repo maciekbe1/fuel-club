@@ -134,12 +134,21 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         HttpClient client,
         string message,
         object? history = null,
-        bool csrf = true
+        bool csrf = true,
+        Guid? conversationId = null
     )
     {
+        conversationId ??= await client.StartConversationAsync();
         using var request = new HttpRequestMessage(HttpMethod.Post, Chat)
         {
-            Content = JsonContent.Create(new { message, history }),
+            Content = JsonContent.Create(
+                new
+                {
+                    message,
+                    history,
+                    conversationId,
+                }
+            ),
         };
         if (csrf)
             request.Headers.Add(TestHttpExtensions.CsrfHeader, await client.GetCsrfTokenAsync());
@@ -485,9 +494,13 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         var customer = await AccountAsync(host: host);
         var other = await AccountAsync(host: host);
 
-        Assert.Equal(HttpStatusCode.OK, (await ChatAsync(customer.Client, "saldo")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await ChatAsync(customer.Client, "saldo")).StatusCode);
-        var limited = await ChatAsync(customer.Client, "saldo");
+        // One conversation: starting it has its own bucket, the turns are what is limited.
+        var conversation = await customer.Client.StartConversationAsync();
+        async Task<Stream> Turn() =>
+            await ChatAsync(customer.Client, "saldo", conversationId: conversation);
+        Assert.Equal(HttpStatusCode.OK, (await Turn()).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Turn()).StatusCode);
+        var limited = await Turn();
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
         Assert.True(limited.Response.Headers.Contains("Retry-After"));
         Assert.Empty(limited.Events);
@@ -671,9 +684,10 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
             )
         );
         var customer = await AccountAsync(host: host);
+        var conversationId = await customer.Client.StartConversationAsync();
         using var request = new HttpRequestMessage(HttpMethod.Post, Chat)
         {
-            Content = JsonContent.Create(new { message = "saldo" }),
+            Content = JsonContent.Create(new { message = "saldo", conversationId }),
         };
         request.Headers.Add(
             TestHttpExtensions.CsrfHeader,
@@ -1209,6 +1223,8 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
 
         Assert.Equal(["search_program_rules:ok"], ToolsOf(stream));
         Assert.Contains(source, stream.Text);
+        // §3.1 is about fuel: for a shop purchase the conclusion is said, not left to the quote.
+        Assert.Equal(source == "Regulamin, §3.1", stream.Text.Contains("nie przewiduje"));
     }
 
     [Theory]

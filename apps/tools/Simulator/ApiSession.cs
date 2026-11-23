@@ -40,7 +40,8 @@ public sealed class ApiSession : IDisposable
         object? body,
         CancellationToken ct,
         string? idempotencyKey = null,
-        HttpMethod? method = null
+        HttpMethod? method = null,
+        bool stream = false
     ) =>
         SendAsync(
             () =>
@@ -54,13 +55,15 @@ public sealed class ApiSession : IDisposable
                 return request;
             },
             ct,
-            csrf: true
+            csrf: true,
+            stream
         );
 
     private async Task<HttpResponseMessage> SendAsync(
         Func<HttpRequestMessage> build,
         CancellationToken ct,
-        bool csrf = false
+        bool csrf = false,
+        bool stream = false
     )
     {
         for (var attempt = 0; ; attempt++)
@@ -68,7 +71,14 @@ public sealed class ApiSession : IDisposable
             using var request = build();
             if (csrf)
                 request.Headers.Add(CsrfHeader, await CsrfAsync(ct));
-            var response = await _http.SendAsync(request, ct);
+            // A stream (the chat) is read as it arrives, not buffered whole.
+            var response = await _http.SendAsync(
+                request,
+                stream
+                    ? HttpCompletionOption.ResponseHeadersRead
+                    : HttpCompletionOption.ResponseContentRead,
+                ct
+            );
             if (
                 response.StatusCode != HttpStatusCode.TooManyRequests
                 || attempt >= MaxRateLimitRetries

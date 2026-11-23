@@ -89,7 +89,9 @@ public static class AssistantModule
         });
         services.AddScoped<AssistantTools>();
         services.AddScoped<ChatService>();
+        services.AddScoped<Conversations.Conversations>();
         services.AddRateLimiter(options =>
+        {
             options.AddPolicy(
                 ChatEndpoints.RateLimitPolicy,
                 http =>
@@ -103,8 +105,24 @@ public static class AssistantModule
                         assistant.ChatWindow
                     );
                 }
-            )
-        );
+            );
+            // Its own bucket with the chat's numbers: starting a conversation must not eat the
+            // turns, and a turn needs a conversation, so it cannot be lower.
+            options.AddPolicy(
+                Conversations.ConversationEndpoints.RateLimitPolicy,
+                http =>
+                {
+                    var assistant = http
+                        .RequestServices.GetRequiredService<IOptions<AssistantOptions>>()
+                        .Value;
+                    return RateLimiting.PerUser(
+                        http,
+                        assistant.ChatPermitLimit,
+                        assistant.ChatWindow
+                    );
+                }
+            );
+        });
         return services;
     }
 
@@ -134,6 +152,18 @@ public static class AssistantModule
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+        var conversations = chat.MapGroup("/conversations");
+        conversations
+            .MapPost("", Conversations.ConversationEndpoints.Start)
+            .RequireIdempotency()
+            .RequireRateLimiting(Conversations.ConversationEndpoints.RateLimitPolicy)
+            .WithDescription(Conversations.ConversationEndpoints.StartDescription)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+        conversations
+            .MapPost("{id:guid}/end", Conversations.ConversationEndpoints.End)
+            .WithDescription(Conversations.ConversationEndpoints.EndDescription)
+            .ProducesProblem(StatusCodes.Status404NotFound);
         // The response carries the coupon code: no-store on the group, so replays get it too.
         var confirmations = app.MapGroup("/api/chat/confirmations")
             .WithTags("Assistant")

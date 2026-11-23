@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SUPPORT } from "./accounts";
-import { loginAs, newCustomer } from "./fixtures";
+import { csrf, loginAs, newCustomer } from "./fixtures";
 
 const PROXY = "http://localhost:5282";
 
@@ -20,7 +20,14 @@ test("handoff: customer and agent talk live, the chat comes back after closing",
   const name = `Klient ${crypto.randomUUID().slice(0, 8)}`;
   await newCustomer(page, name);
   await page.goto("/czat");
+  const conversation = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/chat/conversations") &&
+      r.request().method() === "POST",
+  );
   await ask(page, "Chcę porozmawiać z konsultantem");
+  const conversationId = ((await (await conversation).json()) as { id: string })
+    .id;
   const proposal = page.getByTestId("chat-handoff");
   await expect(proposal).toBeVisible();
   await proposal
@@ -43,6 +50,15 @@ test("handoff: customer and agent talk live, the chat comes back after closing",
   );
   // The assistant takes no questions while the case is open.
   await expect(page.getByLabel("Wiadomość do asystenta")).toHaveCount(0);
+  // The case linked the chat conversation and ended it as a handoff (ADR 0017): ending is
+  // idempotent and keeps the first reason.
+  const ended = await page.request.post(
+    `/api/chat/conversations/${conversationId}/end`,
+    { headers: { "X-CSRF-TOKEN": await csrf(page.request) } },
+  );
+  expect(((await ended.json()) as { endReason: string }).endReason).toBe(
+    "Handoff",
+  );
 
   const agentContext = await browser.newContext();
   const agentPage = await agentContext.newPage();

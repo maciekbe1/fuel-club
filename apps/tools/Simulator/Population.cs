@@ -401,11 +401,13 @@ public sealed class Population(Manifest manifest, Settings settings)
         }
     }
 
+    private string Password(string email) => PasswordFor(settings.Secret, email);
+
     /// <summary>From the run secret: the same password on every rerun, nowhere on disk.</summary>
-    private string Password(string email)
+    public static string PasswordFor(string secret, string email)
     {
         var hash = HMACSHA256.HashData(
-            Encoding.UTF8.GetBytes(settings.Secret),
+            Encoding.UTF8.GetBytes(secret),
             Encoding.UTF8.GetBytes(email)
         );
         return Convert.ToBase64String(hash)[..20].Replace('+', 'x').Replace('/', 'y') + "aA1!";

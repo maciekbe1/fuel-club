@@ -82,6 +82,9 @@ public static class Cleanup
             // the admin (purchases, redemptions, offers) by their keys.
             """DELETE FROM "IdempotencyRecords" WHERE "UserId" = ANY(@ids) OR "IdempotencyKey" = ANY(@keys)""",
             """DELETE FROM "AspNetUsers" WHERE "Id" = ANY(@ids)""",
+            // Conversations and turns carry the run id from the instance configuration (ADR 0017).
+            """DELETE FROM "assistant_turns" WHERE "Synthetic" AND "RunId" = @run""",
+            """DELETE FROM "assistant_conversations" WHERE "Synthetic" AND "RunId" = @run""",
             """DELETE FROM "RewardOffers" o WHERE o."Id" = ANY(@offers) AND NOT EXISTS (SELECT 1 FROM "Coupons" c WHERE c."OfferId" = o."Id")""",
         ];
         var counts = new List<string>();
@@ -91,6 +94,7 @@ public static class Cleanup
             command.Parameters.AddWithValue("ids", accounts);
             command.Parameters.AddWithValue("offers", manifest.OfferIds.ToArray());
             command.Parameters.AddWithValue("keys", keys);
+            command.Parameters.AddWithValue("run", manifest.RunId);
             var rows = await command.ExecuteNonQueryAsync(ct);
             counts.Add($"{sql.Split('"')[1]} {rows}");
         }

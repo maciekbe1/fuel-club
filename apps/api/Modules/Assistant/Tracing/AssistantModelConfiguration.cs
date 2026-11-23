@@ -13,6 +13,10 @@ public sealed class AssistantTurnConfiguration : IEntityTypeConfiguration<Assist
             {
                 table.HasCheckConstraint("ck_assistant_turns_total_ms", "\"TotalMs\" >= 0");
                 table.HasCheckConstraint("ck_assistant_turns_tool_calls", "\"ToolCalls\" >= 0");
+                table.HasCheckConstraint(
+                    "ck_assistant_turns_run",
+                    "\"RunId\" IS NULL OR \"Synthetic\""
+                );
             }
         );
         builder.HasKey(turn => turn.Id);
@@ -23,6 +27,7 @@ public sealed class AssistantTurnConfiguration : IEntityTypeConfiguration<Assist
         builder.Property(turn => turn.PromptVersion).HasMaxLength(100);
         builder.Property(turn => turn.ErrorCode).HasMaxLength(100);
         builder.Property(turn => turn.ReviewedBy).HasMaxLength(450);
+        builder.Property(turn => turn.RunId).HasMaxLength(40);
         builder.Property(turn => turn.Outcome).HasConversion<string>().HasMaxLength(20);
         builder.OwnsMany(
             turn => turn.Tools,
@@ -37,5 +42,7 @@ public sealed class AssistantTurnConfiguration : IEntityTypeConfiguration<Assist
         // Metrics and retention read by time; per-user anomalies by pseudonym and time.
         builder.HasIndex(turn => turn.StartedAt);
         builder.HasIndex(turn => new { turn.UserPseudonym, turn.StartedAt });
+        // No foreign key: turns and conversations share the trace retention, not a lifetime.
+        builder.HasIndex(turn => turn.ConversationId);
     }
 }

@@ -21,7 +21,10 @@ public sealed class TurnRecorder : IDisposable
         string correlationId,
         string userPseudonym,
         IChatModel model,
-        DateTimeOffset now
+        DateTimeOffset now,
+        Guid? conversationId = null,
+        string? runId = null,
+        bool synthetic = false
     )
     {
         _turn = new AssistantTurn
@@ -34,6 +37,9 @@ public sealed class TurnRecorder : IDisposable
             PromptVersion = model.PromptVersion,
             Demo = model.Demo,
             StartedAt = now,
+            ConversationId = conversationId,
+            Synthetic = synthetic,
+            RunId = synthetic ? runId : null,
         };
         // A root span: the HTTP request activity is not exported and is not sampled, and a
         // parent-based sampler would drop the turn with it.
@@ -57,6 +63,9 @@ public sealed class TurnRecorder : IDisposable
     }
 
     public AssistantTurn Turn => _turn;
+
+    /// <summary>The handoff event reached the client in this turn.</summary>
+    public void HandoffProposed() => _turn.HandoffProposed = true;
 
     private int Elapsed() => (int)Stopwatch.GetElapsedTime(_started).TotalMilliseconds;
 

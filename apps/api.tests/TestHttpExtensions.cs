@@ -12,6 +12,19 @@ public static class TestHttpExtensions
     public static async Task<string> GetCsrfTokenAsync(this HttpClient client) =>
         (await client.GetFromJsonAsync<CsrfResponse>("/api/auth/csrf"))!.Token;
 
+    /// <summary>A new chat conversation (ADR 0017); every chat turn needs one.</summary>
+    public static async Task<Guid> StartConversationAsync(this HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat/conversations");
+        request.Headers.Add(CsrfHeader, await client.GetCsrfTokenAsync());
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        var response = await client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>())
+            .GetProperty("id")
+            .GetGuid();
+    }
+
     public static async Task<HttpResponseMessage> PostWithCsrfAsync(
         this HttpClient client,
         string url,

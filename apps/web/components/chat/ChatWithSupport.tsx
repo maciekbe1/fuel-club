@@ -20,8 +20,11 @@ export function ChatWithSupport() {
   const [active, setActive] = useState(false);
 
   const onTalkToAgent = useCallback(
-    (history: AgentRequest["history"], stop: () => void) =>
-      setRequest({ history, stop }),
+    (
+      history: AgentRequest["history"],
+      stop: () => void,
+      conversationId: string | null,
+    ) => setRequest({ history, stop, conversationId }),
     [],
   );
   const onHandoffActive = useCallback(

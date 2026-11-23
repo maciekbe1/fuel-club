@@ -16,6 +16,11 @@ import {
 export const MAX_MESSAGE_LENGTH = 1000;
 /** A support case is open: the chat and its confirmations are off (ADR 0012). */
 export const HANDOFF_ACTIVE = "assistant.handoff_active";
+/** The conversation ended (idle, or ended elsewhere) or is unknown to the API (e.g. after a restart). */
+const CONVERSATION_GONE = new Set([
+  "assistant.conversation_ended",
+  "assistant.conversation_not_found",
+]);
 const MAX_HISTORY_ITEMS = 20;
 const MAX_HISTORY_TEXT = 2000;
 
@@ -143,17 +148,43 @@ function failureMessage(error: unknown) {
   return "Połączenie zostało przerwane - odpowiedź jest niepełna. Spróbuj ponownie.";
 }
 
+type ConversationSlot = { id: string | null; key: string };
+
+const newSlot = (): ConversationSlot => ({
+  id: null,
+  key: crypto.randomUUID(),
+});
+
 /**
- * The conversation lives in this screen only (not cached, not stored). One turn at a time; leaving
- * the screen or pressing stop aborts the request, and the server cancels the turn.
+ * The turns live in this screen only (not cached, not stored). The server conversation (ADR 0017)
+ * starts before the first turn with a key kept until it succeeds, so a retry after a lost response
+ * gets the same one. One turn at a time; leaving the screen or pressing stop aborts the request,
+ * and the server cancels the turn. Leaving the screen ends the conversation.
  */
 export function useChat() {
   const [state, dispatch] = useReducer(reducer, { turns: [], demo: null });
   const active = useRef<AbortController | null>(null);
   const nextId = useRef(1);
+  const conversation = useRef<ConversationSlot>(newSlot());
   const streaming = state.turns.some((turn) => turn.status === "streaming");
 
-  useEffect(() => () => active.current?.abort(), []);
+  useEffect(
+    () => () => {
+      active.current?.abort();
+      // The latest conversation on purpose: the one this screen leaves.
+      const id = conversation.current.id;
+      if (id) void assistantService.endConversation(id).catch(() => {});
+    },
+    [],
+  );
+
+  const conversationId = useCallback(async () => {
+    const slot = conversation.current;
+    if (slot.id) return slot.id;
+    const created = await assistantService.startConversation(slot.key);
+    slot.id = created.id;
+    return created.id;
+  }, []);
 
   /** Starts a turn; false when it did not (empty, or another turn still runs), so the draft stays. */
   const send = useCallback(
@@ -168,11 +199,13 @@ export function useChat() {
       };
       dispatch({ type: "start", id, question: message });
       let finished = false;
-      const run = async () => {
+      const history = historyOf(state.turns);
+      const attempt = async (retry: boolean): Promise<void> => {
         try {
           await assistantService.chat(
+            await conversationId(),
             message,
-            historyOf(state.turns),
+            history,
             controller.signal,
             (event) => {
               if (event.name === "done" || event.name === "error") {
@@ -183,6 +216,23 @@ export function useChat() {
               dispatch({ type: "event", id, event });
             },
           );
+        } catch (error) {
+          // Refused before the model ran: safe to ask once more in a new conversation.
+          if (
+            retry &&
+            error instanceof ApiError &&
+            error.code &&
+            CONVERSATION_GONE.has(error.code)
+          ) {
+            conversation.current = newSlot();
+            return attempt(false);
+          }
+          throw error;
+        }
+      };
+      const run = async () => {
+        try {
+          await attempt(true);
           if (!finished)
             dispatch({ type: "fail", id, message: failureMessage(null) });
         } catch (error) {
@@ -206,7 +256,7 @@ export function useChat() {
       void run();
       return true;
     },
-    [state.turns],
+    [state.turns, conversationId],
   );
 
   const cancel = useCallback(() => active.current?.abort(), []);
@@ -221,6 +271,8 @@ export function useChat() {
     send,
     cancel,
     history,
+    /** The current conversation, for a support case to link (null before the first turn). */
+    conversationId: () => conversation.current.id,
   };
 }
 

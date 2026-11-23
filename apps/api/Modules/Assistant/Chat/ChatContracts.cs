@@ -3,11 +3,17 @@ namespace FuelClub.Api.Modules.Assistant.Chat;
 public sealed record ChatHistoryItem(string? Role, string? Text);
 
 /// <summary>One turn. The model never gets the user's identity from here: it comes from the session.</summary>
-public sealed record ChatRequest(string? Message, IReadOnlyList<ChatHistoryItem>? History);
+public sealed record ChatRequest(
+    string? Message,
+    IReadOnlyList<ChatHistoryItem>? History,
+    // From POST /api/chat/conversations: the server checks the owner and the state each turn.
+    Guid? ConversationId
+);
 
 /// <summary>Always first. <c>Demo</c> marks the rule-based adapter that needs no provider key.</summary>
 public sealed record ChatMetaEvent(
     string CorrelationId,
+    Guid ConversationId,
     string Provider,
     string Model,
     string PromptVersion,

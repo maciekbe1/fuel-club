@@ -17,11 +17,13 @@ import { createError, SUPPORT_CONSENT } from "../texts";
 export function SupportStartForm({
   history,
   stopAssistant,
+  conversationId,
   onCancel,
   onStarted,
 }: {
   history: () => SupportHistoryItem[];
   stopAssistant: () => void;
+  conversationId: string | null;
   onCancel: () => void;
   onStarted: (caseId: string) => void;
 }) {
@@ -37,7 +39,11 @@ export function SupportStartForm({
     stopAssistant();
     const attached = attach ? history() : [];
     create.mutate(
-      { message: text, history: attached.length > 0 ? attached : null },
+      {
+        message: text,
+        history: attached.length > 0 ? attached : null,
+        conversationId,
+      },
       {
         onSuccess: (created) => onStarted(created.id),
         onError: (error) => {

@@ -14,6 +14,9 @@ public sealed class AssistantOptions
     public TimeSpan ToolTimeout { get; set; } = TimeSpan.FromSeconds(5);
     public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(15);
     public TimeSpan ConfirmationLifetime { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>A conversation without a turn for this long ends as Idle (ADR 0017).</summary>
+    public TimeSpan ConversationIdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
     public int ChatPermitLimit { get; set; } = 20;
     public TimeSpan ChatWindow { get; set; } = TimeSpan.FromMinutes(1);
 
@@ -76,6 +79,11 @@ public sealed class AssistantOptionsValidator(IHostEnvironment environment)
             || o.ConfirmationLifetime > TimeSpan.FromHours(1)
         )
             errors.Add("Assistant:ConfirmationLifetime must be 30 s - 1 h.");
+        if (
+            o.ConversationIdleTimeout < TimeSpan.FromMinutes(1)
+            || o.ConversationIdleTimeout > TimeSpan.FromDays(1)
+        )
+            errors.Add("Assistant:ConversationIdleTimeout must be 1 min - 1 day.");
         if (o.ChatPermitLimit is < 1 or > 1000)
             errors.Add("Assistant:ChatPermitLimit must be 1-1000.");
         if (o.ChatWindow <= TimeSpan.Zero || o.ChatWindow > TimeSpan.FromHours(1))

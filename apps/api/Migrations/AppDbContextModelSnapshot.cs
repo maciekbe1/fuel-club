@@ -133,10 +133,69 @@ namespace FuelClub.Api.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("FuelClub.Api.Modules.Assistant.Conversations.AssistantConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastActivityAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RunId")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SupportCaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Synthetic")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Turns")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserPseudonym")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt");
+
+                    b.HasIndex("SupportCaseId")
+                        .IsUnique();
+
+                    b.HasIndex("UserPseudonym", "StartedAt");
+
+                    b.ToTable("assistant_conversations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_assistant_conversations_end", "(\"EndedAt\" IS NULL) = (\"EndReason\" IS NULL)");
+
+                            t.HasCheckConstraint("ck_assistant_conversations_run", "\"RunId\" IS NULL OR \"Synthetic\"");
+
+                            t.HasCheckConstraint("ck_assistant_conversations_turns", "\"Turns\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelClub.Api.Modules.Assistant.Tracing.AssistantTurn", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConversationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CorrelationId")
@@ -153,6 +212,9 @@ namespace FuelClub.Api.Migrations
 
                     b.Property<int?>("FirstEventMs")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("HandoffProposed")
+                        .HasColumnType("boolean");
 
                     b.Property<int?>("InputTokens")
                         .HasColumnType("integer");
@@ -187,8 +249,15 @@ namespace FuelClub.Api.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("character varying(450)");
 
+                    b.Property<string>("RunId")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Synthetic")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("ToolCalls")
                         .HasColumnType("integer");
@@ -203,6 +272,8 @@ namespace FuelClub.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ConversationId");
+
                     b.HasIndex("CorrelationId")
                         .IsUnique();
 
@@ -212,6 +283,8 @@ namespace FuelClub.Api.Migrations
 
                     b.ToTable("assistant_turns", null, t =>
                         {
+                            t.HasCheckConstraint("ck_assistant_turns_run", "\"RunId\" IS NULL OR \"Synthetic\"");
+
                             t.HasCheckConstraint("ck_assistant_turns_tool_calls", "\"ToolCalls\" >= 0");
 
                             t.HasCheckConstraint("ck_assistant_turns_total_ms", "\"TotalMs\" >= 0");

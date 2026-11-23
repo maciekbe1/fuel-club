@@ -64,6 +64,35 @@ public sealed class SimulatorTests : IDisposable
         Assert.Null(Manifest.Load(ManifestPath).CleanedAt);
     }
 
+    [Fact]
+    public void Prune_removes_only_transcripts_past_the_retention()
+    {
+        var folder = Path.Combine(_directory, "run-a", "transcripts");
+        Directory.CreateDirectory(folder);
+        var old = Path.Combine(folder, "c00000.json");
+        var fresh = Path.Combine(folder, "c00001.json");
+        File.WriteAllText(old, "{}");
+        File.WriteAllText(fresh, "{}");
+        File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddDays(-15));
+
+        var removed = ChatScenarios.Prune(_directory, TimeSpan.FromDays(14), DateTimeOffset.UtcNow);
+
+        Assert.Equal(1, removed);
+        Assert.False(File.Exists(old));
+        Assert.True(File.Exists(fresh));
+    }
+
+    [Fact]
+    public void Scenario_weights_add_up_and_every_scenario_has_a_turn()
+    {
+        Assert.Equal(100, ChatScenarios.All.Sum(s => s.Weight));
+        Assert.All(ChatScenarios.All, s => Assert.NotEmpty(s.Messages));
+        Assert.Equal(
+            ChatScenarios.All.Length,
+            ChatScenarios.All.Select(s => s.Name).Distinct().Count()
+        );
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))

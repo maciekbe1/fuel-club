@@ -7,7 +7,7 @@ namespace FuelClub.Api.Modules.Observability;
 /// <summary>Deletes traces and security events older than their retention.</summary>
 public sealed class ObservabilityRetention(AppDbContext db, IOptions<ObservabilityOptions> options)
 {
-    public async Task<(int Turns, int SecurityEvents)> PurgeAsync(
+    public async Task<(int Turns, int SecurityEvents, int Conversations)> PurgeAsync(
         DateTimeOffset now,
         CancellationToken ct
     )
@@ -20,7 +20,11 @@ public sealed class ObservabilityRetention(AppDbContext db, IOptions<Observabili
         var events = await db
             .SecurityEvents.Where(e => e.OccurredAt < eventsBefore)
             .ExecuteDeleteAsync(ct);
-        return (turns, events);
+        // The same retention as the turns, counted from the last activity.
+        var conversations = await db
+            .AssistantConversations.Where(c => c.LastActivityAt < turnsBefore)
+            .ExecuteDeleteAsync(ct);
+        return (turns, events, conversations);
     }
 }
 
@@ -47,14 +51,15 @@ public sealed class ObservabilityWorker(
                 var now = clock.GetUtcNow();
                 if (now >= nextPurge)
                 {
-                    var (turns, events) = await scope
+                    var (turns, events, conversations) = await scope
                         .ServiceProvider.GetRequiredService<ObservabilityRetention>()
                         .PurgeAsync(now, stop);
-                    if (turns + events > 0)
+                    if (turns + events + conversations > 0)
                         logger.LogInformation(
-                            "Retention removed {Turns} traces and {Events} security events",
+                            "Retention removed {Turns} traces, {Events} security events and {Conversations} conversations",
                             turns,
-                            events
+                            events,
+                            conversations
                         );
                     nextPurge = now + options.Value.PurgeInterval;
                 }

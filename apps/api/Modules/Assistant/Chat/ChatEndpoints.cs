@@ -21,8 +21,10 @@ public static class ChatEndpoints
     public const string ChatDescription =
         "One chat turn as a server-sent event stream (POST, read with fetch). Events: meta (first), tool, "
         + "delta, confirmation, then exactly one of done or error; payloads are in ChatStreamContract. "
-        + "Comment lines (': ping') are heartbeats. Validation errors, 429 and 409 assistant.handoff_active "
-        + "(an open support case) come as ProblemDetails before the stream starts.";
+        + "Comment lines (': ping') are heartbeats. conversationId (from POST /api/chat/conversations) is "
+        + "required. Validation errors, 429, 404 assistant.conversation_not_found (unknown or someone "
+        + "else's), 409 assistant.conversation_ended (ended or idle: start a new one) and 409 "
+        + "assistant.handoff_active (an open support case) come as ProblemDetails before the stream starts.";
 
     public const string ConfirmDescription =
         "Confirms an activation proposed in the chat (the token from a confirmation event) and activates the "
@@ -37,7 +39,8 @@ public static class ChatEndpoints
         ChatService chat,
         IOptions<AssistantOptions> options,
         IOptions<JsonOptions> json,
-        AppDbContext db
+        AppDbContext db,
+        Conversations.Conversations conversations
     )
     {
         var errors = Validate(request, options.Value);
@@ -51,6 +54,20 @@ public static class ChatEndpoints
         // A plain read is enough: a turn changes nothing, and a confirmation it proposes is re-checked under the lock.
         if (await SupportCases.HasOpenCaseAsync(db, userId, http.RequestAborted))
             return HandoffActive();
+        // Before the model is called: a turn of an ended, idle or foreign conversation never runs.
+        switch (
+            await conversations.BeginTurnAsync(
+                request.ConversationId!.Value,
+                userId,
+                http.RequestAborted
+            )
+        )
+        {
+            case Conversations.TurnAdmission.NotFound:
+                return Conversations.ConversationEndpoints.NotFound();
+            case Conversations.TurnAdmission.Ended:
+                return Conversations.ConversationEndpoints.Ended();
+        }
 
         var response = http.Response;
         response.ContentType = "text/event-stream; charset=utf-8";
@@ -128,6 +145,10 @@ public static class ChatEndpoints
                     new AssistantValidationError("history", AssistantErrorCodes.InvalidFormat)
                 );
         }
+        if (request.ConversationId is null || request.ConversationId == Guid.Empty)
+            errors.Add(
+                new AssistantValidationError("conversationId", AssistantErrorCodes.RequiredField)
+            );
         return errors;
     }
 

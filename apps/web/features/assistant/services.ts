@@ -74,15 +74,39 @@ export async function readChatEvents(
 }
 
 export const assistantService = {
-  /** One chat turn. Rejects before the stream with ApiError (400, 401, 429) or NetworkError. */
+  /**
+   * A new conversation (ADR 0017), before its first turn. The same key after a lost response
+   * returns the same conversation, so a retry never makes a second one.
+   */
+  startConversation: (key: string) =>
+    unwrap(
+      api.POST("/api/chat/conversations", {
+        params: { header: { "Idempotency-Key": key } },
+      }),
+    ),
+
+  /** Idempotent. keepalive: it still goes out when the screen is being left. */
+  endConversation: (id: string) =>
+    unwrap(
+      api.POST("/api/chat/conversations/{id}/end", {
+        params: { path: { id } },
+        keepalive: true,
+      }),
+    ),
+
+  /**
+   * One chat turn. Rejects before the stream with ApiError (400, 401, 404/409 for a conversation
+   * that is unknown or ended, 429) or NetworkError.
+   */
   async chat(
+    conversationId: string,
     message: string,
     history: ChatHistoryItem[],
     signal: AbortSignal,
     onEvent: (event: ChatEvent) => void,
   ) {
     const { data, error, response } = await api.POST("/api/chat", {
-      body: { message, history },
+      body: { message, history, conversationId },
       parseAs: "stream",
       signal,
     });

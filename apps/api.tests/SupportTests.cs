@@ -505,7 +505,15 @@ public sealed class SupportTests(ApiFactory factory) : IAsyncLifetime
         var couponId = await PurchasedCouponAsync(customer);
         var caseId = await OpenCaseAsync(customer);
 
-        var chat = await PostAsync(customer.Client, "/api/chat", new { message = "Pokaż kupony" });
+        var chat = await PostAsync(
+            customer.Client,
+            "/api/chat",
+            new
+            {
+                message = "Pokaż kupony",
+                conversationId = await customer.Client.StartConversationAsync(),
+            }
+        );
         Assert.Equal(HttpStatusCode.Conflict, chat.StatusCode);
         Assert.Equal("assistant.handoff_active", await CodeOf(chat));
         Assert.NotEqual("text/event-stream", chat.Content.Headers.ContentType?.MediaType);
@@ -542,7 +550,15 @@ public sealed class SupportTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(
             HttpStatusCode.OK,
             (
-                await PostAsync(customer.Client, "/api/chat", new { message = "Pokaż kupony" })
+                await PostAsync(
+                    customer.Client,
+                    "/api/chat",
+                    new
+                    {
+                        message = "Pokaż kupony",
+                        conversationId = await customer.Client.StartConversationAsync(),
+                    }
+                )
             ).StatusCode
         );
         // A new case after the closed one.

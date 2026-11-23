@@ -478,6 +478,39 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - API 638/638, docs build OK.
 - Następnie P16b: rozmowy (serwerowy `conversationId`, `Synthetic`/`RunId` przy turze i rozmowie) i scenariusze czatu.
 
+## P16b - rozmowy i scenariusze (2026-11-23)
+
+- Doprecyzowania właściciela:
+  - rozmowa powstaje przed modelem, a jej odzyskanie po utracie odpowiedzi nie tworzy duplikatów;
+  - każda tura sprawdza właściciela i stan;
+  - zakończenie jest idempotentne, a bezczynność ≠ rozwiązanie;
+  - przekazanie jest wiązane przy tworzeniu zgłoszenia, bez podwojeń;
+  - `Synthetic`/`RunId` tylko z konfiguracji;
+  - najpierw mały przebieg.
+- API:
+  - `POST /api/chat/conversations` (`Idempotency-Key`, osobny limit) i `POST .../{id}/end` (idempotentne);
+  - `conversationId` wymagany w `POST /api/chat`. Właściciel, stan i bezczynność sprawdzane jednym warunkowym `UPDATE` przed modelem: `404 assistant.conversation_not_found`, `409 assistant.conversation_ended`;
+  - `Assistant:ConversationIdleTimeout` (30 min); bezczynna rozmowa kończy się jako `Idle` z czasem upływu limitu;
+  - tabela `assistant_conversations` (migracja `Conversations`) oraz kolumny tury `ConversationId`, `HandoffProposed`, `Synthetic`, `RunId` z `CHECK`;
+  - zgłoszenie z `conversationId` wiąże rozmowę raz (`UNIQUE`, pierwsze wygrywa) i kończy ją jako `Handoff`; cudza rozmowa daje `400`;
+  - retencja rozmów jak tur;
+  - `demo-rules-v7`: przy zakupie produktu §3.1 z wnioskiem („dotyczy paliwa, zakupów w sklepie nie wymienia”).
+- Web:
+  - `useChat` zakłada rozmowę z kluczem trzymanym do skutku. Przy `409`/`404` zakłada nową rozmowę i ponawia pytanie raz;
+  - wyjście z ekranu kończy rozmowę (`keepalive`);
+  - handoff przekazuje `conversationId` do zgłoszenia;
+  - `schema.d.ts` wygenerowany z instancji bez symulacji.
+- Evale: `answerAlternatives` i `answerForbiddenPatterns`. Hot dog zaliczany za dopytanie albo za jasne rozróżnienie zakupu i odbioru. Zakazane: punkty za zakup w sklepie i §3.1 przedstawiony jako zapis o hot dogu. Test `Product_answers_are_checked_by_meaning`. Regexy to przybliżenie; pełną ocenę znaczenia da judge.
+- Symulator:
+  - `converse`: 14 scenariuszy z wagami, wybór deterministyczny, SSE, potwierdzenie aktywacji, zgłoszenie z `conversationId`, porzucenie;
+  - transkrypty w `.simulation/<run>/transcripts`, bez tokenów; `prune` (14 dni);
+  - `cleanup` usuwa też rozmowy i tury przebiegu.
+- Przebiegi: `pilot-6` (30 rozmów) i `pilot-8` (8 kont, 60 rozmów, 89 tur). Wszystko z `RunId`; 10 przekazań z powiązanym zgłoszeniem; 3 aktywacje; ponowienie bez duplikatów.
+- Znaleziska z transkryptów: luki wzorców demo („Za co dostaję punkty?”, „wybrać”) i luka wyszukiwania („zbieranie punktów”). Scenariusze przeformułowane, reguł i wyszukiwania nie zmieniałem bez diagnozy.
+- Testy: API 653+ (w tym `ConversationTests`), E2E czat/konsultant/obserwowalność 42/42 (telefon i desktop), docs build OK.
+- Bez ręcznego przebiegu w przeglądarce: aplikacja dev właściciela (:3000 → :5271) działa na starym kodzie i bazie bez migracji. E2E pokrywa oba widoki.
+- Do zrobienia przez właściciela: `dotnet ef database update --project apps/api` na bazie dev (migracje `RuleFragments`, `Conversations`) i restart API.
+
 ## Następny krok
 
 Otwarte:

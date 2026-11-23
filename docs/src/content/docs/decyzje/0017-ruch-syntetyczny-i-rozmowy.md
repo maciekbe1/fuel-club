@@ -31,9 +31,18 @@ Panel obserwowalności liczy p95, tokeny i anomalie, ale ma tylko kilka tur z r�
 
 ### 2. Rozmowa i metryki
 
-- `conversationId` wydaje serwer. Pierwsza tura bez identyfikatora zakłada rozmowę i zwraca jej id w zdarzeniu `meta`. Kolejne tury podają je z powrotem. Serwer sprawdza właściciela (pseudonim) i to, że rozmowa nie jest zakończona. Cudze, nieznane lub zakończone id daje błąd walidacji.
-- Rozmowa ma jawne zakończenie: klient je wysyła (nowa rozmowa w UI, wylogowanie, koniec scenariusza) albo serwer zamyka ją po bezczynności. Zapisany powód zakończenia: `client`, `idle`, `handoff`.
-- Przekazanie liczy się raz na rozmowę: rozmowa ma flagi „zaproponowano konsultanta” i „utworzono zgłoszenie”, niezależnie od liczby zdarzeń `handoff`.
+- `conversationId` wydaje serwer. Rozmowa powstaje osobnym `POST /api/chat/conversations` z `Idempotency-Key`, zanim ruszy model (doprecyzowanie z P16b: nie w pierwszej turze).
+  - Odzyskanie po utracie odpowiedzi: klient trzyma klucz do skutku. Ponowienie z tym samym kluczem zwraca tę samą rozmowę, więc nie powstaje duplikat. Zdarzenie `meta` tylko potwierdza id; jego utrata niczego nie gubi, bo klient zna id sprzed tury.
+- Każda tura podaje `conversationId`. Serwer sprawdza właściciela (pseudonim) i stan jednym warunkowym `UPDATE`, przed wywołaniem modelu:
+  - cudze lub nieznane id daje `404 assistant.conversation_not_found` (ta sama odpowiedź, więc id niczego nie zdradza);
+  - zakończone lub bezczynne daje `409 assistant.conversation_ended`.
+  Front zakłada wtedy nową rozmowę i jednokrotnie ponawia pytanie, bo model jeszcze nie ruszył.
+- Rozmowa ma jawne zakończenie: klient je wysyła (wyjście z ekranu, koniec scenariusza) albo serwer zamyka ją po bezczynności (`Assistant:ConversationIdleTimeout`, domyślnie 30 min). Zapisany powód: `Client`, `Idle`, `Handoff`.
+  - Zakończenie jest idempotentne: rozmowa zachowuje pierwszy powód i czas.
+  - Bezczynność kończy się z czasem upływu limitu, nie z chwilą zauważenia. Żaden powód nie oznacza rozwiązania sprawy.
+- Przekazanie liczy się raz na rozmowę:
+  - „zaproponowano konsultanta” to tury z `HandoffProposed`;
+  - „utworzono zgłoszenie” to `SupportCaseId` rozmowy, wiązane przy tworzeniu zgłoszenia (`conversationId` w żądaniu, tylko własna rozmowa). Pierwsze powiązanie wygrywa, a ponowienie (ten sam klucz) i kolejne zgłoszenie go nie zmieniają (UNIQUE w bazie jako ostatnia linia).
 - Metryka w panelu to **odsetek rozmów bez przekazania**, z mianownikiem (zakończone rozmowy w zakresie filtra). To nie jest containment ani skuteczność rozwiązania: brak zgłoszenia może oznaczać porzucenie. Containment wymaga jawnego sygnału rozwiązania sprawy, którego nie mamy.
 - Metryki rozmów i tur (koszt z cennika, kroki, p50/p95, przekazania) należą do P15b. P16 dostarcza dane i oznaczenia, nie osobny zestaw metryk.
 - Ruch syntetyczny jest w panelu osobno (filtr, domyślnie wyłączony w widoku rzeczywistym). Wyniki z adaptera demo pokazują wydajność aplikacji i panel, nie opóźnienia Gemini - raportujemy je oddzielnie.

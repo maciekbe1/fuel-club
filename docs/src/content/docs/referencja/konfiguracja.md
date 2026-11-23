@@ -31,7 +31,8 @@ sidebar:
 | `Assistant:TurnTimeout` / `ToolTimeout` | nie | `00:00:30` (do 5 min) / `00:00:05` (≤ `TurnTimeout`) |
 | `Assistant:HeartbeatInterval` | nie | `00:00:15` (do 1 min); komentarz `: ping` w strumieniu |
 | `Assistant:ConfirmationLifetime` | nie | `00:10:00` (30 s - 1 h); ważność tokenu potwierdzenia aktywacji |
-| `Assistant:ChatPermitLimit` / `ChatWindow` | nie | `20` / `00:01:00`; tur czatu na użytkownika w oknie, potem `429` |
+| `Assistant:ChatPermitLimit` / `ChatWindow` | nie | `20` / `00:01:00`; tur czatu na użytkownika w oknie, potem `429`. Start rozmowy ma osobny limit o tych samych liczbach |
+| `Assistant:ConversationIdleTimeout` | nie | `00:30:00` (1 min - 1 dzień); rozmowa bez tury tak długo kończy się jako `Idle` ([ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/)) |
 | `Assistant:Provider` | nie | `demo` (domyślnie, bez sieci) albo `gemini` ([ADR 0011](/decyzje/0011-adapter-gemini/)) |
 | `Assistant:Gemini:ApiKey` | przy `gemini` | klucz Gemini API - sekret: user-secrets / `Assistant__Gemini__ApiKey` |
 | `Assistant:Gemini:Model` / `RequestTimeout` | nie | `gemini-3.5-flash-lite` / `00:00:20` (≤ `TurnTimeout`; łącznie z ponowieniami, [ADR 0011](/decyzje/0011-adapter-gemini/)) |

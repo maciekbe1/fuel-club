@@ -29,7 +29,7 @@ public sealed class Manifest
     [JsonIgnore]
     public string Path { get; private set; } = "";
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() },

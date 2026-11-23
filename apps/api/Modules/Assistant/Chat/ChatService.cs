@@ -25,6 +25,7 @@ public sealed class ChatService(
     IServiceScopeFactory scopes,
     TimeProvider clock,
     IOptions<AssistantOptions> options,
+    IOptions<SimulationOptions> simulation,
     ILogger<ChatService> logger
 )
 {
@@ -37,11 +38,15 @@ public sealed class ChatService(
     )
     {
         var settings = options.Value;
+        var run = simulation.Value;
         using var recorder = new TurnRecorder(
             correlationId,
             pseudonyms.For(context.UserId),
             model,
-            clock.GetUtcNow()
+            clock.GetUtcNow(),
+            request.ConversationId,
+            run.Enabled ? run.RunId : null,
+            run.Enabled
         );
         try
         {
@@ -117,6 +122,7 @@ public sealed class ChatService(
                 "meta",
                 new ChatMetaEvent(
                     correlationId,
+                    request.ConversationId!.Value,
                     model.Provider,
                     model.Model,
                     model.PromptVersion,
@@ -169,6 +175,7 @@ public sealed class ChatService(
                     )
                     {
                         handoffProposed = true;
+                        recorder.HandoffProposed();
                         await Send("handoff", new ChatHandoffEvent(), turn.Token);
                     }
                     await Send("done", new ChatDoneEvent(results.Count), turn.Token);
@@ -219,6 +226,7 @@ public sealed class ChatService(
                     )
                     {
                         handoffProposed = true;
+                        recorder.HandoffProposed();
                         await Send("handoff", handoff, turn.Token);
                     }
                 }

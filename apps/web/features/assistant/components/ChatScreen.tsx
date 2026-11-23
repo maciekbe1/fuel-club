@@ -25,8 +25,8 @@ const SUGGESTIONS = [
 ];
 
 /**
- * @param onTalkToAgent The customer asked for an agent: completed turns (to attach, if they agree)
- *   and a way to stop the answer in progress before the case is created.
+ * @param onTalkToAgent The customer asked for an agent: completed turns (to attach, if they agree),
+ *   a way to stop the answer in progress before the case is created, and the conversation to link.
  * @param locked A support case is shown: no new questions, no confirmations.
  * @param onHandoffActive A turn was refused because a case is open (e.g. opened in another tab).
  */
@@ -35,7 +35,11 @@ export function ChatScreen({
   locked = false,
   onHandoffActive,
 }: {
-  onTalkToAgent?: (history: () => ChatHistoryItem[], stop: () => void) => void;
+  onTalkToAgent?: (
+    history: () => ChatHistoryItem[],
+    stop: () => void,
+    conversationId: string | null,
+  ) => void;
   locked?: boolean;
   onHandoffActive?: () => void;
 } = {}) {
@@ -50,7 +54,7 @@ export function ChatScreen({
   }, [refused, onHandoffActive]);
   const talkToAgent =
     onTalkToAgent && !locked
-      ? () => onTalkToAgent(chat.history, chat.cancel)
+      ? () => onTalkToAgent(chat.history, chat.cancel, chat.conversationId())
       : undefined;
 
   const submit = (text = draft) => {

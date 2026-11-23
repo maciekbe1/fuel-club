@@ -17,6 +17,7 @@ public static class SupportErrorCodes
     public const string CaseTaken = "support.case_taken";
     public const string CaseClosed = "support.case_closed";
     public const string NotAssignee = "support.not_assignee";
+    public const string ConversationNotFound = "support.conversation_not_found";
 }
 
 public sealed record SupportValidationError(string Field, string Code) : IFieldError;

@@ -21,7 +21,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v6";
+    public string PromptVersion => "demo-rules-v7";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -163,6 +163,22 @@ public sealed partial class DemoChatModel : IChatModel
         "Pytasz o zakup tego produktu w sklepie stacji czy o odbiór nagrody z kuponu za punkty? "
         + "Zasady są różne - napisz, o które chodzi.";
 
+    /// <summary>
+    /// §3.1 grants points for fuel and says nothing about shop products: for a product purchase the
+    /// conclusion is spelled out, so the fuel rule is not passed off as a rule about the product.
+    /// </summary>
+    private static string ShopPurchaseNote(string question, string source)
+    {
+        var text = Normalize(question);
+        return
+            source.EndsWith("§3.1", StringComparison.Ordinal)
+            && Product().IsMatch(text)
+            && Purchase().IsMatch(text)
+            ? " Ten punkt dotyczy paliwa. Zakupów w sklepie stacji regulamin nie wymienia, "
+                + "więc punktów za nie nie przewiduje."
+            : "";
+    }
+
     /// <summary>A rules query for the chosen meaning, or null when this is not that answer.</summary>
     private static string? AnswersProductQuestion(
         IReadOnlyList<Chat.ChatHistoryItem> history,
@@ -210,6 +226,7 @@ public sealed partial class DemoChatModel : IChatModel
         if (found.Data is ProgramRulesData { Fragments: [var best, ..] } rules)
             return new ModelStep.Reply(
                 $"{intro}Według regulaminu: {best.Text} Źródło: {best.Source} ({rules.Version})."
+                    + ShopPurchaseNote(query ?? context.Message, best.Source)
             );
         if (found.Status != ToolStatus.Ok)
             return new ModelStep.Reply(

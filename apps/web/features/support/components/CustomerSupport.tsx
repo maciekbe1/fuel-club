@@ -11,6 +11,8 @@ export type AgentRequest = {
   /** Read at submit time: a turn that finishes while the form is open is included. */
   history: () => SupportHistoryItem[];
   stop: () => void;
+  /** The chat conversation handed over: the API links it to the case once (ADR 0017). */
+  conversationId: string | null;
 };
 
 /**
@@ -56,6 +58,7 @@ export function CustomerSupport({
       <SupportStartForm
         history={request.history}
         stopAssistant={request.stop}
+        conversationId={request.conversationId}
         onCancel={onCancelRequest}
         onStarted={setShown}
       />

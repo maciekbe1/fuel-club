@@ -122,7 +122,10 @@ public sealed class AssistantTracingTests(ApiFactory factory) : IAsyncLifetime
         string message
     )
     {
-        var response = await client.PostWithCsrfAsync("/api/chat", new { message });
+        var response = await client.PostWithCsrfAsync(
+            "/api/chat",
+            new { message, conversationId = await client.StartConversationAsync() }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var raw = await response.Content.ReadAsStringAsync();
         return (response.Headers.GetValues("X-Correlation-Id").Single(), raw);
@@ -276,7 +279,7 @@ public sealed class AssistantTracingTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(expected, (await TraceAsync(again)).UserPseudonym);
         Assert.NotEqual(expected, (await TraceAsync(otherUser)).UserPseudonym);
         Assert.Equal(
-            ("demo", "demo-rules", "demo-rules-v6", true),
+            ("demo", "demo-rules", "demo-rules-v7", true),
             (trace.Provider, trace.Model, trace.PromptVersion, trace.Demo)
         );
         Assert.Equal(TurnOutcome.Done, trace.Outcome);
@@ -327,9 +330,10 @@ public sealed class AssistantTracingTests(ApiFactory factory) : IAsyncLifetime
         );
         await using var slowHost = Host(slow);
         var leaving = await AccountAsync(slowHost);
+        var conversationId = await leaving.Client.StartConversationAsync();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
         {
-            Content = JsonContent.Create(new { message = "saldo" }),
+            Content = JsonContent.Create(new { message = "saldo", conversationId }),
         };
         request.Headers.Add(
             TestHttpExtensions.CsrfHeader,

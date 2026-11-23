@@ -1248,7 +1248,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description One chat turn as a server-sent event stream (POST, read with fetch). Events: meta (first), tool, delta, confirmation, then exactly one of done or error; payloads are in ChatStreamContract. Comment lines (': ping') are heartbeats. Validation errors, 429 and 409 assistant.handoff_active (an open support case) come as ProblemDetails before the stream starts. */
+        /** @description One chat turn as a server-sent event stream (POST, read with fetch). Events: meta (first), tool, delta, confirmation, then exactly one of done or error; payloads are in ChatStreamContract. Comment lines (': ping') are heartbeats. conversationId (from POST /api/chat/conversations) is required. Validation errors, 429, 404 assistant.conversation_not_found (unknown or someone else's), 409 assistant.conversation_ended (ended or idle: start a new one) and 409 assistant.handoff_active (an open support case) come as ProblemDetails before the stream starts. */
         post: {
             parameters: {
                 query?: never;
@@ -1291,6 +1291,119 @@ export interface paths {
                 };
                 /** @description Too Many Requests */
                 429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Starts a chat conversation before its first turn (ADR 0017). With Idempotency-Key: a retry after a lost response returns the same conversation, so no duplicate is created. */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description UUID chosen by the client; reuse it only to retry the same request. */
+                    "Idempotency-Key": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/conversations/{id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Ends the conversation (new chat, logout, end of a scenario). Idempotent: an ended conversation keeps its first reason; one left idle ends as Idle. Ending never means the matter was solved. 404 assistant.conversation_not_found for an unknown id or someone else's. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1403,7 +1516,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Opens a support case with the customer's first message and, when the customer chose to attach it, the chat history (stored as untrusted client-provided text). While a case is open the chat and its confirmations return 409 assistant.handoff_active. An open case already exists -> 409 support.case_open with its caseId. */
+        /** @description Opens a support case with the customer's first message and, when the customer chose to attach it, the chat history (stored as untrusted client-provided text). conversationId links the chat conversation once (handoff counted once; it ends as Handoff); someone else's or unknown -> 400 support.conversation_not_found. While a case is open the chat and its confirmations return 409 assistant.handoff_active. An open case already exists -> 409 support.case_open with its caseId. */
         post: {
             parameters: {
                 query?: never;
@@ -2257,6 +2370,8 @@ export interface components {
         };
         ChatMetaEvent: {
             correlationId: string;
+            /** Format: uuid */
+            conversationId: string;
             provider: string;
             model: string;
             promptVersion: string;
@@ -2287,6 +2402,8 @@ export interface components {
         ChatRequest: {
             message: null | string;
             history: null | components["schemas"]["ChatHistoryItem"][];
+            /** Format: uuid */
+            conversationId: null | string;
         };
         ChatStreamContract: {
             meta: components["schemas"]["ChatMetaEvent"];
@@ -2303,6 +2420,17 @@ export interface components {
         };
         ConfirmationRequest: {
             token: null | string;
+        };
+        ConversationResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: null | string;
+            endReason: null | string;
+            /** Format: int32 */
+            turns: number;
         };
         CountItem: {
             key: string;
@@ -2374,6 +2502,8 @@ export interface components {
         CreateSupportCaseRequest: {
             message: null | string;
             history: null | components["schemas"]["SupportHistoryItem"][];
+            /** Format: uuid */
+            conversationId?: null | string;
         };
         CsrfTokenResponse: {
             token: string;

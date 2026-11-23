@@ -104,8 +104,38 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         bool? Handoff = null,
         // Tools a real model may skip, e.g. refusing without trying a foreign coupon. The forced
         // call is still checked on the demo and scripted models (backend owner check).
-        List<string>? GeminiOptionalTools = null
+        List<string>? GeminiOptionalTools = null,
+        // Several acceptable answers (e.g. ask back, or tell both meanings apart): one group's
+        // patterns must all match. Checked on Gemini, like AnswerPatterns.
+        List<List<string>>? AnswerAlternatives = null,
+        // Meanings the answer must not carry (e.g. points for a shop purchase), on every model.
+        List<string>? AnswerForbiddenPatterns = null
     );
+
+    /// <summary>
+    /// The answer checks of one case: patterns or exact texts, alternatives, forbidden meanings.
+    /// Regexes approximate the meaning; the judge (ADR 0017) reads it properly.
+    /// </summary>
+    public static IEnumerable<(string Name, bool Ok)> AnswerChecks(
+        EvalExpect expect,
+        string text,
+        bool gemini
+    )
+    {
+        bool Matches(string pattern) => Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase);
+        if (gemini)
+        {
+            foreach (var pattern in expect.AnswerPatterns ?? [])
+                yield return (pattern, Matches(pattern));
+            if (expect.AnswerAlternatives is { Count: > 0 } alternatives)
+                yield return ("alternatives", alternatives.Any(group => group.All(Matches)));
+        }
+        else
+            foreach (var exact in expect.AnswerContains ?? [])
+                yield return (exact, text.Contains(exact));
+        foreach (var pattern in expect.AnswerForbiddenPatterns ?? [])
+            yield return ($"forbidden: {pattern}", !Matches(pattern));
+    }
 
     public static IEnumerable<object[]> Cases() =>
         Suite.Value.Cases.Select(c => new object[] { c.Id });
@@ -315,12 +345,63 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         Assert.NotEmpty(runs);
     }
 
+    /// <summary>
+    /// The product questions are judged by meaning, not by one wording: asking back and telling
+    /// purchase and pickup apart both pass; points for a shop purchase, or §3.1 passed off as a
+    /// rule about the product, fail. Checked here on sample answers, for free.
+    /// </summary>
+    [Theory]
+    [InlineData(
+        "rules-product-ambiguous",
+        "Pytasz o zakup hot doga w sklepie czy o odbiór nagrody z kuponu?",
+        true
+    )]
+    [InlineData(
+        "rules-product-ambiguous",
+        "Za paliwo dostajesz punkty (Regulamin, §3.1); zakupów w sklepie regulamin nie wymienia. "
+            + "Odebranie nagrody z kuponu nie daje punktów (Regulamin, §3.6).",
+        true
+    )]
+    [InlineData(
+        "rules-product-ambiguous",
+        "Tak, dostaniesz punkty za hot doga: za każdy 1 zł 1 punkt (Regulamin, §3.1). "
+            + "Odbiór nagrody punktów nie daje (§3.6), a zakup w sklepie tak.",
+        false
+    )]
+    [InlineData(
+        "rules-product-ambiguous",
+        "Regulamin, §3.1 dotyczy też hot doga: za zakup są punkty za paliwo, za odbiór nagrody nie (§3.6).",
+        false
+    )]
+    [InlineData(
+        "rules-product-purchase",
+        "Punkty są za paliwo (Regulamin, §3.1). Za hot doga z kasy punktów nie dostaniesz.",
+        true
+    )]
+    [InlineData(
+        "rules-product-purchase",
+        "Tak, otrzymasz 1 punkt za każdy 1 zł przy zakupie hot doga (Regulamin, §3.1, paliwo).",
+        false
+    )]
+    public void Product_answers_are_checked_by_meaning(string caseId, string answer, bool passes)
+    {
+        var expect = Suite.Value.Cases.Single(c => c.Id == caseId).Expect;
+
+        var checks = AnswerChecks(expect, answer, gemini: true).ToList();
+
+        Assert.Equal(passes, checks.All(c => c.Ok));
+    }
+
     /// <summary>Patterns run only on Gemini (paid): a broken one must fail here, for free.</summary>
     [Fact]
     public void Answer_patterns_compile()
     {
         foreach (var evalCase in Suite.Value.Cases)
-        foreach (var pattern in evalCase.Expect.AnswerPatterns ?? [])
+        foreach (
+            var pattern in (evalCase.Expect.AnswerPatterns ?? [])
+                .Concat((evalCase.Expect.AnswerAlternatives ?? []).SelectMany(g => g))
+                .Concat(evalCase.Expect.AnswerForbiddenPatterns ?? [])
+        )
             _ = new Regex(pattern, RegexOptions.IgnoreCase);
         Assert.Contains(Suite.Value.Cases, c => c.Expect.AnswerPatterns is { Count: > 0 });
     }
@@ -564,17 +645,8 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                 .Aggregate(stream.Text, (text, o) => text.Replace(o.Code!, "[kod]"))
         );
         // On Gemini only patterns: the demo's exact wording says nothing about another model.
-        if (gemini is not null)
-            foreach (var pattern in expect.AnswerPatterns ?? [])
-                Check(
-                    "answer",
-                    pattern,
-                    Regex.IsMatch(stream.Text, pattern, RegexOptions.IgnoreCase),
-                    excerpt
-                );
-        else
-            foreach (var text in expect.AnswerContains ?? [])
-                Check("answer", text, stream.Text.Contains(text), excerpt);
+        foreach (var (name, ok) in AnswerChecks(expect, stream.Text, gemini is not null))
+            Check("answer", name, ok, excerpt);
         foreach (var text in expect.MustNotContain ?? [])
             Check("safety", "must-not-contain", !stream.Raw.Contains(Fill(text)), text);
 
@@ -931,7 +1003,9 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
         {
-            Content = JsonContent.Create(new { message }),
+            Content = JsonContent.Create(
+                new { message, conversationId = await client.StartConversationAsync() }
+            ),
         };
         request.Headers.Add(TestHttpExtensions.CsrfHeader, await client.GetCsrfTokenAsync());
         var response = await client.SendAsync(request);

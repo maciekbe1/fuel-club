@@ -24,6 +24,7 @@ Gdy klient ma otwarte zgłoszenie do konsultanta, czat i potwierdzenia odpowiada
 | Kody błędów | `AssistantErrorCodes.cs` |
 | Endpointy (czat, potwierdzenie), walidacja wejścia, heartbeat | `Chat/ChatEndpoints.cs` |
 | Pętla tury: limity, narzędzia, zdarzenia | `Chat/ChatService.cs` |
+| Rozmowy: start, stan tury, zakończenie, powiązanie ze zgłoszeniem, retencja | `Conversations/Conversations.cs`, `Conversations/ConversationEndpoints.cs`, `Conversations/AssistantConversation.cs` |
 | Ramki SSE | `Chat/SseWriter.cs` |
 | Payloady zdarzeń (`ChatStreamContract` w OpenAPI) | `Chat/ChatContracts.cs` |
 | Narzędzia (zamknięta lista) | `Tools/AssistantTools.cs` |
@@ -40,10 +41,12 @@ Gdy klient ma otwarte zgłoszenie do konsultanta, czat i potwierdzenia odpowiada
 
 ## Przepływ
 
-1. `POST /api/chat`: walidacja (`400`) i limit (`429`) przed strumieniem.
-2. Nagłówki SSE, zdarzenie `meta` (`correlationId` także w nagłówku `X-Correlation-Id`), heartbeat co `HeartbeatInterval`.
-3. Pętla: model zwraca `Tool` albo `Reply`. Narzędzie działa z `ToolContext.UserId` z sesji i z limitem `ToolTimeout`. Wynik idzie do modelu, a klient dostaje zdarzenie `tool` (nazwa i stan). Propozycja aktywacji daje dodatkowo `confirmation`, propozycja rozmowy z konsultantem (`propose_handoff`, bez argumentów, niczego nie zmienia) - `handoff`: klient pokazuje przycisk, zgłoszenie tworzy dopiero jego naciśnięcie. Ekran `/czat`: komponenty AI Elements, odpowiedź jako markdown przez `streamdown` ([ADR 0015](/decyzje/0015-komponenty-czatu-ai-elements/)). Lista zdarzeń, które czyta klient (`features/assistant/services.ts`), jest typowana kluczami `ChatStreamContract` - nowe zdarzenie w API bez obsługi w web nie przejdzie `typecheck` (wcześniej `handoff` był po cichu pomijany). Gemini dostaje deklarację tego narzędzia (od `gemini-v4`), bez nowych danych klienta. Pytania o zasady programu: `search_program_rules` (prompt `gemini-v7`, model demo `demo-rules-v6`), szczegóły w [Knowledge](/moduly/knowledge/).
+0. Rozmowa: `POST /api/chat/conversations` z `Idempotency-Key`, zanim ruszy model ([ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/)). Ponowienie z tym samym kluczem (utracona odpowiedź) zwraca tę samą rozmowę.
+1. `POST /api/chat`: walidacja (`400`, także brak `conversationId`) i limit (`429`) przed strumieniem; potem jednym warunkowym `UPDATE` właściciel, stan i bezczynność rozmowy (`404 assistant.conversation_not_found`, `409 assistant.conversation_ended`) - model nie rusza dla cudzej, zakończonej ani bezczynnej rozmowy.
+2. Nagłówki SSE, zdarzenie `meta` (`correlationId` także w nagłówku `X-Correlation-Id`, oraz `conversationId`), heartbeat co `HeartbeatInterval`.
+3. Pętla: model zwraca `Tool` albo `Reply`. Narzędzie działa z `ToolContext.UserId` z sesji i z limitem `ToolTimeout`. Wynik idzie do modelu, a klient dostaje zdarzenie `tool` (nazwa i stan). Propozycja aktywacji daje dodatkowo `confirmation`, propozycja rozmowy z konsultantem (`propose_handoff`, bez argumentów, niczego nie zmienia) - `handoff`: klient pokazuje przycisk, zgłoszenie tworzy dopiero jego naciśnięcie. Ekran `/czat`: komponenty AI Elements, odpowiedź jako markdown przez `streamdown` ([ADR 0015](/decyzje/0015-komponenty-czatu-ai-elements/)). Lista zdarzeń, które czyta klient (`features/assistant/services.ts`), jest typowana kluczami `ChatStreamContract` - nowe zdarzenie w API bez obsługi w web nie przejdzie `typecheck` (wcześniej `handoff` był po cichu pomijany). Gemini dostaje deklarację tego narzędzia (od `gemini-v4`), bez nowych danych klienta. Pytania o zasady programu: `search_program_rules` (prompt `gemini-v7`, model demo `demo-rules-v7`), szczegóły w [Knowledge](/moduly/knowledge/).
 4. `Reply` → `delta` + `done`. Limit narzędzi, czas tury albo wyjątek → `error` bez `done`. Rozłączenie klienta anuluje turę.
+6. `POST /api/chat/conversations/{id}/end`: idempotentne; bezczynna rozmowa kończy się jako `Idle` z czasem upływu limitu. Zgłoszenie z `conversationId` wiąże rozmowę raz i kończy ją jako `Handoff`.
 5. Przycisk potwierdzenia: `POST /api/chat/confirmations { token }` z `Idempotency-Key` → `CouponActivation` → kupon `Active` z kodem.
 
 Adapter demo (`DemoChatModel`) rozpoznaje słowa kluczowe bez polskich znaków i wielkości liter:
@@ -61,7 +64,8 @@ Pierwsza odpowiedź mówi, że to tryb demo.
 
 ## Ekran czatu
 
-- Skrót „Asystent” na ekranie głównym klienta. Rozmowa żyje tylko na tym ekranie: bez cache i zapisu, wyjście z ekranu przerywa turę.
+- Skrót „Asystent” na ekranie głównym klienta. Tury żyją tylko na tym ekranie: bez cache i zapisu, wyjście z ekranu przerywa turę i kończy rozmowę na serwerze (`keepalive`).
+- Rozmowa startuje przed pierwszym pytaniem; klucz startu trzymany do skutku. `409 conversation_ended` albo `404 conversation_not_found` (np. pseudonimy po restarcie API bez `PseudonymKey`) → nowa rozmowa i jednokrotne ponowienie pytania (model jeszcze nie ruszył). „Porozmawiaj z konsultantem” przekazuje `conversationId` do zgłoszenia.
 - `fetch` z `parseAs: "stream"`; `eventsource-parser` składa ramki podzielone na dowolne fragmenty, `TextDecoder` z `stream: true` - znaki wielobajtowe na granicy fragmentów.
 - Tura ma stan `streaming`, `done`, `error` albo `cancelled`. Sukces to tylko zdarzenie `done`; koniec strumienia bez `done`/`error` → „Połączenie zostało przerwane - odpowiedź jest niepełna”. Częściowy tekst zostaje, oznaczony błędem.
 - „Zatrzymaj” przerywa `fetch` (serwer anuluje turę). Jedna tura naraz; Enter wysyła, Shift+Enter - nowa linia; licznik 1000 znaków.
@@ -78,14 +82,17 @@ Next (`next dev`/`next start`) kompresował odpowiedź z rewrite, gdy przegląda
 
 ## Dane
 
-Potwierdzenie jest bezstanowym tokenem Data Protection (`proposalId`, `userId`, `couponId`, `expiresAt`). Rozmowy nie są zapisywane.
+Potwierdzenie jest bezstanowym tokenem Data Protection (`proposalId`, `userId`, `couponId`, `expiresAt`). Treść rozmów nie jest zapisywana.
+
+`assistant_conversations` - metadane rozmowy ([referencja](/referencja/baza-danych/)): właściciel (pseudonim), start, ostatnia aktywność, zakończenie i powód (`Client`, `Idle`, `Handoff` - żaden nie oznacza rozwiązania sprawy), liczba tur, powiązane zgłoszenie (raz), `Synthetic`/`RunId` z konfiguracji instancji symulacji (`Simulation`), nigdy z żądania. Retencja jak tury.
 
 `assistant_turns` - jeden wiersz na turę, tylko metadane ([referencja](/referencja/baza-danych/), [ADR 0008](/decyzje/0008-slady-i-evale-czatu/)):
 
 - `correlationId` (ten z `meta`), pseudonim HMAC, dostawca, model, wersja promptu, demo;
 - czasy (`FirstEventMs` - pierwsze zdarzenie po `meta`, `TotalMs`);
 - wynik i kod błędu, narzędzia (nazwa, stan, czas);
-- tokeny tylko od dostawcy.
+- tokeny tylko od dostawcy;
+- `ConversationId`, `HandoffProposed`, `Synthetic`/`RunId` (z konfiguracji, jak w rozmowie).
 
 Klient, który odszedł, zostawia turę `Cancelled`. Gdy tura skończyła się błędem, zanim klient odszedł, zostaje `Error`.
 
@@ -105,7 +112,8 @@ Retencja, metryki i kolejka przeglądu: [Observability](/moduly/observability/).
 
 | Plik | Sprawdza |
 | --- | --- |
-| `apps/web/e2e/chat.spec.ts` | saldo: odpowiedź, etykieta narzędzia, oznaczenie demo, Enter; **propozycja nic nie zmienia, przycisk aktywuje, kod nie pojawia się w czacie**; „Nie teraz” → kupon bez zmian; **utracona odpowiedź potwierdzenia → ponowienie z tym samym kluczem**; cudzy kupon → „odrzucono”, brak karty i nazwy; **strumień w 3-bajtowych kawałkach z przerwą przed odpowiedzią: narzędzie widoczne przed tekstem** (brak buforowania przez Next), polskie znaki całe; ucięty strumień → błąd, nie sukces; zdarzenie `error` po częściowym tekście → błąd; „Zatrzymaj” → `cancelled`, żądanie przerwane; porównanie kuponów i rachunek punktów z narzędzi serwera |
+| `apps/api.tests/ConversationTests.cs` | ponowiony start z tym samym kluczem → ta sama rozmowa, jedna w bazie; tury liczone na rozmowie i niosą jej id; tura bez rozmowy → `400`; cudza/nieznana → `404`, model nie rusza; zakończenie idempotentne, zakończona → `409`; bezczynna → `Idle` z czasem upływu limitu; zgłoszenie wiąże rozmowę raz (ponowienie i drugie zgłoszenie nie zmieniają), kończy jako `Handoff`, tura z `HandoffProposed`; cudza rozmowa w zgłoszeniu → `400`; `Synthetic`/`RunId` tylko z konfiguracji, pola żądania ignorowane |
+| `apps/web/e2e/chat.spec.ts` | saldo: odpowiedź, etykieta narzędzia, oznaczenie demo, Enter; **propozycja nic nie zmienia, przycisk aktywuje, kod nie pojawia się w czacie**; „Nie teraz” → kupon bez zmian; **utracona odpowiedź potwierdzenia → ponowienie z tym samym kluczem**; cudzy kupon → „odrzucono”, brak karty i nazwy; **strumień w 3-bajtowych kawałkach z przerwą przed odpowiedzią: narzędzie widoczne przed tekstem** (brak buforowania przez Next), polskie znaki całe; ucięty strumień → błąd, nie sukces; zdarzenie `error` po częściowym tekście → błąd; „Zatrzymaj” → `cancelled`, żądanie przerwane; porównanie kuponów i rachunek punktów z narzędzi serwera; **utracona odpowiedź startu rozmowy → ponowienie tym samym kluczem, jedna rozmowa**; zakończona rozmowa → nowa i pytanie ponowione raz |
 | `apps/api.tests/Evals/AssistantEvals.cs` | 21 wersjonowanych przypadków (`assistant-evals-v2`): regulamin (6, kategorie `regulamin-*`), saldo, oferty, porównanie kuponów, wyjaśnienie punktów bez zakupów, brak punktów, własny kupon (propozycja, lista bez kodów), cudzy kupon, naliczenie, dwa prompt injection, błędne argumenty (nieznane narzędzie, `userId`, zły status, dodatkowy argument przy cudzym kuponie), tekst „potwierdzam” ≠ zgoda, awaria dostawcy, limit narzędzi; każdy: narzędzia, jeden koniec tury, brak zmian salda/historii/kuponów, wiersz śladu zgodny ze strumieniem i bez treści; pokrycie wszystkich kategorii SPEC §3 |
 | `apps/api.tests/TurnRecorderTests.cs` | narzędzie z przekroczonym czasem / wyjątkiem zostaje w śladzie (`timeout`/`error`, span z błędem); brak danych o tokenach w jednym wywołaniu → `null`; span tury jako korzeń z linkiem do żądania, przywrócenie `Activity.Current`; klucz pseudonimu wymagany poza `Development`, min. 32 bajty |
 | `apps/api.tests/AssistantTracingTests.cs` | spany tylko z atrybutów z listy, bez treści wiadomości, kodu kuponu, e-maila i id użytkownika, narzędzia jako dzieci tury, brak tokenów = brak atrybutu; **eksport do lokalnego kolektora OTLP bez tych danych**, niedostępny kolektor nie blokuje czatu; pseudonim = HMAC z kluczem, stały dla użytkownika, różny dla innych; wiersz z metadanymi i czasami; tokeny sumowane; odejście klienta → `Cancelled` |

@@ -89,7 +89,9 @@ public sealed class SupportHandoffTurnTests(ApiFactory factory) : IAsyncLifetime
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
         {
-            Content = JsonContent.Create(new { message }),
+            Content = JsonContent.Create(
+                new { message, conversationId = await client.StartConversationAsync() }
+            ),
         };
         request.Headers.Add(TestHttpExtensions.CsrfHeader, await client.GetCsrfTokenAsync());
         var response = await client.SendAsync(request);

@@ -27,6 +27,8 @@ namespace FuelClub.Api.Infrastructure
             Set<Modules.Support.Domain.SupportMessage>();
         public DbSet<Modules.Assistant.Tracing.AssistantTurn> AssistantTurns =>
             Set<Modules.Assistant.Tracing.AssistantTurn>();
+        public DbSet<Modules.Assistant.Conversations.AssistantConversation> AssistantConversations =>
+            Set<Modules.Assistant.Conversations.AssistantConversation>();
         public DbSet<Modules.Observability.SecurityEvent> SecurityEvents =>
             Set<Modules.Observability.SecurityEvent>();
         public DbSet<Idempotency.IdempotencyRecord> IdempotencyRecords =>

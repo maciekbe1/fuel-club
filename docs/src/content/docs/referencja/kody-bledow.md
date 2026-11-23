@@ -87,6 +87,8 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `assistant.invalid_format` | `history` | wpis bez tekstu, z rolą inną niż `user`/`assistant` albo za długi |
 | `assistant.confirmation_invalid` | - | `404`: token potwierdzenia zły, zmieniony albo wydany innemu użytkownikowi - bez rozróżnienia |
 | `assistant.confirmation_expired` | - | `410`: token potwierdzenia po terminie; poproś czat o nową propozycję |
+| `assistant.conversation_not_found` | - | `404`: rozmowa czatu nieznana albo cudza (ta sama odpowiedź) - tura i zakończenie ([ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/)) |
+| `assistant.conversation_ended` | - | `409`: rozmowa zakończona albo bezczynna dłużej niż `Assistant:ConversationIdleTimeout`; front zakłada nową i raz ponawia pytanie |
 | `assistant.handoff_active` | - | `409`: klient ma otwarte zgłoszenie do konsultanta - czat (przed strumieniem) i potwierdzenie aktywacji odmawiają; też zdarzenie `error`, gdy zgłoszenie powstało w trakcie tury ([ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/)) |
 | `assistant.timeout` | - | zdarzenie `error` w strumieniu: tura lub narzędzie przekroczyły limit czasu |
 | `assistant.tool_limit` | - | zdarzenie `error`: więcej wywołań narzędzi niż `Assistant:MaxToolCalls` |

@@ -9,6 +9,8 @@ public static class AssistantErrorCodes
     public const string ConfirmationInvalid = "assistant.confirmation_invalid";
     public const string ConfirmationExpired = "assistant.confirmation_expired";
     public const string HandoffActive = "assistant.handoff_active";
+    public const string ConversationNotFound = "assistant.conversation_not_found";
+    public const string ConversationEnded = "assistant.conversation_ended";
 
     // Stream errors (the `error` event), not HTTP statuses.
     public const string Timeout = "assistant.timeout";
