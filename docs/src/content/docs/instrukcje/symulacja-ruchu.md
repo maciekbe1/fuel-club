@@ -8,7 +8,7 @@ sidebar:
 Decyzje: [ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/). Symulator: `apps/tools/Simulator` (.NET, tylko publiczne HTTP API).
 
 :::caution[Planowane]
-P16d: judge na transkryptach (szacuje jakość znaczenia, wymaga kalibracji ocenami człowieka). Rozmowy na Gemini (`--expect-provider gemini` z limitem kosztu) - jeszcze nie: `converse` działa na adapterze demo. Teraz działa populacja kont (P16a), rozmowy według scenariuszy (P16b) i metryki w panelu (P16c).
+Rozmowy na Gemini (`--expect-provider gemini` z limitem kosztu) - jeszcze nie: `converse` działa na adapterze demo. Teraz działa populacja kont (P16a), rozmowy według scenariuszy (P16b) metryki w panelu (P16c) i judge offline na transkryptach (P16d).
 :::
 
 ## Baza i instancja demo
@@ -129,6 +129,39 @@ Przebieg może być technicznie czysty przy złych odpowiedziach - dlatego rapor
 - Bez tokenów potwierdzeń (tylko ich liczba; token żyje w pamięci do kliknięcia, a plik z tokenem w tekście nie zostanie zapisany). Odpowiedź potwierdzenia (z kodem kuponu) nie jest czytana poza statusem. Kod kuponu nigdy nie trafia do czatu (ADR 0007), a hasła i kody karty nie są częścią rozmowy.
 - Retencja 14 dni: `dotnet run --project apps/tools/Simulator -- prune [--days 14]` usuwa starsze transkrypty ze wszystkich przebiegów.
 
+## Judge
+
+Judge **szacuje** jakość znaczenia odpowiedzi; nie ocenia jej bezbłędnie i wymaga kalibracji ocenami człowieka. Dane: wyłącznie transkrypty przebiegu symulatora (polecenie odmawia bez manifestu przebiegu), [ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/) §3.
+
+```sh
+dotnet run --project apps/tools/Simulator -- judge --run demo-1 [--random 40] [--errors 20] [--regressions 10] [--max-usd 0.20] [--model gemini-3.5-flash-lite]
+dotnet run --project apps/tools/Simulator -- calibrate --run demo-1 [--size 30] [--model gemini-3.5-flash-lite]
+dotnet run --project apps/tools/Simulator -- agreement --run demo-1 [--model gemini-3.5-flash-lite]
+```
+
+- Klucz: `GEMINI_API_KEY` albo user-secret API `Assistant:Gemini:ApiKey`; w nagłówku, nigdy w URL ani w logu.
+- Rubryka `judge-rubric-v1` (kod: `apps/tools/Simulator/Judge.cs`). Judge dostaje regulamin, wcześniejsze tury rozmowy (do 6), pytanie, nazwy i stany narzędzi, propozycję konsultanta i odpowiedź. Ocenia trzy rzeczy w ustrukturyzowanym JSON: `answers_question` (yes/partly/no), `grounded` (yes/no/not_applicable - zgodność z regulaminem i przywołanym paragrafem), `action` (appropriate/inappropriate) oraz `reason`. Werdykt liczy symulator stałą regułą: `pass`, gdy odpowiada na pytanie, nie przeczy regulaminowi i działanie pasuje.
+- Wyników narzędzi konta (saldo, kupony) judge nie widzi - nie ocenia liczb z konta.
+- Próbki osobno: **regresje** (scenariusze znanych pomyłek), **losowa** (pozostałe tury, szacuje udział poprawnych) i **błędów** (tury niezgodne ze sprawdzeniami regułowymi, niewylosowane). Wybór deterministyczny w przebiegu; tylko tury zakończone `done`, bez rozmów `end-pending`.
+- **Awaria judge'a ≠ ocena negatywna**: błąd HTTP, timeout (30 s), błąd transportu albo odpowiedź poza schematem to `judge_error` z rodzajem, liczony osobno i oceniany ponownie przy następnym uruchomieniu.
+- **Twardy limit kosztu** (`--max-usd`, domyślnie 0,20 USD): wywołanie idzie tylko, gdy jego najgorszy przypadek (instrukcje i prompt: znaki/2 tokenów wejścia, 2048 wyjścia) mieści się w limicie; użycie, którego nie da się odczytać jako liczby, też liczone jak najgorszy przypadek; wywołanie bez danych o użyciu liczone jak najgorszy przypadek. Koszt z cennika `gemini-3.5-flash-lite-standard-2026-11-23` (szacunek), osobno od kosztu tur w panelu.
+- Ponowne uruchomienie nie ocenia drugi raz tur już ocenionych tą rubryką i modelem.
+- Pliki w `.simulation/<run>/judge/` (poza Gitem, usuwane przez `prune` po 14 dniach): `results-judge-rubric-v1.json` (oceny wszystkich modeli), `report-judge.md`, `calibration-judge-rubric-v1-<model>.tsv` i `report-calibration-<model>.md`. Oceny tur, których transkrypt usunięto, wypadają przy następnym wczytaniu - przepisanie pliku nie przedłuża ich retencji.
+- Raport liczy każdą ocenioną turę w jej bieżącej próbce (zmiana `--random`/`--errors` przenosi turę, nie dubluje jej). Konsola podaje oceny, awarie judge'a i pominięcia przez limit osobno.
+- Raport: liczebności i pass/fail każdej próbki, awarie judge'a, koszt, zestawienie z wynikiem sprawdzeń regułowych i do 10 rozbieżności z uzasadnieniem judge'a.
+
+### Kalibracja
+
+- `calibrate` zapisuje arkusz dla jednego modelu z wszystkich tur, które ten model ocenił (nie z nowego losowania): połowa ocenionych jako `fail`, reszta `pass`, bez werdyktu i uzasadnienia judge'a (ocena „na ślepo”). Istniejącego arkusza nie nadpisuje; bez ocen odmawia i nic nie zapisuje.
+- Człowiek wpisuje `pass`/`fail` w `human_verdict` (opcjonalnie `human_note`).
+- `agreement` porównuje oceny człowieka z ocenami tego samego modelu: zgodność, macierz (człowiek × judge) i kappa Cohena na wierszach z oceną człowieka; raport podaje model.
+
+Testy: `apps/api.tests/JudgeTests.cs` - rozłączne i deterministyczne próbki bez tur uciętych i `end-pending`; werdykt z reguły i koszt z raportowanego użycia (myślenie jako wyjście), klucz tylko w nagłówku; awaria HTTP i odpowiedź poza schematem jako `judge_error` liczone najgorszym przypadkiem; użycie niebędące liczbą - najgorszy przypadek z instrukcjami; limit kosztu zatrzymuje wywołania, a ponowne uruchomienie nie płaci drugi raz; oceny usuniętego transkryptu wypadają; arkusz kalibracji ślepy, nienadpisywany, z ocen jednego modelu, bez ocen odmawia; zgodność tylko z ocenionych wierszy tego modelu, kappa. `SimulatorTests`: `prune` usuwa też stare pliki judge'a.
+
+:::caution[Planowane]
+Kalibracja ocenami człowieka - arkusz `demo-1` czeka na oceny. Do tego czasu wyniki judge'a to nieskalibrowany szacunek. Judge online na próbce prawdziwego ruchu - P15e.
+:::
+
 ## Sprzątanie przebiegu
 
 ```sh
@@ -145,6 +178,11 @@ dotnet run --project apps/tools/Simulator -- cleanup --run pilot-1
 `pilot-1`, 5 kont: 26/26 operacji. Ponowienie: bez zmian w bazie. Ponowienie z trzema operacjami oznaczonymi `Pending` (zakup, realizacja kuponu, wymiana): bez podwojeń. Sprzątanie na bazie testowej: odmowa; na demo: 5 kont, 7 zakupów, 5 kuponów, 2 oferty usunięte, konta demo zostały.
 
 `pilot-2` (po review): 26/26; ponowienie z dwiema rejestracjami `Pending` - bez błędów; sprzątanie z kontem bez id w manifeście - usunięte wszystkie 5 kont i 21 rekordów idempotencji.
+
+Judge `demo-1` (P16d, `gemini-3.5-flash-lite`, rubryka v1; odpowiedzi adaptera demo, nie Gemini):
+- losowa: 40 tur, 39 pass, 1 fail; regresje: 10 z 10 fail (wszystkie trzy znane pomyłki rozpoznane); próbka błędów pusta (scenariusze zwykłe 100% zgodne z regułami); 0 awarii judge'a; koszt 0,0377 USD łącznie (dwa uruchomienia, 0,0114 + 0,0263).
+- Jedyna rozbieżność z regułami to realny błąd demo, którego sprawdzenia regułowe nie widzą: przy jednym kuponie na koncie „Aktywuj kupon SIM demo-1 rabat” daje propozycję aktywacji kuponu „hot dog” - demo bierze jedyny kupon, choć klient nazwał inny, którego nie ma (`DemoChatModel`, wybór kuponu). Niepoprawione; do decyzji.
+- Arkusz kalibracji `calibration-judge-rubric-v1-gemini-3.5-flash-lite.tsv`: 30 tur (11 fail, 19 pass), bez ocen człowieka. Ponowne uruchomienie judge'a: 0 nowych wywołań, 0 USD.
 
 `demo-1` (P16c, 200 kont, adapter demo): 1460 rozmów, 2113 tur.
 - Technicznie: 1460/1460 rozmów, 2113/2113 tur z `done`, 0 błędów strumienia, 0 oczekiwań na `429`, 7,3 min; czas tury u klienta p50 21 ms, p95 36 ms. To czas aplikacji z adapterem reguł - nie pomiar wydajności ani kosztu Gemini.

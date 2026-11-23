@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-23), P16. Wykonanie po kolei: symulator z manifestem, dane demo, metryki P15b, judge. Feedback (kciuki) i k6 później.
+Decyzja przyjęta (2026-11-23), P16. Wykonane po kolei: symulator z manifestem, dane demo, metryki P15b (P16c), judge offline (P16d). Feedback (kciuki) i k6 później.
 
 ## Problem
 

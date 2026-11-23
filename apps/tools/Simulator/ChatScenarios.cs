@@ -752,20 +752,24 @@ public sealed class ChatScenarios(
         }
     }
 
-    /// <summary>Deletes the run's transcripts older than the retention (ADR 0017: 14 days).</summary>
+    /// <summary>
+    /// Deletes transcripts and judge files (grades, calibration sheets with the answers) older
+    /// than the retention (ADR 0017: 14 days).
+    /// </summary>
     public static int Prune(string simulationRoot, TimeSpan retention, DateTimeOffset now)
     {
         if (!Directory.Exists(simulationRoot))
             return 0;
         var removed = 0;
+        foreach (var name in new[] { "transcripts", "judge" })
         foreach (
             var folder in Directory.EnumerateDirectories(
                 simulationRoot,
-                "transcripts",
+                name,
                 SearchOption.AllDirectories
             )
         )
-        foreach (var file in Directory.EnumerateFiles(folder, "*.json"))
+        foreach (var file in Directory.EnumerateFiles(folder))
             if (now - File.GetLastWriteTimeUtc(file) > retention)
             {
                 File.Delete(file);

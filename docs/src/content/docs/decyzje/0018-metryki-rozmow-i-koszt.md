@@ -51,7 +51,7 @@ Panel liczył tylko tury. Do pokazu i oceny agenta potrzebne są metryki z jawny
   - Suma w panelu obejmuje tylko znane tury i jest pełna, gdy nieznanych jest 0.
 - Domyślny wpis cennika (`gemini-3.5-flash-lite-standard-2026-11-23`): standardowa cena Gemini 3.5 Flash-Lite, 0,30 USD wejście / 2,50 USD wyjście za milion tokenów, wyjście z tokenami myślenia. Potwierdzona przez właściciela 2026-11-23 w [cenniku Google](https://ai.google.dev/gemini-api/docs/pricing). Panel nadal pokazuje szacunek, nie fakturę (inne progi, np. batch czy cache, nie są uwzględnione). Wpis zastąpił nazwę `gemini-flash-lite-assumed-2026-11-23` przed pierwszą zapisaną turą z kosztem (bazy dev i demo sprawdzone); od teraz zmiana ceny to nowy wpis.
 - **Ponowienie po utracie odpowiedzi**: próba bez odpowiedzi HTTP (zerwane połączenie) mogła zostać rozliczona, a tokeny znamy tylko z udanej - tura ma tokeny i koszt „nieznany”, nie sumę wyglądającą na pełną. Ponowienie po statusie błędu (`429`, `5xx`) nie zmienia kosztu: to odpowiedź, nie rozliczana. Próby bez odpowiedzi liczy handler `GeminiAttempts` wewnątrz potoku retry.
-- Koszt judge'a liczony osobno (P16d).
+- Koszt judge'a liczony osobno, w raporcie judge'a (P16d), z tym samym cennikiem i twardym limitem na uruchomienie.
 
 ### Ruch demo
 

@@ -42,7 +42,7 @@ Stan na 2026-11-22. Dowód to test, który przechodzi, albo opisany ręczny prze
 | Limity logowania, realizacji, czatu | `ObservabilityTests` (logowanie, zakupy), `AssistantTests` (czat), `CouponPreviewTests` (podgląd) |
 
 :::caution[Planowane]
-- **Ocena próbek przez judge** (udział, budżet, osobna próbka błędów, kalibracja) - P7c wymaga klucza dostawcy modelu, którego w tym środowisku nie ma. Kolejka nie ma więc powodu „niska ocena”.
+- **Ocena próbek ruchu przez judge online** (udział, budżet, kolejka) - P15e. Jest judge offline na syntetycznych transkryptach (P16d, [symulacja](/instrukcje/symulacja-ruchu/#judge)) z próbką losową, próbką błędów, limitem kosztu i arkuszem kalibracji; ocen człowieka jeszcze nie ma. Kolejka nie ma powodu „niska ocena”.
 - **Feedback klienta** - opcjonalny w specyfikacji, niezaimplementowany. Kolejka nie ma powodu „negatywny feedback”.
 - **Alerty Slack** - opcjonalne, wyłączone; alerty idą do logu.
 :::

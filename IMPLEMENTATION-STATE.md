@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0-P6 - done; P7a - done; P7b - done; P7c - otwarte (judge, wymaga klucza i próbek); P8 - done; P9 - done lokalnie (wdrożenie wymaga konta); P10 - done; poprawki review - done
+Etap i status: P0-P6 - done; P7a - done; P7b - done; P7c - judge offline zrobiony w P16d (kalibracja czeka na oceny człowieka), online w P15e; P8 - done; P9 - done lokalnie (wdrożenie wymaga konta); P10 - done; poprawki review - done
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -545,6 +545,16 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Cennik potwierdzony przez właściciela: `gemini-3.5-flash-lite-standard-2026-11-23`, 0,30 / 2,50 USD (wyjście z myśleniem), nadal szacunek.
 - Review poprawek (`/code-review high`, 7 uwag): przyjęte 6 - zapis transkryptu atomowy i odporny na ucięty plik, koszt nieznany tylko po próbie bez odpowiedzi (nie po `429`/`5xx`), propozycja konsultanta tylko z tury `done`, wyciek tokenu kończy rozmowę przed błędem, wynik ponowienia z manifestu (`activated`/`handoff`), `end-pending` osobno w raporcie. Odrzucona 1: zmiana nazwy wersji cennika - w bazach dev i demo nie ma tur z kosztem, więc nic nie zostało osierocone (notka w ADR 0018).
 - API 675/675, docs build OK.
+
+## P16d - judge offline na syntetycznych transkryptach (2026-11-23)
+
+- Symulator: `judge`, `calibrate`, `agreement` (`Judge.cs`, `JudgeCommand.cs`). Tylko przebiegi z manifestem symulatora; klucz z `GEMINI_API_KEY` albo user-secrets API, w nagłówku.
+- Rubryka `judge-rubric-v1`: `answers_question`, `grounded`, `action`, `reason` w schemacie JSON; werdykt z reguły w symulatorze. Próbki osobno: losowa, błędów, regresje. `judge_error` (HTTP, timeout, transport, format) osobno od oceny negatywnej. Twardy limit kosztu (najgorszy przypadek przed wywołaniem), bez podwójnego płacenia przy ponowieniu. Arkusz kalibracji ślepy; zgodność i kappa Cohena.
+- `prune` usuwa też pliki judge'a (14 dni).
+- `demo-1`: losowa 39/40 pass, regresje 10/10 fail, 0 awarii, 0,0377 USD. Jedyna rozbieżność z regułami to realny błąd demo: przy jednym kuponie nazwanym innym kupon jest proponowany mimo to. Niepoprawione, do decyzji właściciela.
+- Kalibracja: arkusz 30 tur czeka na oceny człowieka. Do tego czasu judge to nieskalibrowany szacunek.
+- Review P16d (`/code-review high`, 10 uwag, wszystkie przyjęte): kalibracja i zgodność dla jednego modelu (arkusz w nazwie z modelem, z ocen tego modelu, bez nowego losowania), oceny usuniętych transkryptów wypadają (retencja), raport wg bieżącej próbki, pusty arkusz nie powstaje, instrukcje w limicie kosztu, odporne odczytanie użycia, uczciwe liczniki w konsoli, test `prune` dla plików judge'a.
+- Testy: `JudgeTests` (7), `SimulatorTests` (prune).
 
 ## Następny krok
 

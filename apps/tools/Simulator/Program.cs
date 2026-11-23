@@ -7,7 +7,12 @@ using FuelClub.Simulator;
 //   populate --run <id> [--accounts 5] [--api http://localhost:5301] [--manifest path]
 //   converse --run <id> [--conversations 10] [--chat-per-minute 60] [--regressions-each 3]
 //   cleanup  --run <id> [--manifest path]     (SIM_DEMO_DATABASE: connection string)
-//   prune    [--days 14]                      (deletes transcripts older than the retention)
+//   prune    [--days 14]                      (deletes transcripts and judge files past the retention)
+//   judge    --run <id> [--random 40] [--errors 20] [--regressions 10] [--max-usd 0.20] [--model M]
+//   calibrate --run <id> [--size 30]           (blind sheet for human grades)
+//   agreement --run <id>                       (human vs judge on the filled sheet)
+//
+// The judge's Gemini key: GEMINI_API_KEY, else the API's user-secrets (Assistant:Gemini:ApiKey).
 //
 // Secrets come from the environment, never from arguments or the manifest:
 //   SIM_SECRET (derives the accounts' passwords), SIM_CASHIER_EMAIL/PASSWORD, SIM_ADMIN_EMAIL/PASSWORD.
@@ -19,10 +24,22 @@ Console.CancelKeyPress += (_, e) =>
     cancel.Cancel();
 };
 
-if (args.Length == 0 || args[0] is not ("populate" or "converse" or "cleanup" or "prune"))
+if (
+    args.Length == 0
+    || args[0]
+        is not (
+            "populate"
+            or "converse"
+            or "cleanup"
+            or "prune"
+            or "judge"
+            or "calibrate"
+            or "agreement"
+        )
+)
 {
     Console.WriteLine(
-        "usage: populate|converse|cleanup --run <id> [--accounts N] [--conversations N] [--api URL] [--manifest PATH] | prune [--days 14]"
+        "usage: populate|converse|cleanup|judge|calibrate|agreement --run <id> [options] | prune [--days 14]"
     );
     return 64;
 }
@@ -35,13 +52,16 @@ if (args[0] == "prune")
         TimeSpan.FromDays(options.Int("days", 14)),
         DateTimeOffset.UtcNow
     );
-    Console.WriteLine($"removed {removed} transcripts");
+    Console.WriteLine($"removed {removed} files (transcripts and judge files)");
     return 0;
 }
 var run = options.Get("run") ?? throw new ArgumentException("--run is required");
 if (!Regex.IsMatch(run, "^[a-z0-9][a-z0-9-]{0,39}$"))
     throw new ArgumentException("--run: 1-40 characters a-z, 0-9, '-'");
 var manifestPath = options.Get("manifest") ?? Path.Combine(".simulation", run, "manifest.json");
+
+if (args[0] is "judge" or "calibrate" or "agreement")
+    return await JudgeCommand.RunAsync(args[0], run, manifestPath, options, cancel.Token);
 
 if (args[0] == "cleanup")
 {

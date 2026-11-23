@@ -65,7 +65,7 @@ public sealed class SimulatorTests : IDisposable
     }
 
     [Fact]
-    public void Prune_removes_only_transcripts_past_the_retention()
+    public void Prune_removes_only_transcripts_and_judge_files_past_the_retention()
     {
         var folder = Path.Combine(_directory, "run-a", "transcripts");
         Directory.CreateDirectory(folder);
@@ -74,12 +74,22 @@ public sealed class SimulatorTests : IDisposable
         File.WriteAllText(old, "{}");
         File.WriteAllText(fresh, "{}");
         File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddDays(-15));
+        // Judge files (grades, the calibration sheet with answers) follow the same retention.
+        var judge = Path.Combine(_directory, "run-a", "judge");
+        Directory.CreateDirectory(judge);
+        var oldSheet = Path.Combine(judge, "calibration-judge-rubric-v1-m.tsv");
+        var freshGrades = Path.Combine(judge, "results-judge-rubric-v1.json");
+        File.WriteAllText(oldSheet, "id");
+        File.WriteAllText(freshGrades, "[]");
+        File.SetLastWriteTimeUtc(oldSheet, DateTime.UtcNow.AddDays(-15));
 
         var removed = ChatScenarios.Prune(_directory, TimeSpan.FromDays(14), DateTimeOffset.UtcNow);
 
-        Assert.Equal(1, removed);
+        Assert.Equal(2, removed);
         Assert.False(File.Exists(old));
         Assert.True(File.Exists(fresh));
+        Assert.False(File.Exists(oldSheet));
+        Assert.True(File.Exists(freshGrades));
     }
 
     [Fact]
