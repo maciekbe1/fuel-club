@@ -40,7 +40,7 @@ public static class ClaimCaseEndpoint
         var claimed = await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             UPDATE "SupportCases"
-            SET "Status" = 'Assigned', "AssignedToUserId" = {agentId}
+            SET "Status" = 'Assigned', "AssignedToUserId" = {agentId}, "AgentActivityAt" = clock_timestamp()
             WHERE "Id" = {id} AND "Status" = 'Waiting'
             """,
             cancellationToken

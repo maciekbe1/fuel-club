@@ -4,7 +4,8 @@ namespace FuelClub.Api.Modules.Accounts.Infrastructure;
 
 /// <summary>
 /// Creates configured accounts (bootstrap staff, demo data). Never promotes an existing account:
-/// if the e-mail already exists without the expected role, provisioning is refused.
+/// if the e-mail already exists without the expected role, provisioning is refused. Error messages
+/// never carry the e-mail: startup failures end up in logs.
 /// Callers own the surrounding transaction.
 /// </summary>
 public static class AccountProvisioning
@@ -22,7 +23,7 @@ public static class AccountProvisioning
         {
             if (!await users.IsInRoleAsync(user, role))
                 throw new InvalidOperationException(
-                    $"Account provisioning refused: account '{email}' already exists without the {role} role."
+                    $"Account provisioning refused: the account already exists without the {role} role."
                 );
             return user;
         }
@@ -36,7 +37,7 @@ public static class AccountProvisioning
         var created = await users.CreateAsync(user, password);
         if (!created.Succeeded)
             throw new InvalidOperationException(
-                $"Could not provision account '{email}': {string.Join(", ", created.Errors.Select(error => error.Code))}"
+                $"Could not provision the {role} account: {string.Join(", ", created.Errors.Select(error => error.Code))}"
             );
 
         var assigned = await users.AddToRoleAsync(user, role);

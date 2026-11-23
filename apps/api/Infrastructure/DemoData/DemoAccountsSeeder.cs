@@ -29,6 +29,7 @@ public sealed class DemoAccountsSeeder(
         ("bartek@demo.fuelclub.test", "Bartek", RoleNames.User),
         ("kasjer@demo.fuelclub.test", "Kasjer demo", RoleNames.Cashier),
         ("admin@demo.fuelclub.test", "Administrator demo", RoleNames.Admin),
+        ("konsultant@demo.fuelclub.test", "Konsultant demo", RoleNames.Support),
     ];
 
     /// <summary>Product rewards (ADR 0013): no stock, no expiry. Created once by name, never changed.</summary>

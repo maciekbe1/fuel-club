@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-22), P11. W realizacji: model, utworzenie, przejęcie i blokada czatu zrobione ([Support](/moduly/support/)); reszta planowana.
+Decyzja przyjęta (2026-11-22), P11. W realizacji: API zrobione ([Support](/moduly/support/)); planowane `propose_handoff`, UI i E2E.
 
 ## Problem
 
@@ -57,6 +57,7 @@ Model nie może sam przekazać rozmowy ani dawać konsultantowi uprawnień, któ
 ### Bot w trakcie zgłoszenia
 
 - Rozpoczęcie przekazania przerywa trwającą odpowiedź bota (UI anuluje strumień).
+- Trwająca tura sama też się zatrzymuje: przed każdą odpowiedzią, zdarzeniem narzędzia i propozycją sprawdza otwarte zgłoszenie i kończy się `error assistant.handoff_active` (dopisane przy realizacji, na prośbę właściciela).
 - Gdy klient ma otwarte zgłoszenie:
   - `POST /api/chat` → `409 assistant.handoff_active` przed strumieniem;
   - `POST /api/chat/confirmations` → `409 assistant.handoff_active` - stare przyciski aktywacji są wyłączone w UI, a backend odrzuca ich użycie.
@@ -95,6 +96,10 @@ Konsultant (rola `Support`, CSRF dla zmian). Ścieżki pod `/api/support/agent/.
 - Autor: `Customer`, `Support`, `System` (kod zdarzenia, np. `claimed` → „Konsultant dołączył”), plus znacznik `ClientProvidedHistory` dla dołączonej rozmowy.
 
 ### Polling
+
+:::note[Zmienione]
+Transport rozmowy z konsultantem zmienia [ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/): SignalR z powiadomieniami i statusem „pisze”; polling zostaje jako tryb awaryjny.
+:::
 
 - Klient i konsultant odpytują co 3 s, tylko przy otwartej karcie i otwartym zgłoszeniu. Po `Closed` odpytywanie się kończy.
 - Odpowiedź niesie stan zgłoszenia, więc przejęcie i zamknięcie widać przy następnym odczycie.

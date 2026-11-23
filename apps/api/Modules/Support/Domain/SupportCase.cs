@@ -42,6 +42,12 @@ public sealed class SupportCase
     /// <summary>Last message or state change; drives expiry and the idle timeout.</summary>
     public DateTimeOffset LastActivityAt { get; set; }
 
+    /// <summary>
+    /// The assignee's last claim or message; set whenever Assigned. Drives the idle timeout, so the
+    /// customer's messages cannot keep a case with an absent agent.
+    /// </summary>
+    public DateTimeOffset? AgentActivityAt { get; set; }
+
     /// <summary>Set exactly when Closed or Expired; retention counts from here.</summary>
     public DateTimeOffset? ClosedAt { get; set; }
 
@@ -98,6 +104,9 @@ public static class SupportSystemEvents
 public static class SupportRules
 {
     public const int MessageMaxLength = 1000;
+
+    /// <summary>Messages per read; the client reads on from the last Seq.</summary>
+    public const int PageSize = 100;
 
     /// <summary>A history entry may be as long as in the chat (AssistantOptions.MaxHistoryTextLength).</summary>
     public const int StoredTextMaxLength = 2000;

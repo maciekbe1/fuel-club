@@ -96,6 +96,9 @@ public sealed class SupportOptions
     /// <summary>A closed or expired case and its messages are deleted this long after closing.</summary>
     public TimeSpan Retention { get; set; } = TimeSpan.FromDays(30);
 
+    public bool WorkerEnabled { get; set; } = true;
+    public TimeSpan WorkerInterval { get; set; } = TimeSpan.FromMinutes(1);
+
     public int CasePermitLimit { get; set; } = 5;
     public TimeSpan CaseWindow { get; set; } = TimeSpan.FromHours(1);
     public int MessagePermitLimit { get; set; } = 30;
@@ -113,6 +116,8 @@ public sealed class SupportOptionsValidator : IValidateOptions<SupportOptions>
             errors.Add("Support:AssignedIdleTimeout must be positive.");
         if (o.Retention <= TimeSpan.Zero)
             errors.Add("Support:Retention must be positive.");
+        if (o.WorkerInterval < TimeSpan.FromSeconds(1) || o.WorkerInterval > TimeSpan.FromHours(1))
+            errors.Add("Support:WorkerInterval must be 1 s - 1 h.");
         if (o.CasePermitLimit < 1 || o.MessagePermitLimit < 1)
             errors.Add("Support permit limits must be at least 1.");
         if (o.CaseWindow <= TimeSpan.Zero || o.MessageWindow <= TimeSpan.Zero)
@@ -157,7 +162,8 @@ public static class SupportCases
     /// <summary>
     /// Appends messages with the next sequence numbers. The UPDATE locks the case row until commit, so
     /// concurrent writers of one case number their messages in commit order without gaps; a reader
-    /// past seq N never misses a later message. Also marks activity.
+    /// past seq N never misses a later message. Also marks activity. For callers that changed the
+    /// case state in this transaction already (claim, release, close, the worker).
     /// </summary>
     /// <returns>false when the case does not exist; nothing is written.</returns>
     public static async Task<bool> AppendAsync(
@@ -179,8 +185,85 @@ public static class SupportCases
                 """
             )
             .ToListAsync(cancellationToken);
+        return await InsertAsync(db, caseId, last, messages, cancellationToken) is not null;
+    }
+
+    /// <summary>
+    /// The customer's message, only into their own open case: the ownership and state check and the
+    /// sequence number are one statement, so a case closed meanwhile takes no message.
+    /// </summary>
+    /// <returns>The message's Seq, or null when the case is not the customer's open case.</returns>
+    public static async Task<int?> AppendFromCustomerAsync(
+        AppDbContext db,
+        Guid caseId,
+        string userId,
+        string text,
+        CancellationToken cancellationToken
+    )
+    {
+        var last = await db
+            .Database.SqlQuery<int>(
+                $"""
+                UPDATE "SupportCases"
+                SET "LastSeq" = "LastSeq" + 1, "LastActivityAt" = clock_timestamp()
+                WHERE "Id" = {caseId} AND "UserId" = {userId} AND "Status" IN ('Waiting', 'Assigned')
+                RETURNING "LastSeq" AS "Value"
+                """
+            )
+            .ToListAsync(cancellationToken);
+        return await InsertAsync(
+            db,
+            caseId,
+            last,
+            [new NewSupportMessage(SupportAuthor.Customer, text)],
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// An agent's message, only while that agent is the assignee of the open case (ADR 0012): the
+    /// check and the sequence number are one statement under the row lock, so after a release, a
+    /// claim by someone else, a close or the idle timeout the former assignee writes nothing.
+    /// </summary>
+    /// <returns>The message's Seq, or null when the agent is not the assignee of the open case.</returns>
+    public static async Task<int?> AppendFromAgentAsync(
+        AppDbContext db,
+        Guid caseId,
+        string agentId,
+        string text,
+        CancellationToken cancellationToken
+    )
+    {
+        var last = await db
+            .Database.SqlQuery<int>(
+                $"""
+                UPDATE "SupportCases"
+                SET "LastSeq" = "LastSeq" + 1, "LastActivityAt" = clock_timestamp(),
+                    "AgentActivityAt" = clock_timestamp()
+                WHERE "Id" = {caseId} AND "Status" = 'Assigned' AND "AssignedToUserId" = {agentId}
+                RETURNING "LastSeq" AS "Value"
+                """
+            )
+            .ToListAsync(cancellationToken);
+        return await InsertAsync(
+            db,
+            caseId,
+            last,
+            [new NewSupportMessage(SupportAuthor.Support, text, AuthorUserId: agentId)],
+            cancellationToken
+        );
+    }
+
+    private static async Task<int?> InsertAsync(
+        AppDbContext db,
+        Guid caseId,
+        List<int> last,
+        IReadOnlyList<NewSupportMessage> messages,
+        CancellationToken cancellationToken
+    )
+    {
         if (last.Count == 0)
-            return false;
+            return null;
         var seq = last[0] - messages.Count;
         foreach (var message in messages)
             db.SupportMessages.Add(
@@ -197,6 +280,70 @@ public static class SupportCases
                 }
             );
         await db.SaveChangesAsync(cancellationToken);
-        return true;
+        return last[0];
+    }
+
+    /// <summary>Messages after the cursor, in sequence order; at most <see cref="SupportRules.PageSize"/>.</summary>
+    public static async Task<List<SupportMessageItem>> PageAsync(
+        AppDbContext db,
+        Guid caseId,
+        int after,
+        CancellationToken cancellationToken
+    ) =>
+        (
+            await db
+                .SupportMessages.AsNoTracking()
+                .Where(m => m.CaseId == caseId && m.Seq > after)
+                .OrderBy(m => m.Seq)
+                .Take(SupportRules.PageSize)
+                .ToListAsync(cancellationToken)
+        )
+            .Select(m => new SupportMessageItem(
+                m.Seq,
+                m.Author.ToString(),
+                m.ClientProvidedHistory,
+                m.HistoryRole,
+                m.Text,
+                m.CreatedAt
+            ))
+            .ToList();
+
+    public static List<SupportValidationError> ValidateText(string? text)
+    {
+        var trimmed = text?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return [new("text", SupportErrorCodes.RequiredField)];
+        if (trimmed.Length > SupportRules.MessageMaxLength)
+            return [new("text", SupportErrorCodes.TooLong)];
+        return [];
     }
 }
+
+/// <summary>
+/// One message. <c>ClientProvidedHistory</c> marks the chat history the customer attached: untrusted
+/// text, shown apart. A System message's text is an event code (claimed, released, ...).
+/// </summary>
+public sealed record SupportMessageItem(
+    int Seq,
+    string Author,
+    bool ClientProvidedHistory,
+    string? HistoryRole,
+    string Text,
+    DateTimeOffset CreatedAt
+);
+
+/// <summary>
+/// The case state with the messages after the cursor. Read again with <c>after</c> = the last
+/// <c>Seq</c> received: the same cursor gives the same messages, none skipped or repeated.
+/// </summary>
+public sealed record SupportMessagesResponse(
+    Guid CaseId,
+    string Status,
+    int LastSeq,
+    IReadOnlyList<SupportMessageItem> Items
+);
+
+public sealed record SupportMessageRequest(string? Text);
+
+/// <summary>The stored message: its <c>Seq</c> lets the client continue the cursor past it.</summary>
+public sealed record SupportMessageCreated(int Seq);

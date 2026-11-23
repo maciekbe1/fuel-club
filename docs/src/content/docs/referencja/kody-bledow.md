@@ -87,18 +87,19 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `assistant.invalid_format` | `history` | wpis bez tekstu, z rolą inną niż `user`/`assistant` albo za długi |
 | `assistant.confirmation_invalid` | - | `404`: token potwierdzenia zły, zmieniony albo wydany innemu użytkownikowi - bez rozróżnienia |
 | `assistant.confirmation_expired` | - | `410`: token potwierdzenia po terminie; poproś czat o nową propozycję |
-| `assistant.handoff_active` | - | `409`: klient ma otwarte zgłoszenie do konsultanta - czat (przed strumieniem) i potwierdzenie aktywacji odmawiają ([ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/)) |
+| `assistant.handoff_active` | - | `409`: klient ma otwarte zgłoszenie do konsultanta - czat (przed strumieniem) i potwierdzenie aktywacji odmawiają; też zdarzenie `error`, gdy zgłoszenie powstało w trakcie tury ([ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/)) |
 | `assistant.timeout` | - | zdarzenie `error` w strumieniu: tura lub narzędzie przekroczyły limit czasu |
 | `assistant.tool_limit` | - | zdarzenie `error`: więcej wywołań narzędzi niż `Assistant:MaxToolCalls` |
 | `assistant.provider_error` | - | zdarzenie `error`: awaria modelu lub narzędzia; szczegóły tylko w logu serwera |
 | `support.validation_failed` | - | `400`: błędy pól zgłoszenia w `errors` |
-| `support.required_field` | `message` | pusta wiadomość (po przycięciu) |
-| `support.too_long` | `message`, `history` | wiadomość > 1000 znaków albo historia > `Assistant:MaxHistoryItems` wpisów |
-| `support.invalid_format` | `history` | wpis bez tekstu, z rolą inną niż `user`/`assistant` albo za długi |
+| `support.required_field` | `message`, `text` | pusta wiadomość (po przycięciu) |
+| `support.too_long` | `message`, `text`, `history` | wiadomość > 1000 znaków albo historia > `Assistant:MaxHistoryItems` wpisów |
+| `support.invalid_format` | `history`, `after` | kursor ujemny; wpis bez tekstu, z rolą inną niż `user`/`assistant` albo za długi |
 | `support.case_open` | - | `409`: klient ma już otwarte zgłoszenie; `caseId` wskazuje je (`SupportConflictProblem`) |
 | `support.case_not_found` | - | `404`: brak zgłoszenia |
 | `support.case_taken` | - | `409`: zgłoszenie przejął inny konsultant |
-| `support.case_closed` | - | `409`: zgłoszenie zamknięte albo wygasłe |
+| `support.case_closed` | - | `409`: zgłoszenie zamknięte albo wygasłe (wiadomość, oddanie, przejęcie) |
+| `support.not_assignee` | - | `403`: konsultant nie jest opiekunem otwartego zgłoszenia - inny je przejął, oddał je, wróciło do kolejki po bezczynności albo nie zostało przejęte |
 | `loyalty.card_not_found` | - | `404`: kod karty nieznany albo unieważniony - celowo bez rozróżnienia |
 | `loyalty.receipt_already_registered` | - | `409`: paragon (stacja, kasa, data, numer) już zapisany; bez informacji o właścicielu |
 | `loyalty.customer_busy` | - | `503` + `Retry-After`: inna operacja na tym kliencie trwa dłużej niż `Loyalty:CustomerLockTimeout`; ponów z tym samym kluczem (niezapisywany) |

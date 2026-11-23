@@ -87,6 +87,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                             ["Assistant:Gemini:ApiKey"] = "",
                             ["BootstrapAdmin:Email"] = "",
                             ["BootstrapAdmin:Password"] = "",
+                            ["BootstrapSupport:Email"] = "",
+                            ["BootstrapSupport:Password"] = "",
                             ["BootstrapCashier:Email"] = "",
                             ["BootstrapCashier:Password"] = "",
                             ["BootstrapCashier:StationCode"] = "",
@@ -100,6 +102,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                             ["RateLimits:AuthPermitLimit"] = "100000",
                             // Tests run retention and alerts themselves.
                             ["Observability:WorkerEnabled"] = "false",
+                            ["Support:WorkerEnabled"] = "false",
                             ["RateLimits:PurchasePermitLimit"] = "100000",
                         }
                     )

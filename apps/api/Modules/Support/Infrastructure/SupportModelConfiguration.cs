@@ -30,6 +30,10 @@ internal sealed class SupportCaseConfiguration : IEntityTypeConfiguration<Suppor
                     "(\"Status\" IN ('Closed', 'Expired')) = (\"ClosedAt\" IS NOT NULL)"
                 );
                 table.HasCheckConstraint("CK_SupportCases_LastSeq", "\"LastSeq\" >= 0");
+                table.HasCheckConstraint(
+                    "CK_SupportCases_AgentActivity",
+                    "\"Status\" <> 'Assigned' OR \"AgentActivityAt\" IS NOT NULL"
+                );
             }
         );
 

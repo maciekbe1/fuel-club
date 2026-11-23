@@ -721,6 +721,9 @@ namespace FuelClub.Api.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("AgentActivityAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("AssignedToUserId")
                         .HasColumnType("text");
 
@@ -764,6 +767,8 @@ namespace FuelClub.Api.Migrations
 
                     b.ToTable("SupportCases", null, t =>
                         {
+                            t.HasCheckConstraint("CK_SupportCases_AgentActivity", "\"Status\" <> 'Assigned' OR \"AgentActivityAt\" IS NOT NULL");
+
                             t.HasCheckConstraint("CK_SupportCases_Assignee", "(\"Status\" = 'Assigned' AND \"AssignedToUserId\" IS NOT NULL)\nOR (\"Status\" = 'Waiting' AND \"AssignedToUserId\" IS NULL)\nOR \"Status\" IN ('Closed', 'Expired')");
 
                             t.HasCheckConstraint("CK_SupportCases_ClosedAt", "(\"Status\" IN ('Closed', 'Expired')) = (\"ClosedAt\" IS NOT NULL)");

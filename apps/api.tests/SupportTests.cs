@@ -3,13 +3,17 @@ using System.Net.Http.Json;
 using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
+using FuelClub.Api.Modules.Accounts.Infrastructure;
 using FuelClub.Api.Modules.Assistant.Confirmation;
 using FuelClub.Api.Modules.Loyalty.Infrastructure;
 using FuelClub.Api.Modules.Rewards.Domain;
 using FuelClub.Api.Modules.Support.Domain;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace FuelClub.Api.Tests;
@@ -639,8 +643,74 @@ public sealed class SupportTests(ApiFactory factory) : IAsyncLifetime
                 db.SupportCases.Where(c => c.Id == caseId)
                     .ExecuteUpdateAsync(s =>
                         s.SetProperty(c => c.Status, SupportCaseStatus.Assigned)
+                            .SetProperty(c => c.AgentActivityAt, DateTimeOffset.UtcNow)
                     )
             )
+        );
+        // Assigned without the agent's activity: the idle timeout would have nothing to count from.
+        var agent = await AccountAsync(RoleNames.Support);
+        Assert.Equal(
+            "CK_SupportCases_AgentActivity",
+            await Violation(db =>
+                db.SupportCases.Where(c => c.Id == caseId)
+                    .ExecuteUpdateAsync(s =>
+                        s.SetProperty(c => c.Status, SupportCaseStatus.Assigned)
+                            .SetProperty(c => c.AssignedToUserId, agent.UserId)
+                    )
+            )
+        );
+    }
+
+    private SupportAccountProvisioner Provisioner(string email, string password) =>
+        new(
+            factory.Services.GetRequiredService<IServiceScopeFactory>(),
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["BootstrapSupport:Email"] = email,
+                        ["BootstrapSupport:Password"] = password,
+                    }
+                )
+                .Build(),
+            factory.Services.GetRequiredService<ILogger<SupportAccountProvisioner>>()
+        );
+
+    [Fact]
+    public async Task Bootstrap_creates_a_new_support_account_and_never_promotes_an_existing_one()
+    {
+        var fresh = $"support-boot-{Guid.NewGuid():N}@example.test";
+        _emails.Add(fresh);
+        await Provisioner(fresh, Password).StartAsync(CancellationToken.None);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var created = (await users.FindByEmailAsync(fresh))!;
+            Assert.Equal([RoleNames.Support], await users.GetRolesAsync(created));
+        }
+        // Repeating it changes nothing and does not fail.
+        await Provisioner(fresh, "Another-Password1!").StartAsync(CancellationToken.None);
+
+        var existing = await AccountAsync();
+        var email = await DbAsync(db =>
+            db.Users.Where(u => u.Id == existing.UserId).Select(u => u.Email!).SingleAsync()
+        );
+        var logsBefore = factory.Logs.Messages.Count;
+        await Provisioner(email, Password).StartAsync(CancellationToken.None);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = (await users.FindByEmailAsync(email))!;
+            Assert.Equal([RoleNames.User], await users.GetRolesAsync(user));
+            Assert.True(await users.CheckPasswordAsync(user, Password));
+        }
+        var logged = factory.Logs.Messages.Skip(logsBefore).ToList();
+        Assert.Contains(logged, m => m.StartsWith("Warning") && m.Contains(existing.UserId));
+        Assert.DoesNotContain(logged, m => m.Contains(email));
+        // The customer still cannot reach the agent side.
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await existing.Client.GetAsync("/api/support/agent/queue")).StatusCode
         );
     }
 }

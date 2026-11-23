@@ -392,6 +392,16 @@ Krok 1 - model, przejęcie, wyścig z aktywacją (kolejność od właściciela):
 - review (`/code-review high`, 4 uwagi, przyjęte): bez zamknięcia klient blokował sobie czat na stałe → `POST /api/support/cases/{id}/close` już w tym kroku (worker wygaszania dalej planowany); `Location` wskazywał nieistniejący zasób - usunięty; `AppendAsync` zwraca `false` dla braku zgłoszenia zamiast wyjątku; odmowa `handoff_active` zapisana pod kluczem - ponowienie nowym kluczem, opisane;
 - testy: `SupportTests` 10/10 (przejęcie z bramką i równoległe, wyścig w obu kolejnościach, czat, role, ograniczenia bazy); mutacje (bez blokady w potwierdzeniu, przejęcie bez warunku `Waiting`) wywracają po 2 testy; API 512/512 (1 pominięty, Gemini na żywo).
 
+Właściciel przyjął trzy odstępstwa od ADR. Poprawka P13: „Wydanie zostało już zarejestrowane … Przed przekazaniem produktu sprawdź, czy klient go otrzymał” (ta sama kasa nie dowodzi, że produkt nie został wydany); E2E `product-rewards` 12/12.
+
+Krok 2 - API reszty P11 (kolejność od właściciela: endpointy → wygaszanie i retencja → BootstrapSupport):
+- tura trwająca w chwili przekazania: przed odpowiedzią, zdarzeniem narzędzia i propozycją sprawdza zgłoszenie, kończy się `error handoff_active` - testy z modelem wstrzymanym w trakcie tury (odpowiedź i propozycja nie wychodzą, kupon nieaktywny);
+- endpointy: `current`, wiadomości z kursorem i wysyłanie (klient i konsultant), kolejka, oddanie, zamknięcie przez konsultanta; zapis konsultanta sprawdza opiekuna otwartego zgłoszenia w tym samym `UPDATE`, który nadaje `Seq` - test z bramką: wiadomość w wyścigu z oddaniem dostaje `403`;
+- worker: wygaśnięcie (7 dni), powrót do kolejki (24 h), retencja (30 dni od zamknięcia);
+- `BootstrapSupport` (nowe konto; istniejące bez roli tylko ostrzeżenie z id) i konto demo `konsultant@demo.fuelclub.test`;
+- review (`/code-review high`, 8 uwag, przyjęte): bezczynność liczona od aktywności konsultanta (`AgentActivityAt`, nowa migracja) - wiadomości klienta nie trzymają zgłoszenia przy nieobecnym konsultancie; tura zatrzymana przekazaniem w śladzie jako `Cancelled`, nie błąd; odczyt usuniętego zgłoszenia `404` zamiast `500`; e-mail usunięty z komunikatów błędów zakładania kont; kolejka do 100; powtórzone oddanie `403` opisane jako wykonane; tabela testów i opis UI w docs poprawione;
+- mutacje: bez ponownego sprawdzenia w turze - 2 testy; bezczynność od dowolnej aktywności - 1 test; zapis konsultanta bez warunku opiekuna - 3 testy; API 526/526 (1 pominięty).
+
 ## Następny krok
 
 Otwarte:
@@ -400,4 +410,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: dalej pozostałe endpointy (stan, wiadomości z kursorem, oddanie, zamknięcie, kolejka), worker, bootstrap, `propose_handoff`, UI klienta i konsultanta, E2E.
+P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: API gotowe; dalej `propose_handoff`, UI klienta i konsultanta, E2E.

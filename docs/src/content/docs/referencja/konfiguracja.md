@@ -14,6 +14,7 @@ sidebar:
 | `ConnectionStrings:DefaultConnection` | tak | PostgreSQL. Bez niego API nie startuje. |
 | `BootstrapAdmin:Email` | nie | e-mail administratora startowego, w parze z hasłem |
 | `BootstrapAdmin:Password` | nie | hasło administratora startowego |
+| `BootstrapSupport:Email` / `Password` | nie | konsultant startowy (rola `Support`), oba albo żaden; sekrety: env / user-secrets. Tworzy tylko nowe konto - istniejące z tym e-mailem nie dostaje roli (ostrzeżenie w logu z id konta, bez e-maila) |
 | `BootstrapCashier:Email`, `Password`, `StationCode`, `RegisterCode` | nie | kasjer startowy ze stanowiskiem; wszystkie cztery albo żaden |
 | `DemoAccounts:Enabled` | nie | `true` włącza tworzenie kont demo; ustawiane w user-secrets; tworzy konta tylko w środowisku Development |
 | `DemoAccounts:Password` | gdy `Enabled` | wspólne hasło kont demo, tylko w user-secrets; bez niego API przy `Enabled=true` nie startuje |
@@ -47,6 +48,10 @@ sidebar:
 | `Observability:WorkerEnabled` | nie | `true`; testy wyłączają i wywołują retencję i reguły same |
 | `Observability:RepeatedErrorsPerUser` / `ReviewQueueLimit` | nie | `3` / `50`; od ilu błędów pseudonim dostaje powód `repeated_errors`; długość kolejki |
 | `Observability:Rules:<reguła>:Enabled`, `Threshold`, `Window`, `MinSample`, `Cooldown`, `Severity` | nie | reguły i domyślne wartości: [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#reguły-anomalii); nieznana reguła lub zły zakres zatrzymuje start |
+| `Support:WaitingExpiry` / `AssignedIdleTimeout` / `Retention` | nie | `7.00:00:00` / `1.00:00:00` / `30.00:00:00`; zgłoszenie czekające bez aktywności wygasa; przejęte bez wiadomości wraca do kolejki; zamknięte i wygasłe są usuwane z wiadomościami ([Support](/moduly/support/)) |
+| `Support:CasePermitLimit` / `CaseWindow` | nie | `5` / `01:00:00`; zgłoszeń na klienta w oknie, potem `429` |
+| `Support:MessagePermitLimit` / `MessageWindow` | nie | `30` / `00:01:00`; wiadomości na użytkownika (klient i konsultant), potem `429` |
+| `Support:WorkerEnabled` / `WorkerInterval` | nie | `true` / `00:01:00` (1 s - 1 h); testy wyłączają worker i wywołują porządki same |
 | `Telemetry:OtlpEndpoint` | nie | adres OTLP/HTTP (np. `http://localhost:6006/v1/traces` dla Phoenix); pusty = bez eksportu OpenTelemetry. Nagłówki eksportera tylko z `OTEL_EXPORTER_OTLP_HEADERS` |
 | `ASPNETCORE_ENVIRONMENT` | nie | `Development` włącza OpenAPI i `/health/db` |
 

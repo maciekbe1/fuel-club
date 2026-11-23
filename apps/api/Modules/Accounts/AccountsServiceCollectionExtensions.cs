@@ -12,6 +12,7 @@ namespace FuelClub.Api.Modules.Accounts
             services.AddScoped<IAccountsService, IdentityAccountsService>();
             services.AddHostedService<RoleInitializer>();
             services.AddHostedService<AdminAccountProvisioner>();
+            services.AddHostedService<SupportAccountProvisioner>();
             services
                 .AddIdentity<ApplicationUser, IdentityRole>(options =>
                 {

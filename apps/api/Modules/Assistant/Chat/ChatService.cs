@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Modules.Assistant.Model;
 using FuelClub.Api.Modules.Assistant.Tools;
 using FuelClub.Api.Modules.Assistant.Tracing;
+using FuelClub.Api.Modules.Support;
 using Microsoft.Extensions.Options;
 
 namespace FuelClub.Api.Modules.Assistant.Chat;
@@ -11,6 +13,10 @@ namespace FuelClub.Api.Modules.Assistant.Chat;
 /// done or error. Tool calls run as the session user only. Logs carry the tool name, status and
 /// duration, never arguments, results or message text. Every turn leaves a trace (metadata only):
 /// a row in assistant_turns and, when a listener is configured, an OpenTelemetry span.
+/// A turn already streaming when the customer opens a support case (ADR 0012) stops at its next
+/// event: before each answer, tool event and confirmation it re-checks for an open case and then
+/// ends with error assistant.handoff_active instead. The client also drops the stream when it
+/// starts a handoff; a confirmation that slipped through is refused under the customer lock.
 /// </summary>
 public sealed class ChatService(
     IChatModel model,
@@ -78,6 +84,28 @@ public sealed class ChatService(
             await sse.EventAsync("error", new ChatErrorEvent(code, message), aborted);
         }
 
+        async Task<bool> HandedOver()
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            if (!await SupportCases.HasOpenCaseAsync(db, context.UserId, turn.Token))
+                return false;
+            logger.LogInformation("Chat {CorrelationId} stopped: support case open", correlationId);
+            // The customer's choice, not a failure: traced as cancelled so the review queue and the
+            // repeated-errors rule do not count it.
+            recorder.Finish(TurnOutcome.Cancelled, AssistantErrorCodes.HandoffActive);
+            recorder.Event();
+            await sse.EventAsync(
+                "error",
+                new ChatErrorEvent(
+                    AssistantErrorCodes.HandoffActive,
+                    "Rozmowę przejmuje konsultant - asystent nie odpowiada."
+                ),
+                aborted
+            );
+            return true;
+        }
+
         var results = new List<ToolResult>();
         var calls = new List<ToolCall>();
         var history = request.History ?? [];
@@ -118,6 +146,8 @@ public sealed class ChatService(
                     throw;
                 }
                 recorder.Usage(step.Usage);
+                if (await HandedOver())
+                    return;
                 if (step is ModelStep.Reply reply)
                 {
                     await Send("delta", new ChatDeltaEvent(reply.Text), turn.Token);
@@ -156,6 +186,8 @@ public sealed class ChatService(
                     );
                     results.Add(result);
                     calls.Add(call with { Step = stepIndex });
+                    if (await HandedOver())
+                        return;
                     await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
                     if (result.Confirmation is { } confirmation)
                         await Send("confirmation", confirmation, turn.Token);
