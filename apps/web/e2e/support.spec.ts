@@ -110,6 +110,10 @@ test("handoff: customer and agent talk live, the chat comes back after closing",
   await expect(
     customer.getByTestId("support-message").filter({ hasText: "sprawdzam" }),
   ).toBeVisible();
+  // No empty assistant window above the case.
+  await expect(
+    page.getByRole("log", { name: "Rozmowa z asystentem" }),
+  ).toHaveCount(0);
 
   await customer.getByRole("button", { name: "Zakończ rozmowę" }).click();
   await expect(customer.getByTestId("support-status")).toHaveText(

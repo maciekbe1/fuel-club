@@ -64,7 +64,7 @@ Token jest powiązany z tożsamością. Po logowaniu i wylogowaniu klient woła 
 
 ### 7. SSE
 
-`lib/sse.ts` - `postSse()`: fetch POST + `EventSourceParserStream` + `AbortSignal`. Zdarzenia `meta | tool | delta | confirmation | done | error` obsługuje reducer w `useChatStream`. Koniec strumienia bez `done` lub `error` to błąd. Przycisk z `confirmation` woła zwykły endpoint aktywacji, z własnym kluczem idempotencji.
+`features/assistant/services.ts` - `readChatEvents()`: fetch POST przez `api` (openapi-fetch, `parseAs: "stream"`) + `eventsource-parser` + `AbortSignal`. Zdarzenia `meta | tool | delta | confirmation | handoff | done | error` (lista typowana kontraktem `ChatStreamContract`) obsługuje reducer w `useChat` (`hooks.ts`). Koniec strumienia bez `done` lub `error` to błąd. Przycisk z `confirmation` woła zwykły endpoint aktywacji, z własnym kluczem idempotencji.
 
 ### 8. Invalidacja cache
 

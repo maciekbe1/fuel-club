@@ -18,7 +18,7 @@ Ekrany czatu (`/czat`) i rozmowy z konsultantem miały ręcznie pisane dymki, pr
 [AI Elements](https://ai-sdk.dev/elements) (Vercel) - komponenty w rejestrze shadcn, kopiowane do `apps/web/components/ai-elements/` jak `components/ui/` (nie edytujemy ich, ESLint je pomija):
 
 - `conversation` - przewijany kontener trzymający dół (`use-stick-to-bottom`), przycisk „Przewiń na dół”, pusty stan; w czacie i w rozmowie z konsultantem;
-- `message` - dymki (`Message`, `MessageContent`) i `MessageResponse`: odpowiedź asystenta jako markdown przez `streamdown` (sanityzacja `rehype-sanitize`/`rehype-harden`, obsługa niedomkniętej składni w trakcie strumienia). Wiadomości ludzi w rozmowie z konsultantem zostają zwykłym tekstem;
+- `message` - dymki (`Message`, `MessageContent`) i `MessageResponse`: odpowiedź asystenta jako markdown przez `streamdown` (`AssistantAnswer.tsx`; obsługa niedomkniętej składni w trakcie strumienia). Domyślnie `streamdown` przepuszcza obrazki z dowolnego adresu i ma angielskie przyciski, więc: bez elementów `img` i `a` (link zostaje tekstem - odpowiedź nie każe przeglądarce pobrać ani otworzyć obcego adresu), bez wbudowanych przycisków (`controls={false}`), `remark-breaks` zachowuje pojedyncze nowe linie. Wiadomości ludzi w rozmowie z konsultantem zostają zwykłym tekstem;
 - `suggestion` - podpowiedzi pytań.
 
 Zostaje nasze: protokół SSE i reducer tury (`features/assistant/hooks.ts`), potwierdzenia aktywacji, przekazanie do konsultanta, kursor i hub w `features/support`, pole wiadomości (shadcn `textarea`).
@@ -32,7 +32,7 @@ Zostaje nasze: protokół SSE i reducer tury (`features/assistant/hooks.ts`), po
 
 ## Konsekwencje
 
-- Zależności: `streamdown`, `ai` (tylko typy, importowane przez `message.tsx`; nie używamy AI SDK w kodzie), komponenty shadcn `button-group`, `tooltip`, `scroll-area`, `separator`.
+- Zależności: `streamdown`, `remark-breaks`, `ai` (tylko typy, importowane przez `message.tsx`; nie używamy AI SDK w kodzie), komponenty shadcn `button-group`, `tooltip`, `scroll-area`, `separator`.
 - `globals.css`: `@source` dla klas `streamdown`.
 - Odpowiedzi modelu mogą zawierać markdown (listy, pogrubienia); dalej bez danych spoza narzędzi (ADR 0007).
 - Okno czatu ma stałą wysokość (przewija się wnętrze), pole wiadomości pod nim.

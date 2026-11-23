@@ -29,7 +29,7 @@ export function QueueItem({
           {item.reasons.map((reason) => (
             <Badge
               key={reason}
-              className="bg-amber-100 font-normal text-amber-950 dark:bg-amber-900 dark:text-amber-50"
+              className="h-auto bg-amber-100 font-normal whitespace-normal text-amber-950 dark:bg-amber-900 dark:text-amber-50"
             >
               {REASONS[reason] ?? reason}
             </Badge>

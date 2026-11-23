@@ -30,7 +30,7 @@ export function SupportMessageBubble({
       data-author={message.author}
       className="gap-0.5"
     >
-      <MessageContent className="whitespace-pre-wrap group-[.is-assistant]:rounded-lg group-[.is-assistant]:bg-muted group-[.is-assistant]:px-4 group-[.is-assistant]:py-3">
+      <MessageContent className="break-words whitespace-pre-wrap group-[.is-assistant]:rounded-lg group-[.is-assistant]:bg-muted group-[.is-assistant]:px-4 group-[.is-assistant]:py-3">
         {message.text}
       </MessageContent>
       <span className="text-xs text-muted-foreground group-[.is-user]:text-right">

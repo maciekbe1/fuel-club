@@ -70,32 +70,35 @@ export function ChatScreen({
         </p>
       )}
 
-      <Conversation
-        aria-label="Rozmowa z asystentem"
-        aria-live="polite"
-        className="h-[45dvh] min-h-64 rounded-3xl border sm:h-[calc(100dvh-20rem)]"
-      >
-        <ConversationContent className="gap-4">
-          {chat.turns.length === 0 && !locked ? (
-            <ConversationEmptyState>
-              <p className="text-muted-foreground">
-                Zapytaj o saldo, oferty albo swoje kupony. Aktywację kuponu
-                asystent tylko proponuje - zatwierdzasz ją przyciskiem.
-              </p>
-            </ConversationEmptyState>
-          ) : (
-            chat.turns.map((turn) => (
-              <ChatTurn
-                key={turn.id}
-                turn={turn}
-                locked={locked}
-                onTalkToAgent={talkToAgent}
-              />
-            ))
-          )}
-        </ConversationContent>
-        <ConversationScrollButton aria-label="Przewiń na dół" />
-      </Conversation>
+      {/* Locked with nothing to show (a case found on entry): no empty box above the case. */}
+      {!(locked && chat.turns.length === 0) && (
+        <Conversation
+          aria-label="Rozmowa z asystentem"
+          aria-live="polite"
+          className="h-[45dvh] min-h-64 rounded-3xl border sm:h-[calc(100dvh-20rem)]"
+        >
+          <ConversationContent className="gap-4">
+            {chat.turns.length === 0 && !locked ? (
+              <ConversationEmptyState>
+                <p className="text-muted-foreground">
+                  Zapytaj o saldo, oferty albo swoje kupony. Aktywację kuponu
+                  asystent tylko proponuje - zatwierdzasz ją przyciskiem.
+                </p>
+              </ConversationEmptyState>
+            ) : (
+              chat.turns.map((turn) => (
+                <ChatTurn
+                  key={turn.id}
+                  turn={turn}
+                  locked={locked}
+                  onTalkToAgent={talkToAgent}
+                />
+              ))
+            )}
+          </ConversationContent>
+          <ConversationScrollButton aria-label="Przewiń na dół" />
+        </Conversation>
+      )}
 
       {!locked && (
         <form

@@ -170,7 +170,7 @@ export function EditLoaded({ initial }: { initial: AdminReward }) {
         className="flex flex-col gap-5 disabled:opacity-70"
       >
         <legend className="sr-only">Edycja oferty</legend>
-        <RewardFields form={form} kindLocked />
+        <RewardFields form={form} kindLocked disabled={locked} />
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="lg" className="h-12">
             {update.isPending ? "Zapisywanie…" : "Zapisz zmiany"}

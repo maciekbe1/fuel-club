@@ -27,7 +27,7 @@ export function ToolChip({ tool }: { tool: ToolCall }) {
       <Badge
         variant="outline"
         className={cn(
-          "font-normal",
+          "h-auto font-normal whitespace-normal",
           !ok && "border-amber-500/50 text-amber-900 dark:text-amber-100",
         )}
       >

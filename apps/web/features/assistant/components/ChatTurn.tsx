@@ -1,14 +1,11 @@
 "use client";
 
 import { CircleAlert, Headset } from "lucide-react";
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message";
+import { Message, MessageContent } from "@/components/ai-elements/message";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { Turn } from "../hooks";
+import { AssistantAnswer } from "./AssistantAnswer";
 import { ConfirmationCard } from "./ConfirmationCard";
 import { ToolChip } from "./ToolChip";
 
@@ -29,7 +26,7 @@ export function ChatTurn({
       className="flex flex-col gap-2"
     >
       <Message from="user">
-        <MessageContent className="whitespace-pre-wrap">
+        <MessageContent className="break-words whitespace-pre-wrap">
           {turn.question}
         </MessageContent>
       </Message>
@@ -44,8 +41,7 @@ export function ChatTurn({
         {(turn.text || turn.status === "streaming") && (
           <MessageContent data-testid="chat-answer">
             {turn.text ? (
-              // Markdown from the model, sanitised by streamdown; incomplete syntax while streaming.
-              <MessageResponse>{turn.text}</MessageResponse>
+              <AssistantAnswer text={turn.text} />
             ) : (
               <span className="text-muted-foreground">Asystent pisze…</span>
             )}

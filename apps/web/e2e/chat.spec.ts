@@ -237,6 +237,42 @@ test("an error event ends the turn without success", async ({
   );
 });
 
+test("an answer is markdown without images or links, and keeps line breaks", async ({
+  page,
+  customer,
+}) => {
+  void customer;
+  let fetched = false;
+  await page.route("https://tracker.example/**", (route) => {
+    fetched = true;
+    return route.abort();
+  });
+  const text =
+    "**Saldo**: 120 pkt\nKupony: 2\n![x](https://tracker.example/p.png?b=120) [strona](https://tracker.example/x)";
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body:
+        'event: meta\ndata: {"correlationId":"x","provider":"demo","model":"m","promptVersion":"v","demo":true}\n\n' +
+        `event: delta\ndata: ${JSON.stringify({ text })}\n\n` +
+        'event: done\ndata: {"correlationId":"x"}\n\n',
+    }),
+  );
+  await openChat(page);
+
+  const turn = await ask(page, "saldo");
+
+  await expect(turn).toHaveAttribute("data-status", "done");
+  const answer = turn.getByTestId("chat-answer");
+  await expect(answer.locator("[data-streamdown=strong]")).toHaveText("Saldo");
+  await expect(answer.locator("br")).toHaveCount(2);
+  await expect(answer.locator("img")).toHaveCount(0);
+  await expect(answer.locator("a")).toHaveCount(0);
+  await expect(answer).toContainText("strona");
+  expect(fetched).toBe(false);
+});
+
 test("stop cancels the turn and frees the composer", async ({
   page,
   customer,

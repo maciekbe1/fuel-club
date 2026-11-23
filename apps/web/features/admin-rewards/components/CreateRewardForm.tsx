@@ -112,7 +112,7 @@ export function CreateRewardForm() {
         className="flex flex-col gap-5 disabled:opacity-70"
       >
         <legend className="sr-only">Nowa oferta</legend>
-        <RewardFields form={form} />
+        <RewardFields form={form} disabled={locked} />
         <Button type="submit" size="lg" className="h-12">
           {create.isPending ? "Zapisywanie…" : "Utwórz ofertę"}
         </Button>

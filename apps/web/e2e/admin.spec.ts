@@ -195,6 +195,12 @@ test("lost PUT response: the outcome is checked, never retried blindly", async (
     "Wynik zapisu nieznany",
   );
   await expect(admin.page.getByLabel("Koszt (pkt)")).toBeDisabled();
+  // Base UI controls ignore the disabled fieldset: they are locked on their own.
+  await expect(
+    admin.page
+      .getByRole("checkbox", { name: "Aktywna (widoczna w katalogu klientów)" })
+      .filter({ visible: true }),
+  ).toBeDisabled();
   await admin.page.unroute(ADMIN_REWARD);
 
   await admin.page

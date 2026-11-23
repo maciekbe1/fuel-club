@@ -16,9 +16,12 @@ import type { RewardValues } from "../schemas";
 export function RewardFields({
   form,
   kindLocked = false,
+  disabled = false,
 }: {
   form: UseFormReturn<RewardValues>;
   kindLocked?: boolean;
+  /** Base UI radios and checkboxes ignore a disabled <fieldset>: they need it themselves. */
+  disabled?: boolean;
 }) {
   const { errors } = form.formState;
   const product = form.watch("kind") === "Product";
@@ -46,6 +49,7 @@ export function RewardFields({
               <RadioGroup
                 value={field.value}
                 onValueChange={field.onChange}
+                disabled={disabled}
                 className="gap-3"
               >
                 {(
@@ -141,7 +145,11 @@ export function RewardFields({
         name="isActive"
         render={({ field }) => (
           <Label className="gap-3 font-normal">
-            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+            <Checkbox
+              checked={field.value}
+              onCheckedChange={field.onChange}
+              disabled={disabled}
+            />
             Aktywna (widoczna w katalogu klientów)
           </Label>
         )}

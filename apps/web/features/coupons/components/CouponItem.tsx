@@ -75,7 +75,7 @@ export function CouponItem({
         <Badge
           data-testid="coupon-status"
           variant="secondary"
-          className={status.className}
+          className={cn("h-auto whitespace-normal", status.className)}
         >
           {status.label}
         </Badge>
