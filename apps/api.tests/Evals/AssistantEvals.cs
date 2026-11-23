@@ -218,6 +218,7 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         var runs = new List<CaseReport>();
         var skipped = new List<string>();
         string? stoppedBy = null;
+        var unknownTokens = 0;
         long usedInput = 0,
             usedOutput = 0;
         foreach (var round in Enumerable.Range(1, repeats))
@@ -232,21 +233,41 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                 skipped.Add($"{evalCase.Id}#{round}");
                 continue;
             }
-            var report = await RunAsync(evalCase, settings);
+            CaseReport report;
+            try
+            {
+                report = await RunAsync(evalCase, settings);
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                // A paid run keeps its report: the case fails, the run goes on.
+                report = new CaseReport(
+                    evalCase.Id,
+                    evalCase.Category,
+                    "Exception",
+                    [],
+                    null,
+                    null,
+                    0,
+                    [new("turn", "exception", false, e.GetType().Name)]
+                );
+            }
             var input = report.InputTokens ?? 0;
             var outputTokens = report.OutputTokens ?? 0;
             usedInput += input;
             usedOutput += outputTokens;
-            report.Checks.Add(
-                new(
-                    "budget",
-                    "tokens-per-case",
-                    report.InputTokens is not null
-                        && input <= MaxInputTokensPerCase
-                        && outputTokens <= MaxOutputTokensPerCase,
-                    $"in {input}, out {outputTokens}"
-                )
-            );
+            // Unknown (an error turn records none): counted in the report, not a budget failure.
+            if (report.InputTokens is null)
+                unknownTokens++;
+            else
+                report.Checks.Add(
+                    new(
+                        "budget",
+                        "tokens-per-case",
+                        input <= MaxInputTokensPerCase && outputTokens <= MaxOutputTokensPerCase,
+                        $"in {input}, out {outputTokens}"
+                    )
+                );
             runs.Add(report with { Id = $"{evalCase.Id}#{round}" });
             output.WriteLine(
                 $"{report.Id} #{round}: {report.Checks.Count(c => c.Ok)}/{report.Checks.Count}, "
@@ -262,7 +283,8 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             skipped,
             stoppedBy,
             budget,
-            fullRunCases: applicable.Count * 3
+            unknownTokens,
+            fullRunCases: applicable.Count * (mode == "full" ? repeats : 3)
         );
         output.WriteLine($"report: {path}");
         // The key never leaves user-secrets.
@@ -272,6 +294,16 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             File.ReadAllText(Path.ChangeExtension(path, ".json"))
         );
         Assert.NotEmpty(runs);
+    }
+
+    /// <summary>Patterns run only on Gemini (paid): a broken one must fail here, for free.</summary>
+    [Fact]
+    public void Answer_patterns_compile()
+    {
+        foreach (var evalCase in Suite.Value.Cases)
+        foreach (var pattern in evalCase.Expect.AnswerPatterns ?? [])
+            _ = new Regex(pattern, RegexOptions.IgnoreCase);
+        Assert.Contains(Suite.Value.Cases, c => c.Expect.AnswerPatterns is { Count: > 0 });
     }
 
     /// <summary>One named result: tools, arguments, answer, safety or trace.</summary>
@@ -371,13 +403,15 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             .Select(t => $"{t.GetProperty("name")}:{t.GetProperty("status")}")
             .ToList();
         Check("turn", "status", stream.Status == HttpStatusCode.OK, stream.Status.ToString());
-        Check(
-            "tools",
-            "exact",
-            expect.Tools.SequenceEqual(tools),
-            $"expected [{string.Join(", ", expect.Tools)}], got [{string.Join(", ", tools)}]"
-        );
-        // A real model may look things up in another order or once more; what it must not skip.
+        // Demo is deterministic: the exact sequence. A real model may look things up in another
+        // order or once more, so on Gemini only the required tools count.
+        if (gemini is null)
+            Check(
+                "tools",
+                "exact",
+                expect.Tools.SequenceEqual(tools),
+                $"expected [{string.Join(", ", expect.Tools)}], got [{string.Join(", ", tools)}]"
+            );
         Check(
             "tools",
             "required",
@@ -402,8 +436,9 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             Check(
                 "turn",
                 "error-code",
-                stream.Of("error").SingleOrDefault() is { ValueKind: JsonValueKind.Object } e
-                    && e.GetProperty("code").GetString() == code,
+                stream.Of("error").ToList() is [{ ValueKind: JsonValueKind.Object } e]
+                    && e.TryGetProperty("code", out var c)
+                    && c.GetString() == code,
                 code
             );
         var confirmations = stream.Of("confirmation").ToList();
@@ -415,24 +450,34 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         );
         // A proposal may name only the user's own coupon.
         foreach (var c in confirmations)
+        {
+            var couponId = c.TryGetProperty("couponId", out var idValue)
+                ? idValue.GetString()
+                : null;
             Check(
                 "arguments",
                 "own-coupon",
-                own.Any(o => o.Id.ToString() == c.GetProperty("couponId").GetString()),
-                c.GetProperty("couponId").GetString() ?? ""
+                own.Any(o => o.Id.ToString() == couponId),
+                couponId ?? "missing"
             );
-        var patterns = gemini is not null ? expect.AnswerPatterns : null;
-        if (patterns is not null)
-            foreach (var pattern in patterns)
+        }
+        // Reports are committed: no redemption code in an excerpt.
+        var excerpt = Excerpt(
+            own.Where(o => o.Code is not null)
+                .Aggregate(stream.Text, (text, o) => text.Replace(o.Code!, "[kod]"))
+        );
+        // On Gemini only patterns: the demo's exact wording says nothing about another model.
+        if (gemini is not null)
+            foreach (var pattern in expect.AnswerPatterns ?? [])
                 Check(
                     "answer",
                     pattern,
                     Regex.IsMatch(stream.Text, pattern, RegexOptions.IgnoreCase),
-                    Excerpt(stream.Text)
+                    excerpt
                 );
         else
             foreach (var text in expect.AnswerContains ?? [])
-                Check("answer", text, stream.Text.Contains(text), Excerpt(stream.Text));
+                Check("answer", text, stream.Text.Contains(text), excerpt);
         foreach (var text in expect.MustNotContain ?? [])
             Check("safety", "must-not-contain", !stream.Raw.Contains(Fill(text)), text);
 
@@ -454,8 +499,29 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             );
 
         // The trace agrees with the stream and holds no identity or content.
-        var correlationId = stream.Of("meta").Single().GetProperty("correlationId").GetString();
-        var trace = await TraceAsync(correlationId!);
+        var correlationId =
+            stream.Of("meta").FirstOrDefault() is { ValueKind: JsonValueKind.Object } meta
+            && meta.TryGetProperty("correlationId", out var value)
+                ? value.GetString()
+                : null;
+        var trace = correlationId is null
+            ? null
+            : await DbAsync(db =>
+                db.AssistantTurns.AsNoTracking()
+                    .SingleOrDefaultAsync(t => t.CorrelationId == correlationId)
+            );
+        Check("trace", "exists", trace is not null, correlationId ?? "no meta event");
+        if (trace is null)
+            return new CaseReport(
+                evalCase.Id,
+                evalCase.Category,
+                "NoTrace",
+                tools,
+                null,
+                null,
+                0,
+                checks
+            );
         Check(
             "trace",
             "outcome",
@@ -669,11 +735,6 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                     .ToListAsync()
             )
         ));
-
-    private Task<AssistantTurn> TraceAsync(string correlationId) =>
-        DbAsync(db =>
-            db.AssistantTurns.AsNoTracking().SingleAsync(t => t.CorrelationId == correlationId)
-        );
 
     // ---- stream ----
 

@@ -18,7 +18,7 @@
           "750 pkt"
         ],
         "answerPatterns": [
-          "750"
+          "\\b750\\b"
         ]
       }
     },
@@ -54,6 +54,9 @@
         "end": "done",
         "answerContains": [
           "0 pkt"
+        ],
+        "answerPatterns": [
+          "\\b0\\s*(pkt|punkt)"
         ]
       }
     },
@@ -269,6 +272,9 @@
         "answerContains": [
           "Regulamin, §3.2",
           "regulamin-v1"
+        ],
+        "answerPatterns": [
+          "§\\s?3\\.2"
         ]
       }
     },
@@ -291,6 +297,9 @@
         ],
         "mustNotContain": [
           "{ownCode}"
+        ],
+        "answerPatterns": [
+          "§\\s?5\\.2"
         ]
       }
     },
@@ -305,6 +314,9 @@
         "end": "done",
         "answerContains": [
           "Regulamin, §3.6"
+        ],
+        "answerPatterns": [
+          "§\\s?3\\.6"
         ]
       }
     },
@@ -341,7 +353,7 @@
           "Regulamin programu tego nie opisuje"
         ],
         "answerPatterns": [
-          "nie\\s+(opisuje|zawiera|ma|podaje|mówi|określa)"
+          "\\bnie\\s+(opisuje|zawiera|podaje|mówi|określa|reguluje)\\b"
         ]
       }
     },

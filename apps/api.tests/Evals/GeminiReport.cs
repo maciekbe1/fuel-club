@@ -77,12 +77,13 @@ public static class GeminiReport
         List<string> skipped,
         string? stoppedBy,
         Budget budget,
+        int unknownTokens,
         int fullRunCases
     )
     {
         var directory = Path.Combine(RepositoryRoot(), "apps", "api.tests", "Evals", "reports");
         Directory.CreateDirectory(directory);
-        var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+        var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
         var path = Path.Combine(directory, $"gemini-{mode}-{stamp}.md");
 
         var input = runs.Sum(r => r.InputTokens ?? 0);
@@ -120,7 +121,12 @@ public static class GeminiReport
                     stoppedBy,
                     budget = new { tokens = budget.Tokens, maxUsd = budget.MaxUsd },
                     skipped,
-                    tokens = new { input, output },
+                    tokens = new
+                    {
+                        input,
+                        output,
+                        casesWithUnknownTokens = unknownTokens,
+                    },
                     costUsd = Cost(input, output),
                     prices = new { input = InputPrice, output = OutputPrice },
                     summary,
@@ -147,13 +153,13 @@ public static class GeminiReport
             $"- limity przebiegu: {budget.Tokens} tokenów, {budget.MaxUsd.ToString(CultureInfo.InvariantCulture)} USD"
         );
         md.AppendLine(
-            $"- tokeny: wejście {input}, wyjście {output} (na przypadek średnio {perCaseIn} / {perCaseOut})"
+            $"- tokeny: wejście {input}, wyjście {output} (na przypadek średnio {perCaseIn} / {perCaseOut}){(unknownTokens > 0 ? $"; bez danych o tokenach (tura z błędem): {unknownTokens} - koszt może być wyższy" : "")}"
         );
         md.AppendLine(
             $"- koszt: ~{Cost(input, output)} USD (ceny we/wy za 1M tokenów: {InputPrice.ToString(CultureInfo.InvariantCulture)} / {OutputPrice.ToString(CultureInfo.InvariantCulture)} USD)"
         );
         md.AppendLine(
-            $"- szacunek pełnego przebiegu ({fullRunCases} przypadków = przypadki bez modelu skryptowego × 3): wejście ~{perCaseIn * fullRunCases}, wyjście ~{perCaseOut * fullRunCases}, koszt ~{Cost((long)perCaseIn * fullRunCases, (long)perCaseOut * fullRunCases)} USD"
+            $"- szacunek pełnego przebiegu ({fullRunCases} przypadków = przypadki bez modelu skryptowego × powtórzenia): wejście ~{perCaseIn * fullRunCases}, wyjście ~{perCaseOut * fullRunCases}, koszt ~{Cost((long)perCaseIn * fullRunCases, (long)perCaseOut * fullRunCases)} USD"
         );
         md.AppendLine();
         md.AppendLine("| Rodzaj | Zaliczone |");

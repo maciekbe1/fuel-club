@@ -34,7 +34,7 @@ Evale `assistant-evals-v2` na modelu demo są deterministyczne i blokują CI. Na
 - Po poprawce (`gemini-v6`, te same przypadki): 5/5.
 
 :::caution[Planowane]
-Pełny przebieg (wszystkie przypadki × 3, szacunkowo 0,05 USD) jako punkt odniesienia.
+Pełny przebieg (19 przypadków bez modelu skryptowego × 3 = 57, szacunkowo 0,07 USD) jako punkt odniesienia.
 :::
 
 ## Vertex AI

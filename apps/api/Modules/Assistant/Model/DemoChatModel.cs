@@ -379,7 +379,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     // Wording of questions about how the program works, not about the user's own data.
     [GeneratedRegex(
-        @"regulamin|zasad|wygasa|termin|waznos|zwrot|anulow|cofn|limit|maksymal|najwiecej|jednorazow|dwoch\s+kupon|licza?\s+sie|liczon|czy\s+(dostane|dostaje)\s+punkt|jak\s+(dziala|odebrac)|do\s+czego\s+sluzy"
+        @"regulamin|zasad|wygasa|termin|waznos|zwrot|anulow|cofn|limit|maksymal|najwiecej|jednorazow|dwoch\s+kupon|licza?\s+sie|liczon|czy\s+(dostane|dostaje)\s+punkt|jak\s+(dziala|odebrac)|do\s+czego\s+sluz\w*\s+(karta|kod|program|punkt)"
     )]
     private static partial Regex RulesQuestion();
 
