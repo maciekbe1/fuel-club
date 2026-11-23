@@ -1,21 +1,10 @@
+export {
+  numberFormat as plain,
+  moneyFormat as money,
+  litersFormat as liters,
+  dateTimeFormat as dateTime,
+} from "@/lib/format";
 export const points = new Intl.NumberFormat("pl-PL", { signDisplay: "always" });
-
-export const plain = new Intl.NumberFormat("pl-PL");
-
-export const money = new Intl.NumberFormat("pl-PL", {
-  style: "currency",
-  currency: "PLN",
-});
-
-export const liters = new Intl.NumberFormat("pl-PL", {
-  maximumFractionDigits: 3,
-});
-
-export const dateTime = new Intl.DateTimeFormat("pl-PL", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Europe/Warsaw",
-});
 
 export const saleDate = new Intl.DateTimeFormat("pl-PL", {
   dateStyle: "medium",

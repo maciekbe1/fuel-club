@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ReviewItem } from "../services";
 import { REASONS, dateTime, ms } from "./labels";
@@ -26,12 +27,12 @@ export function QueueItem({
         </span>
         <span className="flex flex-wrap gap-1">
           {item.reasons.map((reason) => (
-            <span
+            <Badge
               key={reason}
-              className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-950 dark:bg-amber-900 dark:text-amber-50"
+              className="bg-amber-100 font-normal text-amber-950 dark:bg-amber-900 dark:text-amber-50"
             >
               {REASONS[reason] ?? reason}
-            </span>
+            </Badge>
           ))}
         </span>
       </div>

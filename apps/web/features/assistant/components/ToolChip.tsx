@@ -1,4 +1,5 @@
 import { Check, Wrench } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ToolCall } from "../hooks";
 
@@ -22,14 +23,17 @@ export function ToolChip({ tool }: { tool: ToolCall }) {
   const label = TOOL_LABELS[tool.name] ?? "Nieznane narzędzie";
   const ok = tool.status === "ok";
   return (
-    <li
-      className={cn(
-        "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs",
-        !ok && "border-amber-500/50 text-amber-900 dark:text-amber-100",
-      )}
-    >
-      {ok ? <Check className="size-3" /> : <Wrench className="size-3" />}
-      {label}: {TOOL_STATUS[tool.status] ?? tool.status}
+    <li>
+      <Badge
+        variant="outline"
+        className={cn(
+          "font-normal",
+          !ok && "border-amber-500/50 text-amber-900 dark:text-amber-100",
+        )}
+      >
+        {ok ? <Check /> : <Wrench />}
+        {label}: {TOOL_STATUS[tool.status] ?? tool.status}
+      </Badge>
     </li>
   );
 }

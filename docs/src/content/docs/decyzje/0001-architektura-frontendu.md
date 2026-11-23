@@ -95,7 +95,7 @@ hooks/                  tylko generyczne, wielofeature'owe (np. useMediaQuery)
 lib/
   api/                  client, csrf, problem, schema.d.ts (generowany)
   server/               kod tylko dla RSC (import "server-only")
-  idempotency.ts, sse.ts, query-keys.ts, utils.ts
+  idempotency.ts, format.ts (wspólne formatery pl-PL), query-keys.ts, utils.ts
 proxy.ts
 ```
 

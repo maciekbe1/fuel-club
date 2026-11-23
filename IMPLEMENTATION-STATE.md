@@ -419,6 +419,9 @@ Refaktor 2 - wspólne elementy: `components/query/QueryError.tsx` (shadcn `alert
 
 Refaktor 3 - czat na AI Elements ([ADR 0015](docs)): `conversation`, `message` (odpowiedź jako markdown przez `streamdown`), `suggestion` w `/czat` i w rozmowie z konsultantem zamiast ręcznych dymków, przewijania i podpowiedzi; `prompt-input` odrzucony (1414 linii za ~70); okno czatu o stałej wysokości (telefon 45dvh); zrzuty telefon/desktop sprawdzone; E2E 148/148.
 
+Refaktor 4 - martwy kod i shadcn: usunięty nieużywany `lib/sse.ts`; formatery (kwota, liczba, litry, godzina, data z godziną) wspólne w `lib/format.ts` zamiast kopii w 9 plikach (zostają tylko specyficzne: procenty i sekundy w obserwowalności, znak punktów i data sprzedaży UTC w historii); shadcn `badge` (statusy kuponów i ofert, narzędzia czatu, powody przeglądu), `toggle-group` (okno czasu), `radio-group` + `checkbox` + `textarea` w formularzu oferty (przez `Controller`; E2E przez `getByRole`, bo Base UI dodaje ukryte pole z tą samą etykietą); E2E 148/148.
+- zostaje z audytu (osobno, za zgodą): skaner QR na `barcode-detector`, API: walidacja ustawień przez DataAnnotations, `Http.Resilience` dla Gemini, wbudowany health check.
+
 ## Następny krok
 
 Otwarte:

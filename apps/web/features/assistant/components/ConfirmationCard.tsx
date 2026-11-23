@@ -6,16 +6,11 @@ import { useState } from "react";
 import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, NetworkError } from "@/lib/api/problem";
-import { benefitTerms, isProduct } from "@/lib/format";
+import { benefitTerms, isProduct, timeFormat as time } from "@/lib/format";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { HANDOFF_ACTIVE, useConfirmActivation } from "../hooks";
 import type { Turn } from "../hooks";
 import type { ChatConfirmation } from "../services";
-
-const time = new Intl.DateTimeFormat("pl-PL", {
-  timeStyle: "short",
-  timeZone: "Europe/Warsaw",
-});
 
 function confirmationError(error: Error) {
   if (error instanceof NetworkError)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Queue } from "./Queue";
 import { Summary } from "./Summary";
 
@@ -16,20 +16,20 @@ export function ObservabilityDashboard() {
   const [hours, setHours] = useState<number>(24);
   return (
     <div className="flex flex-col gap-8">
-      <div role="group" aria-label="Okno czasu" className="flex gap-2">
+      <ToggleGroup
+        aria-label="Okno czasu"
+        variant="outline"
+        size="sm"
+        value={[String(hours)]}
+        // A window is always chosen: clicking the active one keeps it.
+        onValueChange={(value) => value[0] && setHours(Number(value[0]))}
+      >
         {WINDOWS.map((window) => (
-          <Button
-            key={window.hours}
-            type="button"
-            size="sm"
-            variant={hours === window.hours ? "default" : "outline"}
-            aria-pressed={hours === window.hours}
-            onClick={() => setHours(window.hours)}
-          >
+          <ToggleGroupItem key={window.hours} value={String(window.hours)}>
             {window.label}
-          </Button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
       <Summary hours={hours} />
       <Queue />
     </div>

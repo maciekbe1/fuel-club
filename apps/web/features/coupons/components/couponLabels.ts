@@ -1,12 +1,7 @@
+export { dateTimeFormat as dateTime } from "@/lib/format";
 import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { ApiError, NetworkError } from "@/lib/api/problem";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
-
-export const dateTime = new Intl.DateTimeFormat("pl-PL", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Europe/Warsaw",
-});
 
 export const STATUS: Record<string, { label: string; className: string }> = {
   Purchased: {

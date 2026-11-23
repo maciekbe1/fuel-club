@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiError, NetworkError } from "@/lib/api/problem";
+import { shortDateTimeFormat as clock } from "@/lib/format";
 import { keepsIdempotencyKey, keepsPendingOperation } from "@/lib/idempotency";
 import {
   isCertainRefusal,
@@ -22,12 +23,6 @@ export function busyMessage(error: unknown) {
     return "Trwa inna operacja tego klienta. Nagroda nie została wydana - spróbuj za chwilę.";
   return null;
 }
-
-export const clock = new Intl.DateTimeFormat("pl-PL", {
-  dateStyle: "short",
-  timeStyle: "short",
-  timeZone: "Europe/Warsaw",
-});
 
 /**
  * The current state of a handed-over product reward: when and where (station and till) the server

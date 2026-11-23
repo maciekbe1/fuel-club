@@ -1,12 +1,7 @@
 import { Inbox } from "lucide-react";
 import type { ReactNode } from "react";
+import { shortDateTimeFormat as time } from "@/lib/format";
 import type { SupportQueueItem } from "../services";
-
-const time = new Intl.DateTimeFormat("pl-PL", {
-  dateStyle: "short",
-  timeStyle: "short",
-  timeZone: "Europe/Warsaw",
-});
 
 export function AgentCaseList({
   title,

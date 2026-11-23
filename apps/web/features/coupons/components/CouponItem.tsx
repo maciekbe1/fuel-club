@@ -1,6 +1,7 @@
 import { CheckCircle2, Ticket } from "lucide-react";
 import { CodeQr } from "@/components/code/CodeQr";
 import { CopyButton } from "@/components/code/CopyButton";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { benefitTerms, formatPoints, isProduct } from "@/lib/format";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
@@ -71,15 +72,13 @@ export function CouponItem({
               ` · wykorzystany ${dateTime.format(new Date(coupon.redeemedAt))}`}
           </p>
         </div>
-        <span
+        <Badge
           data-testid="coupon-status"
-          className={cn(
-            "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium",
-            status.className,
-          )}
+          variant="secondary"
+          className={status.className}
         >
           {status.label}
-        </span>
+        </Badge>
       </div>
 
       {coupon.status === "Purchased" && (

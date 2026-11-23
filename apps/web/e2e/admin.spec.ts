@@ -99,7 +99,7 @@ test("admin creates an offer, customers see it, deactivating hides it", async ({
 
   await row.getByRole("link", { name: `Edytuj ofertę ${name}` }).click();
   await admin.page
-    .getByLabel("Aktywna (widoczna w katalogu klientów)")
+    .getByRole("checkbox", { name: "Aktywna (widoczna w katalogu klientów)" })
     // Next keeps the previously visited "Nowa oferta" screen hidden in the DOM.
     .filter({ visible: true })
     .uncheck();
@@ -338,7 +338,7 @@ test("admin creates a product reward: no per-liter fields, kind fixed on edit", 
   await admin.page.goto("/admin/oferty/nowa");
   await admin.page.getByLabel("Nazwa").fill(name);
   await admin.page.getByLabel("Koszt (pkt)").fill("150");
-  await admin.page.getByLabel("Nagroda (produkt)").check();
+  await admin.page.getByRole("radio", { name: "Nagroda (produkt)" }).check();
   await expect(admin.page.getByLabel("Rabat (zł/l)")).toHaveCount(0);
   await expect(admin.page.getByLabel("Limit litrów")).toHaveCount(0);
   await admin.page.getByRole("button", { name: "Utwórz ofertę" }).click();
@@ -352,7 +352,9 @@ test("admin creates a product reward: no per-liter fields, kind fixed on edit", 
   ).toContainText("Nagroda (produkt)");
   // The create screen stays hidden in the DOM (Next keeps visited screens): only visible ones count.
   await expect(
-    admin.page.getByLabel("Nagroda (produkt)").filter({ visible: true }),
+    admin.page
+      .getByRole("radio", { name: "Nagroda (produkt)" })
+      .filter({ visible: true }),
   ).toHaveCount(0);
   await admin.page
     .getByLabel("Koszt (pkt)")

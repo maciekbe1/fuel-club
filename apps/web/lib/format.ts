@@ -1,9 +1,33 @@
-const money = new Intl.NumberFormat("pl-PL", {
+// Shared Polish formatters; times in the station's zone (Europe/Warsaw).
+export const moneyFormat = new Intl.NumberFormat("pl-PL", {
   style: "currency",
   currency: "PLN",
 });
-const liters = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
-const points = new Intl.NumberFormat("pl-PL");
+export const numberFormat = new Intl.NumberFormat("pl-PL");
+export const litersFormat = new Intl.NumberFormat("pl-PL", {
+  maximumFractionDigits: 3,
+});
+/** "14:05" */
+export const timeFormat = new Intl.DateTimeFormat("pl-PL", {
+  timeStyle: "short",
+  timeZone: "Europe/Warsaw",
+});
+/** "23.11.2026, 14:05" */
+export const shortDateTimeFormat = new Intl.DateTimeFormat("pl-PL", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: "Europe/Warsaw",
+});
+/** "23 lis 2026, 14:05" */
+export const dateTimeFormat = new Intl.DateTimeFormat("pl-PL", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Europe/Warsaw",
+});
+
+const money = moneyFormat;
+const liters = litersFormat;
+const points = numberFormat;
 
 export const formatPoints = (value: number) => `${points.format(value)} pkt`;
 

@@ -3,10 +3,9 @@
 import { LoginAgainLink } from "@/components/auth/LoginAgainLink";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ApiError, readErrorMessage } from "@/lib/api/problem";
+import { numberFormat as points } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useWallet } from "../hooks";
-
-const points = new Intl.NumberFormat("pl-PL");
 
 export function formatPoints(value: number) {
   return `${points.format(value)} pkt`;

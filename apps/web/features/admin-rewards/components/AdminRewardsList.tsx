@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { QueryError } from "@/components/query/QueryError";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPoints, benefitTerms } from "@/lib/format";
@@ -58,17 +59,16 @@ export function AdminRewardsList() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span
+                <Badge
                   data-testid="admin-offer-status"
+                  variant="secondary"
                   className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium",
-                    offer.isActive
-                      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100"
-                      : "bg-muted text-foreground",
+                    offer.isActive &&
+                      "bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100",
                   )}
                 >
                   {offer.isActive ? "Aktywna" : "Wyłączona"}
-                </span>
+                </Badge>
                 <Link
                   href={`/admin/oferty/${offer.id}`}
                   aria-label={`Edytuj ofertę ${offer.name}`}

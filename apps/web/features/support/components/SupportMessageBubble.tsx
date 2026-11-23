@@ -1,11 +1,7 @@
 import { Message, MessageContent } from "@/components/ai-elements/message";
+import { timeFormat as time } from "@/lib/format";
 import type { SupportMessage, SupportSide } from "../services";
 import { SYSTEM_TEXT } from "../texts";
-
-const time = new Intl.DateTimeFormat("pl-PL", {
-  timeStyle: "short",
-  timeZone: "Europe/Warsaw",
-});
 
 /** People's messages stay plain text (no markdown); system events in this side's words. */
 export function SupportMessageBubble({

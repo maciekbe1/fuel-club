@@ -6,7 +6,12 @@ import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, NetworkError } from "@/lib/api/problem";
-import { benefitTerms, isProduct } from "@/lib/format";
+import {
+  benefitTerms,
+  isProduct,
+  moneyFormat as money,
+  numberFormat as plain,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   useCashierStation,
@@ -22,13 +27,6 @@ import {
 import { QrScanner } from "./QrScanner";
 import type { PurchaseFlow } from "./usePurchaseFlow";
 import { RewardHandover, handedOverMessage } from "./RewardHandover";
-
-const money = new Intl.NumberFormat("pl-PL", {
-  style: "currency",
-  currency: "PLN",
-});
-
-const plain = new Intl.NumberFormat("pl-PL");
 
 function previewError(error: unknown) {
   if (error instanceof ApiError && error.status === 429)

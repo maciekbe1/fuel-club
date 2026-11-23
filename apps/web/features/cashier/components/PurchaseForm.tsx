@@ -5,18 +5,13 @@ import { FormAlert } from "@/components/form/FormAlert";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { moneyFormat as money, numberFormat as plain } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { looksLikeCardCode, warsawToday } from "../schemas";
 import { CouponSection } from "./CouponSection";
 import { QrScanner } from "./QrScanner";
 import { UnknownOutcome } from "./UnknownOutcome";
 import type { PurchaseFlow } from "./usePurchaseFlow";
-
-const plain = new Intl.NumberFormat("pl-PL");
-const money = new Intl.NumberFormat("pl-PL", {
-  style: "currency",
-  currency: "PLN",
-});
 
 export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
   const {

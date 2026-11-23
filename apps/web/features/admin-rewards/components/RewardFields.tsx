@@ -1,9 +1,12 @@
 "use client";
 
-import type { UseFormReturn } from "react-hook-form";
+import { Controller, type UseFormReturn } from "react-hook-form";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import type { RewardValues } from "../schemas";
 
 /**
@@ -36,22 +39,29 @@ export function RewardFields({
       ) : (
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 text-sm font-medium">Rodzaj</legend>
-          {(
-            [
-              ["FuelDiscount", "Rabat na paliwo"],
-              ["Product", "Nagroda (produkt)"],
-            ] as const
-          ).map(([value, label]) => (
-            <label key={value} className="flex items-center gap-3 text-sm">
-              <input
-                type="radio"
-                value={value}
-                className="size-5 accent-[var(--color-brand-orange)]"
-                {...form.register("kind")}
-              />
-              {label}
-            </label>
-          ))}
+          <Controller
+            control={form.control}
+            name="kind"
+            render={({ field }) => (
+              <RadioGroup
+                value={field.value}
+                onValueChange={field.onChange}
+                className="gap-3"
+              >
+                {(
+                  [
+                    ["FuelDiscount", "Rabat na paliwo"],
+                    ["Product", "Nagroda (produkt)"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Label key={value} className="gap-3 font-normal">
+                    <RadioGroupItem value={value} />
+                    {label}
+                  </Label>
+                ))}
+              </RadioGroup>
+            )}
+          />
           {errors.kind && (
             <p role="alert" className="text-sm text-destructive">
               {errors.kind.message}
@@ -72,11 +82,9 @@ export function RewardFields({
         label="Opis (opcjonalnie)"
         error={errors.description}
       >
-        <textarea
+        <Textarea
           rows={3}
-          className={cn(
-            "rounded-xl border bg-transparent px-4 py-3 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive",
-          )}
+          className="rounded-xl px-4 py-3"
           {...fieldA11y("description", errors.description)}
           {...form.register("description")}
         />
@@ -128,14 +136,16 @@ export function RewardFields({
           </>
         )}
       </div>
-      <label className="flex items-center gap-3 text-sm">
-        <input
-          type="checkbox"
-          className="size-5 accent-[var(--color-brand-orange)]"
-          {...form.register("isActive")}
-        />
-        Aktywna (widoczna w katalogu klientów)
-      </label>
+      <Controller
+        control={form.control}
+        name="isActive"
+        render={({ field }) => (
+          <Label className="gap-3 font-normal">
+            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+            Aktywna (widoczna w katalogu klientów)
+          </Label>
+        )}
+      />
     </>
   );
 }
