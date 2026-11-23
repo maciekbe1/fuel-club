@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::caution[W trakcie - P11]
-Zrealizowane (API): rola `Support`, model, wszystkie endpointy klienta i konsultanta, blokada czatu (także tura trwająca w chwili przekazania i wyścig z aktywacją), worker (wygaśnięcie, bezczynność, retencja), `BootstrapSupport` i konto demo. Zrealizowane także `propose_handoff` (zdarzenie `handoff`). Planowane: hub SignalR ([ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)), interfejs klienta i konsultanta, E2E. Decyzja: [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/).
+Zrealizowane (API): rola `Support`, model, wszystkie endpointy klienta i konsultanta, blokada czatu (także tura trwająca w chwili przekazania i wyścig z aktywacją), worker (wygaśnięcie, bezczynność, retencja), `BootstrapSupport` i konto demo. Zrealizowane także `propose_handoff` (zdarzenie `handoff`). Zrealizowany hub SignalR ([ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)). Planowane: interfejs klienta i konsultanta, E2E. Decyzja: [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/).
 :::
 
 ## Co robi
@@ -25,6 +25,7 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
 | Klient: utworzenie, stan, wiadomości, zamknięcie | `Customer/CreateCaseEndpoint.cs`, `Customer/CustomerCaseEndpoints.cs`, `Customer/CloseCaseEndpoint.cs` |
 | Konsultant: przejęcie; kolejka, wiadomości, oddanie, zamknięcie | `Agent/ClaimCaseEndpoint.cs`, `Agent/AgentCaseEndpoints.cs` |
 | Blokada czatu i potwierdzeń; zatrzymanie trwającej tury | `apps/api/Modules/Assistant/Chat/ChatEndpoints.cs`, `Chat/ChatService.cs` |
+| Hub SignalR, powiadomienia, kontrola originu, schemat zdarzeń | `SupportHub.cs` |
 | Konto konsultanta (`BootstrapSupport`), konto demo | `Modules/Accounts/Infrastructure/SupportAccountProvisioner.cs`, `Infrastructure/DemoData/DemoAccountsSeeder.cs` |
 
 ## Przepływ
@@ -49,6 +50,16 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
    - `Assigned`, gdy **konsultant** nic nie zrobił przez `AssignedIdleTimeout` (24 h; liczy się `AgentActivityAt` - przejęcie i wiadomości konsultanta, nie klienta) → `Waiting` bez opiekuna, `idle_returned`; potem obowiązuje wygaśnięcie. Wiadomości klienta nie zatrzymają zgłoszenia przy nieobecnym konsultancie;
    - `Closed`/`Expired` starsze niż `Retention` (30 dni od `ClosedAt`) → usunięte z wiadomościami.
    W logu tylko liczby.
+
+## Hub SignalR
+
+`/api/support/hub` ([ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)) - powiadomienia i status „pisze”, bez zapisu i bez treści wiadomości:
+
+- `SupportHubOriginGuard`: negocjacja (`POST .../negotiate`) i upgrade WebSocket wymagają originu z `Support:HubAllowedOrigins` (lokalnie `http://localhost:3000` i `:3100` w `appsettings.Development.json`; wpisy sprawdzane przy starcie: `scheme://host[:port]`, bez ścieżki i ukośnika). Kolejne żądania transportów SSE i long polling przeglądarka wysyła bez originu - wystarcza im token połączenia z chronionej negocjacji; obcy origin jest odrzucany zawsze (`403 support.origin_not_allowed`). Pusta lista = hub niedostępny.
+- Połączenie kończy się z wygaśnięciem ciasteczka sesji (`CloseOnAuthenticationExpiration`). Ograniczenie: wylogowanie w innej karcie nie zamyka już otwartego połączenia do czasu wygaśnięcia - zdarzenia niosą tylko identyfikatory i numery, bez treści.
+- Role `User` i `Support`; anonimowy `401`, `Cashier`/`Admin` `403`.
+- `messageAdded { caseId, seq }`, `caseChanged { caseId, status }` - do właściciela i aktualnego opiekuna; odbiorcy **i stan** czytane z bazy w chwili wysyłki (`Clients.User`), więc spóźnione zdarzenie nie niesie nieaktualnego stanu. Przy oddaniu i powrocie do kolejki raz także do byłego opiekuna, potem już nigdy. `queueChanged {}` - do grupy konsultantów; przebieg workera wysyła je raz. Odpowiedź z błędem (zmiana wycofana) nie wysyła niczego.
+- `Typing(caseId)`: przekazane drugiej stronie tylko, gdy wołający jest właścicielem albo opiekunem zgłoszenia `Assigned` (sprawdzane w bazie przy każdym wywołaniu); najwyżej 1/s na połączenie i zgłoszenie, liczone tylko dla przekazanych sygnałów; bez zapisu i logów.
 
 ## Konto konsultanta
 
@@ -105,4 +116,6 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
 | `apps/api.tests/SupportHandoffTurnTests.cs` | **tura wstrzymana w modelu, w tym czasie zgłoszenie: spóźniona odpowiedź nie wychodzi (`meta`, `error handoff_active`); spóźniona propozycja aktywacji - bez `tool` i `confirmation`, kupon nieaktywny**; ślad tury zatrzymanej przekazaniem ma wynik `Cancelled`, nie `Error` (kolejka przeglądu i reguła powtarzających się błędów go nie liczą); bez zgłoszenia tura odpowiada normalnie; **„chcę porozmawiać z konsultantem” (model demo) → `tool propose_handoff ok`, `handoff`, odpowiedź z nazwą przycisku, żadnego zgłoszenia**; `propose_handoff` z argumentami → odrzucone, bez `handoff` |
 | `apps/api.tests/SupportHousekeepingTests.cs` | przejęte: 23 h bez zmian, 25 h → kolejka, `idle_returned`, były opiekun `403`; czekające: 6 dni bez zmian, 8 dni → `Expired`, `expired`, czat wolny, wiadomość `409`, nowe zgłoszenie; retencja: po 29 dniach zamknięte i wygasłe zostają, po 31 usunięte z wiadomościami; **wiadomość klienta nie zatrzymuje zgłoszenia przy konsultancie nieaktywnym 25 h, wiadomość konsultanta tak** |
 
-Mutacje sprawdzone: bez blokady klienta w potwierdzeniu - 2 testy wyścigu padają; przejęcie bez warunku `Waiting` - 2 testy przejęcia; tura bez ponownego sprawdzenia - 2 testy tury; bezczynność liczona od dowolnej aktywności - test wiadomości klienta; zapis konsultanta bez warunku opiekuna - 3 testy rozmowy.
+| `apps/api.tests/SupportHubTests.cs` | klient SignalR (long polling przez `TestServer`, ciasteczko sesji): kolejka → `queueChanged`, przejęcie → `caseChanged Assigned` u klienta, wiadomość → `messageAdded` z `seq` bez treści u obu stron, „pisze” w obie strony z autorem; **po oddaniu: były opiekun (który pisał w zgłoszeniu) dostaje jedno `caseChanged Waiting`, potem ani `messageAdded`, ani `typing`, a jego `Typing` nie dociera do klienta**; obcy klient i obcy konsultant - ich `Typing` nie dociera, nie dostają zdarzeń zgłoszenia; dwa sygnały w sekundę → jeden, ale konsultant przełączający się między dwoma zgłoszeniami - oba dochodzą; **long polling jak przeglądarka: origin tylko przy negocjacji, potem bez - działa**; obcy origin i brak originu przy negocjacji `403`, anonimowy `401`, `Cashier`/`Admin` `403`; walidacja `HubAllowedOrigins` (ukośnik, ścieżka, brak schematu, `ftp`) |
+
+Mutacje sprawdzone: bez blokady klienta w potwierdzeniu - 2 testy wyścigu padają; przejęcie bez warunku `Waiting` - 2 testy przejęcia; tura bez ponownego sprawdzenia - 2 testy tury; bezczynność liczona od dowolnej aktywności - test wiadomości klienta; zapis konsultanta bez warunku opiekuna - 3 testy rozmowy; `Typing` konsultanta bez sprawdzenia opiekuna - 2 testy huba; odbiorcy `messageAdded` z autorów wiadomości zamiast stanu - test oddania; origin wymagany na każdym żądaniu - test long pollingu; ograniczenie „pisze” na połączenie zamiast na zgłoszenie - test przełączania.

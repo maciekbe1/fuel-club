@@ -161,7 +161,10 @@ public static class AgentCaseEndpoints
             cancellationToken
         );
         if (seq is { } stored)
+        {
+            SupportNotifier.AfterResponse(http, notifier => notifier.MessageAddedAsync(id, stored));
             return TypedResults.Created((string?)null, new SupportMessageCreated(stored));
+        }
         return Refusal(await StateAsync(db, id, cancellationToken));
     }
 
@@ -191,6 +194,11 @@ public static class AgentCaseEndpoints
             cancellationToken
         );
         await transaction.CommitAsync(cancellationToken);
+        // The releasing agent is no longer a party: told explicitly, then never again.
+        SupportNotifier.AfterResponse(
+            http,
+            notifier => notifier.CaseChangedAsync(id, formerAssignee: agentId)
+        );
         return await ViewAsync(db, id, agentId, cancellationToken);
     }
 
@@ -220,6 +228,7 @@ public static class AgentCaseEndpoints
                 cancellationToken
             );
             await transaction.CommitAsync(cancellationToken);
+            SupportNotifier.AfterResponse(http, notifier => notifier.CaseChangedAsync(id));
             return await ViewAsync(db, id, agentId, cancellationToken);
         }
 

@@ -54,6 +54,7 @@ public static class ClaimCaseEndpoint
                 cancellationToken
             );
             await transaction.CommitAsync(cancellationToken);
+            SupportNotifier.AfterResponse(http, notifier => notifier.CaseChangedAsync(id));
         }
 
         var current = await Rows(db, db.SupportCases.Where(c => c.Id == id))

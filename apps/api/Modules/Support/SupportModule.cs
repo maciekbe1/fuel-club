@@ -22,6 +22,8 @@ public static class SupportModule
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<SupportOptions>, SupportOptionsValidator>();
         services.AddScoped<SupportHousekeeping>();
+        services.AddSignalR();
+        services.AddSingleton<SupportNotifier>();
         services.AddHostedService<SupportWorker>();
         services.AddRateLimiter(options =>
             options.AddPolicy(
@@ -100,6 +102,11 @@ public static class SupportModule
             .WithTags("Support")
             .RequireAuthorization(policy => policy.RequireRole(RoleNames.Support))
             .RequireCsrf();
+        // The connection ends when the session cookie expires; it is not re-checked per message.
+        app.MapHub<SupportHub>(
+            SupportHub.Path,
+            options => options.CloseOnAuthenticationExpiration = true
+        );
         app.MapGroup("/api/support/agent/queue")
             .WithTags("Support")
             .RequireAuthorization(policy => policy.RequireRole(RoleNames.Support))

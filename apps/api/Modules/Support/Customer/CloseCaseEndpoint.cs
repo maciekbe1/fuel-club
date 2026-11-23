@@ -44,6 +44,7 @@ public static class CloseCaseEndpoint
                 cancellationToken
             );
             await transaction.CommitAsync(cancellationToken);
+            SupportNotifier.AfterResponse(http, notifier => notifier.CaseChangedAsync(id));
         }
 
         var current = await db

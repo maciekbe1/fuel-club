@@ -108,7 +108,10 @@ public static class CustomerCaseEndpoints
             cancellationToken
         );
         if (seq is { } stored)
+        {
+            SupportNotifier.AfterResponse(http, notifier => notifier.MessageAddedAsync(id, stored));
             return TypedResults.Created((string?)null, new SupportMessageCreated(stored));
+        }
 
         var status = await db
             .SupportCases.AsNoTracking()

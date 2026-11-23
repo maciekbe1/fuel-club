@@ -2566,6 +2566,25 @@ export interface components {
             role: null | string;
             text: null | string;
         };
+        SupportHubContract: {
+            messageAdded: {
+                /** Format: uuid */
+                caseId: string;
+                /** Format: int32 */
+                seq: number;
+            };
+            caseChanged: {
+                /** Format: uuid */
+                caseId: string;
+                status: string;
+            };
+            queueChanged: Record<string, never>;
+            typing: {
+                /** Format: uuid */
+                caseId: string;
+                author: string;
+            };
+        };
         SupportMessageCreated: {
             /** Format: int32 */
             seq: number;

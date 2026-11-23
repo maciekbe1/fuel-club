@@ -96,6 +96,12 @@ public sealed class SupportOptions
     /// <summary>A closed or expired case and its messages are deleted this long after closing.</summary>
     public TimeSpan Retention { get; set; } = TimeSpan.FromDays(30);
 
+    /// <summary>
+    /// Origins allowed to connect to the support hub (ADR 0014), e.g. https://app.example (validated
+    /// at startup). Empty: no browser can connect to the hub.
+    /// </summary>
+    public string[] HubAllowedOrigins { get; set; } = [];
+
     public bool WorkerEnabled { get; set; } = true;
     public TimeSpan WorkerInterval { get; set; } = TimeSpan.FromMinutes(1);
 
@@ -116,6 +122,16 @@ public sealed class SupportOptionsValidator : IValidateOptions<SupportOptions>
             errors.Add("Support:AssignedIdleTimeout must be positive.");
         if (o.Retention <= TimeSpan.Zero)
             errors.Add("Support:Retention must be positive.");
+        // Compared with the browser's Origin as is: scheme://host[:port], nothing more.
+        foreach (var origin in o.HubAllowedOrigins)
+            if (
+                !Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                || uri.Scheme is not ("http" or "https")
+                || origin != uri.GetLeftPart(UriPartial.Authority)
+            )
+                errors.Add(
+                    $"Support:HubAllowedOrigins entry '{origin}' must be scheme://host[:port] without a path or a trailing slash."
+                );
         if (o.WorkerInterval < TimeSpan.FromSeconds(1) || o.WorkerInterval > TimeSpan.FromHours(1))
             errors.Add("Support:WorkerInterval must be 1 s - 1 h.");
         if (o.CasePermitLimit < 1 || o.MessagePermitLimit < 1)

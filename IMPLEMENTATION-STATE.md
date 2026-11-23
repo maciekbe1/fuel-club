@@ -406,6 +406,9 @@ Krok 3 - `propose_handoff`: narzędzie bez argumentów, niczego nie zmienia, zda
 
 Transport rozmowy: właściciel zdecydował SignalR (status „pisze”, wiadomości od razu) - [ADR 0014](docs/src/content/docs/decyzje/0014-signalr-rozmowa-z-konsultantem.md), przed UI.
 
+Krok 4 - hub SignalR (ADR 0014): `/api/support/hub`, kontrola originu, odbiorcy z bazy w chwili wysyłki, `Typing` sprawdzany przy każdym wywołaniu (1/s), powiadomienia po zatwierdzeniu (endpointy `Response.OnCompleted`, worker po commicie), schemat `SupportHubContract` w OpenAPI; testy `SupportHubTests` 4 (klient SignalR w testach); mutacje: `Typing` bez sprawdzenia opiekuna - 2 testy, odbiorcy z autorów wiadomości - 1 test (po wzmocnieniu: były opiekun pisze przed oddaniem); API 533/533 (1 pominięty).
+- review (`/code-review high`, 8 uwag, przyjęte): origin wymagany tylko przy negocjacji i WebSocket (przeglądarka nie wysyła go przy GET transportów zapasowych - inaczej fallback SSE/long polling dostawał `403`); stan w `caseChanged` czytany przy wysyłce (spóźnione zdarzenie nie niesie starego stanu); brak powiadomień przy odpowiedzi z błędem; „pisze” ograniczane per zgłoszenie i tylko po przekazaniu; walidacja `HubAllowedOrigins`; jedno `queueChanged` na przebieg workera; `CloseOnAuthenticationExpiration` (wylogowanie w innej karcie - opisane ograniczenie); opis UI w docs bez trybu, którego jeszcze nie ma; mutacje: origin na każdym żądaniu, ograniczenie per połączenie - po 1 teście.
+
 ## Następny krok
 
 Otwarte:
@@ -414,4 +417,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: API i `propose_handoff` gotowe; dalej hub SignalR (ADR 0014), UI klienta i konsultanta, E2E.
+P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: API, `propose_handoff` i hub gotowe; dalej UI klienta i konsultanta, E2E.

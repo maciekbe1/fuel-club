@@ -5,7 +5,14 @@ using Microsoft.Extensions.Options;
 
 namespace FuelClub.Api.Modules.Support;
 
-public sealed record HousekeepingResult(int Returned, int Expired, int Purged);
+public sealed record HousekeepingResult(int Returned, int Expired, int Purged)
+{
+    /// <summary>For hub events after the commit: expired cases and returned ones with their former agent.</summary>
+    public IReadOnlyList<Guid> ExpiredIds { get; init; } = [];
+    public IReadOnlyList<ReturnedCase> ReturnedCases { get; init; } = [];
+}
+
+public sealed record ReturnedCase(Guid Id, string FormerAssignee);
 
 /// <summary>
 /// No case stays open forever (ADR 0012): an assigned case whose agent was idle (no claim or agent
@@ -41,16 +48,18 @@ public sealed class SupportHousekeeping(AppDbContext db, IOptions<SupportOptions
             );
 
         var idleBefore = now - o.AssignedIdleTimeout;
+        // The self-join keeps the agent being removed, for the notification.
         var returned = await db
-            .Database.SqlQuery<Guid>(
+            .Database.SqlQuery<ReturnedCase>(
                 $"""
-                UPDATE "SupportCases" SET "Status" = 'Waiting', "AssignedToUserId" = NULL
-                WHERE "Status" = 'Assigned' AND "AgentActivityAt" < {idleBefore}
-                RETURNING "Id" AS "Value"
+                UPDATE "SupportCases" AS c SET "Status" = 'Waiting', "AssignedToUserId" = NULL
+                FROM "SupportCases" AS old
+                WHERE old."Id" = c."Id" AND c."Status" = 'Assigned' AND c."AgentActivityAt" < {idleBefore}
+                RETURNING c."Id" AS "Id", old."AssignedToUserId" AS "FormerAssignee"
                 """
             )
             .ToListAsync(ct);
-        foreach (var id in returned)
+        foreach (var (id, _) in returned)
             await SupportCases.AppendAsync(
                 db,
                 id,
@@ -68,7 +77,11 @@ public sealed class SupportHousekeeping(AppDbContext db, IOptions<SupportOptions
             .ExecuteDeleteAsync(ct);
 
         await transaction.CommitAsync(ct);
-        return new HousekeepingResult(returned.Count, expired.Count, purged);
+        return new HousekeepingResult(returned.Count, expired.Count, purged)
+        {
+            ExpiredIds = expired,
+            ReturnedCases = returned,
+        };
     }
 }
 
@@ -76,6 +89,7 @@ public sealed class SupportHousekeeping(AppDbContext db, IOptions<SupportOptions
 public sealed class SupportWorker(
     IServiceScopeFactory scopes,
     IOptions<SupportOptions> options,
+    SupportNotifier notifier,
     TimeProvider clock,
     ILogger<SupportWorker> logger
 ) : BackgroundService
@@ -93,6 +107,7 @@ public sealed class SupportWorker(
                 var result = await scope
                     .ServiceProvider.GetRequiredService<SupportHousekeeping>()
                     .RunAsync(clock.GetUtcNow(), stop);
+                await notifier.NotifyAsync(result);
                 if (result.Returned + result.Expired + result.Purged > 0)
                     logger.LogInformation(
                         "Support housekeeping: {Returned} back in the queue, {Expired} expired, {Purged} deleted",

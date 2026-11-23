@@ -28,7 +28,11 @@ builder.Services.AddIdempotency(builder.Configuration);
 builder.Services.AddClientAddress(builder.Configuration);
 builder.Services.AddPersistentDataProtection(builder.Configuration, builder.Environment);
 builder.Services.AddApiRateLimiting(builder.Configuration);
-builder.Services.AddOpenApi(options => options.AddIdempotencyHeader());
+builder.Services.AddOpenApi(options =>
+{
+    options.AddIdempotencyHeader();
+    options.AddSupportHubContract();
+});
 builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
 builder.Services.AddRewards(builder.Configuration);
@@ -54,6 +58,7 @@ if (args is [DemoPasswordReset.Command])
 app.UseForwardedHeaders();
 app.UseSecurityEvents();
 app.UseHttpsRedirection();
+app.UseMiddleware<SupportHubOriginGuard>();
 app.UseAuthentication();
 app.UseAuthorization();
 

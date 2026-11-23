@@ -51,6 +51,7 @@ sidebar:
 | `Support:WaitingExpiry` / `AssignedIdleTimeout` / `Retention` | nie | `7.00:00:00` / `1.00:00:00` / `30.00:00:00`; zgłoszenie czekające bez aktywności wygasa; przejęte bez wiadomości wraca do kolejki; zamknięte i wygasłe są usuwane z wiadomościami ([Support](/moduly/support/)) |
 | `Support:CasePermitLimit` / `CaseWindow` | nie | `5` / `01:00:00`; zgłoszeń na klienta w oknie, potem `429` |
 | `Support:MessagePermitLimit` / `MessageWindow` | nie | `30` / `00:01:00`; wiadomości na użytkownika (klient i konsultant), potem `429` |
+| `Support:HubAllowedOrigins` | dla huba | originy, z których przeglądarka może połączyć się z hubem SignalR (np. `https://app.example`); lokalnie w `appsettings.Development.json` (`:3000`, `:3100`); każdy wpis `scheme://host[:port]` bez ścieżki i ukośnika (inaczej API nie startuje); pusto = hub niedostępny |
 | `Support:WorkerEnabled` / `WorkerInterval` | nie | `true` / `00:01:00` (1 s - 1 h); testy wyłączają worker i wywołują porządki same |
 | `Telemetry:OtlpEndpoint` | nie | adres OTLP/HTTP (np. `http://localhost:6006/v1/traces` dla Phoenix); pusty = bez eksportu OpenTelemetry. Nagłówki eksportera tylko z `OTEL_EXPORTER_OTLP_HEADERS` |
 | `ASPNETCORE_ENVIRONMENT` | nie | `Development` włącza OpenAPI i `/health/db` |

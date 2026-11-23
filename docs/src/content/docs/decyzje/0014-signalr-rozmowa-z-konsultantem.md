@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-23), P11. Zmienia transport z [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/) (polling co 3 s). Nie zrealizowana - kontrakt przed implementacją UI.
+Decyzja przyjęta (2026-11-23), P11. Zmienia transport z [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/) (polling co 3 s). Hub zrealizowany ([Support](/moduly/support/#hub-signalr)); UI planowane.
 
 ## Problem
 
@@ -26,8 +26,8 @@ Czat z AI zostaje na SSE ([ADR 0007](/decyzje/0007-czat-i-potwierdzenia/)) - to 
 ### Hub
 
 - ASP.NET Core SignalR (część frameworka, bez nowego pakietu po stronie API). Ścieżka `/api/support/hub` - pod istniejącym przepisaniem `/api/*` w Next (proxy Nexta przekazuje upgrade WebSocket).
-- Wymaga zalogowania z rolą `User` albo `Support`. Uwierzytelnienie ciasteczkiem sesji, jak reszta API.
-- **Origin**: hub przyjmuje połączenie (negocjacja i upgrade) tylko z dozwolonego originu aplikacji - przeglądarka nie wyśle nagłówka CSRF w WebSocket, a sprawdzenie originu chroni przed przejęciem gniazda z obcej strony. Dozwolone originy z konfiguracji (`Support:HubAllowedOrigins`); lokalnie origin Nexta.
+- Wymaga zalogowania z rolą `User` albo `Support`. Uwierzytelnienie ciasteczkiem sesji, jak reszta API. Konsultanci są w grupie `support-agents` (tylko `queueChanged`, bez danych zgłoszeń).
+- **Origin**: hub przyjmuje połączenie (negocjacja i upgrade WebSocket; dalsze żądania SSE/long polling przeglądarka wysyła bez originu i chroni je token połączenia z negocjacji) tylko z dozwolonego originu aplikacji - przeglądarka nie wyśle nagłówka CSRF w WebSocket, a sprawdzenie originu chroni przed przejęciem gniazda z obcej strony. Dozwolone originy z konfiguracji (`Support:HubAllowedOrigins`); lokalnie origin Nexta.
 - Transporty: WebSocket, przy braku - automatyczny fallback SignalR (SSE, long polling).
 - Jedna instancja API; kilka instancji wymagałoby backplane (Redis) - poza zakresem demo.
 
@@ -42,7 +42,7 @@ Bez treści wiadomości - tylko powiadomienia. Odbiorcy wyliczani **w chwili wys
 | `queueChanged` | wszyscy połączeni konsultanci | `{}` - konsultant odświeża kolejkę |
 | `typing` | druga strona: opiekun albo właściciel | `{ caseId, author }`, `author` = `Customer` / `Support` |
 
-Zdarzenia wysyła serwer po zatwierdzeniu transakcji (endpointy i worker).
+Zdarzenia wysyła serwer po zatwierdzeniu transakcji: endpointy przez `Response.OnCompleted` (filtr idempotencji zatwierdza przed zapisem odpowiedzi), worker po swoim `Commit`. Wysyłka jest „best effort” - nieudana idzie do logu (sam typ błędu), klient nadrabia kursorem. Payloady w OpenAPI jako schemat `SupportHubContract`.
 
 ### Status „pisze”
 

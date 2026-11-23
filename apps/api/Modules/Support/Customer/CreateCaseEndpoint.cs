@@ -88,6 +88,7 @@ public static class CreateCaseEndpoint
             .ToList();
         await SupportCases.AppendAsync(db, supportCase.Id, messages, cancellationToken);
 
+        SupportNotifier.AfterResponse(http, notifier => notifier.QueueChangedAsync());
         var created = await db
             .SupportCases.AsNoTracking()
             .SingleAsync(c => c.Id == supportCase.Id, cancellationToken);

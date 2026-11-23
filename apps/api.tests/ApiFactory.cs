@@ -38,6 +38,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public CustomerLockGate LockGate { get; } = new();
 
+    /// <summary>The only origin the support hub accepts in tests.</summary>
+    public const string SupportHubOrigin = "http://localhost:3000";
+
     /// <summary>
     /// A host with the production session check interval. With the interval at zero every request
     /// renews the auth cookie, and the cookie handler then adds no-store to every response, which
@@ -103,6 +106,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                             // Tests run retention and alerts themselves.
                             ["Observability:WorkerEnabled"] = "false",
                             ["Support:WorkerEnabled"] = "false",
+                            ["Support:HubAllowedOrigins:0"] = SupportHubOrigin,
                             ["RateLimits:PurchasePermitLimit"] = "100000",
                         }
                     )
