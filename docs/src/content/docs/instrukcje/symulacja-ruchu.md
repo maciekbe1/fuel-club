@@ -73,6 +73,18 @@ dotnet run --project apps/tools/Simulator -- populate --run pilot-1 --accounts 5
 - Rejestracja bez klucza idempotencji: gdy ponowienie dostaje odmowę (konto już istnieje), symulator loguje się hasłem przebiegu - udane logowanie dowodzi, że konto jest tego przebiegu.
 - Błąd jednego konta (API, timeout, zła odpowiedź) nie zatrzymuje pozostałych; jego krok zostaje do ponowienia.
 - Klucze idempotencji API wygasają ([Idempotencja](/wyjasnienia/idempotencja/)) - ponowienie operacji `Pending` sprzed wygaśnięcia jest bezpieczne, później już nie.
+- Rozmowa z operacją w manifeście zostaje na zapisanym koncie (`Operation.Account`), także po dopopulowaniu kont - inaczej ten sam klucz trafiłby do innego użytkownika i założył drugą rozmowę. Zapisane konto, którego dziś nie ma, kończy rozmowę błędem, bez przeniesienia.
+- `429` z `Retry-After` dłuższym niż 60 s (np. limit zgłoszeń na godzinę) nie jest przeczekiwany: operacja pada widocznie i można ją dokończyć ponowieniem później.
+- Transkrypt zapisuje cel każdej propozycji aktywacji (nazwa oferty ze zdarzenia `confirmation`, bez tokenu). W transkryptach sprzed tego zapisu sprawdzenie celu nie ma dowodu i wychodzi niezgodne, nie zgodne.
+- Rozmowa z zapisanym przebiegiem (`end-pending`) przy ponowieniu tej samej rozmowy (to samo `conversationId`; po wygaśnięciu klucza startu nowa rozmowa dostaje własne tury) idzie od razu do zakończenia, bez powtarzania tur; potwierdzenie lub zgłoszenie z manifestu daje wynik `activated`/`handoff`; wynik dostaje sufiks `-resumed` (tokeny nie są zapisywane, więc propozycji aktywacji nie da się już potwierdzić).
+
+### Przejście (`--pass`)
+
+`converse --run <id> --pass <nazwa>` powtarza te same rozmowy przebiegu jako nowe: ten sam scenariusz (z manifestu albo z transkryptu bazowego, gdy przebieg był sprzed zapisu scenariuszy), to samo konto i te same decyzje losowe, nowe klucze (`<nazwa>/c00001`). Pliki w `.simulation/<run>/passes/<nazwa>/`. `compare --run <id> --pass <nazwa>` sprawdza obie strony dzisiejszymi regułami scenariuszy i pomija rozmowy z innym scenariuszem.
+
+:::caution
+Przejście to test techniczny, nie porównanie jakości: stan kont zmienił się w bazowym przebiegu (aktywowane kupony), więc te same pytania trafiają na inne dane. Porównanie jakości wymaga osobnych, identycznie przygotowanych danych dla obu wersji.
+:::
 
 ## Rozmowy według scenariuszy
 
@@ -94,7 +106,7 @@ dotnet run --project apps/tools/Simulator -- converse --run pilot-6 --conversati
 | `produkt-odbior` | 5 | punkty za hot doga → dopytanie → „odbiór nagrody” | klient |
 | `oferty` | 8 | dostępne oferty | klient |
 | `porownanie` | 6 | który kupon przy 40 l | klient |
-| `aktywacja` | 8 | „Aktywuj kupon SIM {run} rabat” | przycisk potwierdzenia (70%), gdy padła propozycja; inaczej bez aktywacji |
+| `aktywacja` | 7 | „Aktywuj kupon SIM {run} rabat”; sprawdzenie: propozycja (jeśli padła) dotyczy oferty „… rabat” - cel ze zdarzenia `confirmation`, nie tekst | przycisk potwierdzenia (70%), gdy padła propozycja; inaczej bez aktywacji |
 | `brak-zrodla` | 7 | pytanie spoza regulaminu | zgłoszenie (70%), gdy padła propozycja |
 | `konsultant` | 7 | prośba o konsultanta | jak wyżej |
 | `zlosc` | 5 | pretensja o punkty, potem prośba o człowieka | jak wyżej |
@@ -104,6 +116,7 @@ dotnet run --project apps/tools/Simulator -- converse --run pilot-6 --conversati
 | `porzucona` | 5 | saldo | bez zakończenia - serwer zamknie jako `Idle` |
 | `regresja-za-co-punkty` | 1 | „Za co dostaję punkty?” | klient; regresja |
 | `regresja-wybor-nagrody` | 1 | „Jakie nagrody mogę wybrać?” | klient; regresja |
+| `regresja-nazwany-kupon` | 1 | „Aktywuj kupon SIM {run} rabat” (błąd `demo-rules-v7` z `demo-1`) | klient; regresja |
 | `regresja-zbieranie-punktow` | 1 | „Jak działa zbieranie punktów?” | klient; regresja |
 
 - Scenariusze regresyjne to pytania, na które agent odpowiadał źle (znaleziska P16b), w oryginalnym brzmieniu. Przeformułowane wersje w scenariuszach zwykłych tylko generują ruch - nie oznaczają poprawy agenta. Pierwsze rozmowy przebiegu idą na regresje (`--regressions-each`, domyślnie 3 na scenariusz), więc mały przebieg też je ma. Scenariusz zapisuje się w operacji rozmowy w manifeście przy pierwszym uruchomieniu; ponowienie go używa niezależnie od flag.
@@ -181,8 +194,13 @@ dotnet run --project apps/tools/Simulator -- cleanup --run pilot-1
 
 Judge `demo-1` (P16d, `gemini-3.5-flash-lite`, rubryka v1; odpowiedzi adaptera demo, nie Gemini):
 - losowa: 40 tur, 39 pass, 1 fail; regresje: 10 z 10 fail (wszystkie trzy znane pomyłki rozpoznane); próbka błędów pusta (scenariusze zwykłe 100% zgodne z regułami); 0 awarii judge'a; koszt 0,0377 USD łącznie (dwa uruchomienia, 0,0114 + 0,0263).
-- Jedyna rozbieżność z regułami to realny błąd demo, którego sprawdzenia regułowe nie widzą: przy jednym kuponie na koncie „Aktywuj kupon SIM demo-1 rabat” daje propozycję aktywacji kuponu „hot dog” - demo bierze jedyny kupon, choć klient nazwał inny, którego nie ma (`DemoChatModel`, wybór kuponu). Niepoprawione; do decyzji.
+- Jedyna rozbieżność z regułami to realny błąd demo, którego sprawdzenia regułowe nie widzą: przy jednym kuponie na koncie „Aktywuj kupon SIM demo-1 rabat” daje propozycję aktywacji kuponu „hot dog” - demo bierze jedyny kupon, choć klient nazwał inny, którego nie ma (`DemoChatModel`, wybór kuponu). Poprawione w `demo-rules-v8`, regresja `regresja-nazwany-kupon`.
 - Arkusz kalibracji `calibration-judge-rubric-v1-gemini-3.5-flash-lite.tsv`: 30 tur (11 fail, 19 pass), bez ocen człowieka. Ponowne uruchomienie judge'a: 0 nowych wywołań, 0 USD.
+- Przegląd pomocniczy drugim modelem (nie kalibracja): ten arkusz wypełnił agent, który projektował rubrykę i znał część wyników judge'a. Werdykty 30/30 (kappa 1,00) nie potwierdzają zgodności z człowiekiem; próbka ma ok. 16 różnych przypadków i była dobrana według werdyktów judge'a. Różnice w ocenach cząstkowych: przy złym kuponie judge uznał działanie za właściwe („właściwe narzędzie”), a fail dał tylko za częściową odpowiedź - rubryka v1 nie ocenia celu działania; przy skardze `grounded yes` bez paragrafu; jedno uzasadnienie przekręca odpowiedź. Plik `report-secondary-review.md` w folderze judge'a.
+
+Przejście `demo-1 / v8-same` (`demo-rules-v8`, test techniczny):
+- 1453/1460 rozmów, 2104 tury z `done`, 0 błędów strumienia. 7 rozmów z przekazaniem stanęło na limicie zgłoszeń (5 na konto na godzinę, te same konta co w `demo-1`): symulator przeczekiwał `Retry-After` do godziny - poprawione (limit 60 s, wznowienie bez powtarzania tur); 7 pozostaje do ponowienia po oknie limitu.
+- Porównanie: 2043 → 2050 z 2113 tur zgodnych, 7 poprawionych w `aktywacja`. 6 z nich to efekt danych (kupon „hot dog” aktywowany w `demo-1`, więc klient nie ma kuponów), zachowanie v8 widać tylko w 1 (`c01315`). 0 aktywacji: kupony do aktywacji zostały tylko tam, gdzie `demo-1` nie potwierdził, a decyzje są te same. Dlatego to nie jest porównanie jakości.
 
 `demo-1` (P16c, 200 kont, adapter demo): 1460 rozmów, 2113 tur.
 - Technicznie: 1460/1460 rozmów, 2113/2113 tur z `done`, 0 błędów strumienia, 0 oczekiwań na `429`, 7,3 min; czas tury u klienta p50 21 ms, p95 36 ms. To czas aplikacji z adapterem reguł - nie pomiar wydajności ani kosztu Gemini.

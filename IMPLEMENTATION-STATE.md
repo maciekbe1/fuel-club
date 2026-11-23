@@ -556,6 +556,16 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Review P16d (`/code-review high`, 10 uwag, wszystkie przyjęte): kalibracja i zgodność dla jednego modelu (arkusz w nazwie z modelem, z ocen tego modelu, bez nowego losowania), oceny usuniętych transkryptów wypadają (retencja), raport wg bieżącej próbki, pusty arkusz nie powstaje, instrukcje w limicie kosztu, odporne odczytanie użycia, uczciwe liczniki w konsoli, test `prune` dla plików judge'a.
 - Testy: `JudgeTests` (7), `SimulatorTests` (prune).
 
+## P16d - poprawki po przeglądzie właściciela (2026-11-23)
+
+- Konto rozmowy z manifestu (`Operation.Account`) przy wznowieniu; test z dopopulowaniem kont.
+- `demo-rules-v8`: wybór kuponu - ID albo nazwa → tylko pasujący; brak dopasowania → informacja i lista własnych; kilka → dopytanie; ogólne „aktywuj mój kupon” → jedyny. Testy w `AssistantTests`. Regresja `regresja-nazwany-kupon` (oryginalne brzmienie z `demo-1`) i sprawdzenie odpowiedzi w `aktywacja`.
+- Symulator: `--pass` i `compare`; `429` z `Retry-After` > 60 s pada zamiast czekać; wznowienie `end-pending` bez powtarzania tur.
+- Baseline `demo-1` (v7) w `.simulation/demo-1/baseline-v7/`. `v8-same` zachowany jako test techniczny (stan kuponów zmieniony - nie mierzy jakości).
+- Wypełniony przeze mnie arkusz to przegląd pomocniczy drugim modelem, nie kalibracja; arkusz kalibracji wyczyszczony do oceny człowieka.
+- Review (`/code-review high`, 10 uwag): przyjęte 8 - wznowienie bierze wynik z manifestu i tylko dla tej samej rozmowy; dopasowanie nazwy po całych słowach z odmianą (nie „kawa” w „kawałek”), samodzielny myślnik i powitania to nie nazwa; sprawdzenie celu propozycji ze zdarzenia `confirmation` zamiast wzorca tekstu; `compare` bez przejścia odmawia; nieaktualny akapit docs; klucz w logu. Częściowo: luźniejsze dopasowanie („jedno słowo”) odrzucone - przywraca błąd v7 („SIM demo-1” pasuje do „hot dog”); zbyt ostra odmowa kończy się listą do wyboru. Pominięta: `screenshots.spec.ts` uruchamia się w `npm run e2e` - plik nie mój, nieśledzony.
+- Testy: API 689/689, E2E chat/demo/observability 40/40.
+
 ## Następny krok
 
 Otwarte:

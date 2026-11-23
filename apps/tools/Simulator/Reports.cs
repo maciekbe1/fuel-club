@@ -12,13 +12,15 @@ public static class Reports
 {
     public static (string Technical, string Correctness) Write(
         Manifest manifest,
+        string runFolder,
+        string? pass,
         string provider,
         string model,
         TimeSpan duration,
         int rateLimitWaits
     )
     {
-        var folder = Path.Combine(Path.GetDirectoryName(manifest.Path)!, "transcripts");
+        var folder = Path.Combine(runFolder, "transcripts");
         var transcripts = Directory.Exists(folder)
             ? Directory
                 .EnumerateFiles(folder, "*.json")
@@ -33,9 +35,17 @@ public static class Reports
         var unfinished = transcripts.Count(t => t.Outcome == ChatScenarios.EndPending);
         transcripts = transcripts.Where(t => t.Outcome != ChatScenarios.EndPending).ToList();
         var turns = transcripts.SelectMany(t => t.Turns).ToList();
-        var conversationOps = manifest.Operations.Where(o => o.Kind == "conversation").ToList();
+        // This pass's conversations only (a pass prefixes its keys with "<pass>/").
+        var conversationOps = manifest
+            .Operations.Where(o =>
+                o.Kind == "conversation"
+                && (pass is null ? !o.Key.Contains('/') : o.Key.StartsWith(pass + "/"))
+            )
+            .ToList();
         var technical = new StringBuilder();
-        technical.AppendLine($"# Przebieg techniczny - {manifest.RunId}");
+        technical.AppendLine(
+            $"# Przebieg techniczny - {manifest.RunId}{(pass is null ? "" : $", przejście {pass}")}"
+        );
         technical.AppendLine();
         technical.AppendLine(
             $"Instancja: {manifest.ApiUrl}, dostawca `{provider}`, model `{model}`."
@@ -70,7 +80,9 @@ public static class Reports
         );
 
         var correctness = new StringBuilder();
-        correctness.AppendLine($"# Poprawność odpowiedzi - {manifest.RunId}");
+        correctness.AppendLine(
+            $"# Poprawność odpowiedzi - {manifest.RunId}{(pass is null ? "" : $", przejście {pass}")}"
+        );
         correctness.AppendLine();
         correctness.AppendLine(
             $"Dostawca `{provider}`, model `{model}`. Sprawdzenia regułowe (narzędzia, wzorce, propozycja konsultanta) przybliżają znaczenie; nie zastępują oceny człowieka ani skalibrowanego judge'a."
@@ -118,7 +130,7 @@ public static class Reports
             $"- Scenariusze regresyjne (znane pomyłki): {regressionTurns.Count(t => t.Checks.All(c => c.Ok))} z {regressionTurns.Count} sprawdzonych tur zgodnych. Przeformułowane scenariusze zwykłe generują ruch; nie oznaczają, że agent przestał się mylić."
         );
 
-        var root = Path.GetDirectoryName(manifest.Path)!;
+        var root = runFolder;
         var technicalPath = Path.Combine(root, "report-technical.md");
         var correctnessPath = Path.Combine(root, "report-correctness.md");
         File.WriteAllText(technicalPath, technical.ToString());

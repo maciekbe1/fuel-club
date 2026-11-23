@@ -430,6 +430,7 @@ public sealed class TranscriptFile
     public string RunId { get; set; } = "";
     public string Scenario { get; set; } = "";
     public bool Regression { get; set; }
+    public Guid ConversationId { get; set; }
     public string? Outcome { get; set; }
     public List<TranscriptTurn> Turns { get; set; } = [];
 

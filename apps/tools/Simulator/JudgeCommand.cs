@@ -22,7 +22,11 @@ internal static class JudgeCommand
             Console.WriteLine($"Refused: no simulator manifest for run '{run}'.");
             return 2;
         }
-        var runFolder = Path.GetDirectoryName(manifestPath)!;
+        // A pass (converse --pass) has its own transcripts and judge folder; turn ids match the
+        // base run's, so the same turns are graded and compared.
+        var runFolder = options.Get("pass") is { } pass
+            ? Path.Combine(Path.GetDirectoryName(manifestPath)!, "passes", pass)
+            : Path.GetDirectoryName(manifestPath)!;
         var model = options.Get("model") ?? "gemini-3.5-flash-lite";
         if (command is "calibrate" or "agreement")
             return await CalibrationAsync(command, run, runFolder, model, options, ct);

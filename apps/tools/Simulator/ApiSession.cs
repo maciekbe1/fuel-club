@@ -12,6 +12,12 @@ public sealed class ApiSession : IDisposable
 {
     private const string CsrfHeader = "X-CSRF-TOKEN";
     private const int MaxRateLimitRetries = 5;
+
+    /// <summary>
+    /// A longer Retry-After (an hourly limit, e.g. support cases per user) is not slept through:
+    /// the 429 is returned and the operation fails visibly, a rerun later can finish it.
+    /// </summary>
+    public static readonly TimeSpan MaxRateLimitWait = TimeSpan.FromSeconds(60);
     private static int _rateLimitWaits;
 
     /// <summary>429 answers waited out in this process (the technical report).</summary>
@@ -83,12 +89,13 @@ public sealed class ApiSession : IDisposable
                     : HttpCompletionOption.ResponseContentRead,
                 ct
             );
+            var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5);
             if (
                 response.StatusCode != HttpStatusCode.TooManyRequests
                 || attempt >= MaxRateLimitRetries
+                || wait > MaxRateLimitWait
             )
                 return response;
-            var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5);
             response.Dispose();
             Interlocked.Increment(ref _rateLimitWaits);
             Console.WriteLine($"  429 on {request.RequestUri}: waiting {wait.TotalSeconds:F0} s");

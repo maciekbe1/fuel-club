@@ -21,7 +21,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v7";
+    public string PromptVersion => "demo-rules-v8";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -126,34 +126,128 @@ public sealed partial class DemoChatModel : IChatModel
             return new ModelStep.Reply(
                 intro + "Nie masz kuponów do aktywacji. Kupon dostaniesz w zakładce „Oferty”."
             );
-        // One coupon, or the one whose offer the message names; otherwise ask which one.
-        var named = list.FirstOrDefault(c =>
-            text.Contains(Normalize(c.OfferName), StringComparison.Ordinal)
-        );
-        // A short answer ("Weekend") names part of one offer: used only when exactly one matches.
-        var answer = text.Trim().TrimEnd('.', '!', '?');
-        if (named is null && answer.Length >= 3)
-        {
-            var partial = list.Where(c =>
-                    Normalize(c.OfferName).Contains(answer, StringComparison.Ordinal)
-                )
-                .Take(2)
-                .ToList();
-            if (partial.Count == 1)
-                named = partial[0];
-        }
-        if (named is not null)
-            return Propose(named.Id.ToString());
-        if (list.Count == 1)
-            return Propose(list[0].Id.ToString());
-        return new ModelStep.Reply(
+        // What the customer named once the activation words are gone ("aktywuj kupon X" -> "x").
+        // Nothing named: a general request, so the only coupon may be proposed.
+        var named = NamedWords(text);
+        if (named.Count == 0)
+            return list.Count == 1 ? Propose(list[0].Id.ToString()) : AskWhich(intro, list);
+        // Named: only a coupon whose offer has every named word; never another one in its place.
+        var matching = list.Where(c => Names(c.OfferName, named)).ToList();
+        if (matching.Count == 0)
+            return AskWhich(intro + "Nie masz takiego kuponu do aktywacji. ", list);
+        // Several coupons of one offer are the same thing: any of them is what was named.
+        if (matching.Select(c => c.OfferName).Distinct().Count() == 1)
+            return Propose(matching[0].Id.ToString());
+        return AskWhich(intro, matching);
+    }
+
+    private static ModelStep AskWhich(string intro, IEnumerable<CouponSummary> coupons) =>
+        new ModelStep.Reply(
             intro
                 + WhichCoupon
                 + Listed
-                + string.Join("; ", list.Select(c => c.OfferName))
+                + string.Join("; ", coupons.Select(c => c.OfferName).Distinct())
                 + ListEnd
         );
+
+    /// <summary>
+    /// The words of the message that name a coupon: without the activation words and filler
+    /// ("aktywuj mój kupon" names nothing; "aktywuj kupon weekend" names "weekend").
+    /// </summary>
+    private static List<string> NamedWords(string text) =>
+        NonWord()
+            .Split(text)
+            .Select(word => word.Trim('-'))
+            .Where(word => word.Length > 0 && !Activation().IsMatch(word) && !Filler.Contains(word))
+            .ToList();
+
+    /// <summary>
+    /// Every named word is a whole word of the offer name, or the same word inflected ("doga" for
+    /// "dog", "kawe" for "kawa"): never a part of another word ("kawa" is not "kawalek").
+    /// </summary>
+    private static bool Names(string offerName, List<string> named)
+    {
+        var words = NonWord().Split(Normalize(offerName)).Select(w => w.Trim('-')).ToList();
+        return named.All(word => words.Any(w => SameWord(w, word)));
     }
+
+    private static bool SameWord(string offer, string named)
+    {
+        if (offer == named)
+            return true;
+        // Polish endings ("kawalek", "kawalka"): a shared stem of 3+ letters, all but the last two
+        // letters of the shorter word, lengths differing by at most two.
+        if (
+            offer.Length < 3
+            || named.Length < 3
+            || Math.Abs(offer.Length - named.Length) > 2
+            || !offer.All(char.IsLetter)
+            || !named.All(char.IsLetter)
+        )
+            return false;
+        var shared = 0;
+        while (shared < Math.Min(offer.Length, named.Length) && offer[shared] == named[shared])
+            shared++;
+        return shared >= 3 && shared >= Math.Min(offer.Length, named.Length) - 2;
+    }
+
+    private static readonly HashSet<string> Filler =
+    [
+        "kupon",
+        "kupony",
+        "kuponu",
+        "kuponow",
+        "kuponem",
+        "moj",
+        "moja",
+        "moje",
+        "mojego",
+        "moich",
+        "swoj",
+        "swoje",
+        "prosze",
+        "hej",
+        "czesc",
+        "dzien",
+        "dobry",
+        "dzieki",
+        "dziekuje",
+        "pls",
+        "moge",
+        "mozna",
+        "moglbys",
+        "moglabys",
+        "jak",
+        "sie",
+        "bym",
+        "chcesz",
+        "chce",
+        "chcialbym",
+        "chcialabym",
+        "mozesz",
+        "mi",
+        "mnie",
+        "ten",
+        "ta",
+        "to",
+        "tego",
+        "jedyny",
+        "jedyna",
+        "jedyne",
+        "go",
+        "jej",
+        "na",
+        "o",
+        "z",
+        "za",
+        "do",
+        "i",
+        "a",
+        "czy",
+        "teraz",
+        "juz",
+        "please",
+    ];
 
     /// <summary>
     /// Searches the rules with the question; cites the best point, or says the rules do not cover it
@@ -488,6 +582,10 @@ public sealed partial class DemoChatModel : IChatModel
         @"(?<![\d.,])(?<!po\s)(\d{1,3}(?:\s\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(?:zl|pln)(?!\s*/\s*l)(?!\s+za\s+litr)"
     )]
     private static partial Regex MoneyAmount();
+
+    // Word separators; a hyphen stays inside a name ("demo-1").
+    [GeneratedRegex(@"[^\p{L}\p{N}-]+")]
+    private static partial Regex NonWord();
 
     [GeneratedRegex(@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")]
     private static partial Regex CouponId();

@@ -102,6 +102,7 @@ public sealed class SimulatorTests : IDisposable
             [
                 "Za co dostaję punkty?",
                 "Jakie nagrody mogę wybrać?",
+                "Aktywuj kupon SIM {run} rabat",
                 "Jak działa zbieranie punktów?",
             ],
             ChatScenarios.All.Where(s => s.Regression).SelectMany(s => s.Messages)
@@ -237,6 +238,149 @@ public sealed class SimulatorTests : IDisposable
             }
         );
         Assert.True(ChatScenarios.HandoffShown(transcript));
+    }
+
+    [Fact]
+    public void A_resumed_conversation_keeps_its_recorded_account_after_more_are_populated()
+    {
+        var manifest = Manifest.Create(
+            ManifestPath,
+            "t-1",
+            "http://localhost:5301",
+            "Europe/Warsaw"
+        );
+        SimAccount Account(int i) =>
+            new()
+            {
+                Index = i,
+                Email = $"a{i}@sim.test",
+                Profile = Profile.Low,
+                UserId = $"u{i}",
+            };
+        var two = new List<SimAccount> { Account(0), Account(1) };
+        var settings = new Settings("s", "c", "c", "a", "a", 1, 10, 10);
+        var chat = new ChatScenarios(manifest, settings, 60);
+        // The first run started c00000..c00003 on two accounts (c00003 left pending).
+        foreach (var (index, account) in chat.AssignAccounts(4, two))
+            manifest.Operation($"c{index:00000}", "conversation", account!.Email);
+
+        // A third account is populated; the resume must not move c00002 or c00003 to it.
+        var three = new List<SimAccount>(two) { Account(2) };
+        var resumed = chat.AssignAccounts(6, three);
+
+        Assert.Equal(
+            [
+                "a0@sim.test",
+                "a1@sim.test",
+                "a0@sim.test",
+                "a1@sim.test",
+                "a1@sim.test",
+                "a2@sim.test",
+            ],
+            resumed.Select(p => p.Account!.Email)
+        );
+        // A recorded account that is not usable now: the conversation fails, it is not moved.
+        Assert.Null(chat.AssignAccounts(4, [Account(0)])[1].Account);
+    }
+
+    [Fact]
+    public void A_pass_replays_the_base_conversation_as_a_new_one()
+    {
+        var manifest = Manifest.Create(
+            ManifestPath,
+            "t-1",
+            "http://localhost:5301",
+            "Europe/Warsaw"
+        );
+        var settings = new Settings("s", "c", "c", "a", "a", 1, 10, 10);
+        SimAccount Account(int i) =>
+            new()
+            {
+                Index = i,
+                Email = $"a{i}@sim.test",
+                Profile = Profile.Low,
+                UserId = $"u{i}",
+            };
+        var baseRun = new ChatScenarios(manifest, settings, 60);
+        var first = baseRun.ScenarioFor(20, "a1@sim.test");
+        // A base run from before scenarios were stored: the pass reads its transcript.
+        Directory.CreateDirectory(Path.Combine(_directory, "transcripts"));
+        File.WriteAllText(
+            Path.Combine(_directory, "transcripts", "c00021.json"),
+            "{\"scenario\": \"oferty\", \"turns\": []}"
+        );
+
+        // The pass runs with other flags and more accounts: same scenario and account, new key.
+        var pass = new ChatScenarios(manifest, settings, 60, regressionsEach: 0, pass: "v8");
+        var (_, account) = pass.AssignAccounts(21, [Account(0), Account(1), Account(2)])[20];
+
+        Assert.Equal(first.Name, pass.ScenarioFor(20, account!.Email).Name);
+        Assert.Equal("a1@sim.test", account.Email);
+        Assert.Equal("v8/c00020", pass.Key(20));
+        Assert.NotEqual(
+            manifest.Find("c00020")!.IdempotencyKey,
+            manifest.Find("v8/c00020")!.IdempotencyKey
+        );
+        Assert.EndsWith(Path.Combine("passes", "v8"), pass.RunFolder);
+        Assert.Equal("oferty", pass.ScenarioFor(21, "a0@sim.test").Name);
+    }
+
+    [Fact]
+    public void A_comparison_checks_both_sides_with_todays_steps()
+    {
+        static (string, TranscriptFile) Run(
+            string folder,
+            string answer,
+            params string[] proposals
+        ) =>
+            (
+                $"/{folder}/transcripts/c00000.json",
+                new TranscriptFile
+                {
+                    Scenario = "aktywacja",
+                    Turns =
+                    [
+                        new TranscriptTurn
+                        {
+                            User = "Aktywuj kupon SIM t-1 rabat",
+                            Assistant = answer,
+                            Done = true,
+                            Tools = ["list_my_coupons:ok"],
+                            Confirmations = proposals.Length,
+                            Proposals = [.. proposals],
+                        },
+                    ],
+                }
+            );
+
+        var (rows, changes, _) = Comparison.Compare(
+            [Run("base", "Proponuję aktywację.", "SIM t-1 hot dog")],
+            [Run("pass", "Nie masz takiego kuponu do aktywacji. Który kupon aktywować?")]
+        );
+
+        Assert.Equal(new Comparison.Row("aktywacja", 1, 0, 1), Assert.Single(rows));
+        Assert.True(Assert.Single(changes).PassOk);
+    }
+
+    [Fact]
+    public void A_proposal_is_checked_by_its_recorded_target_and_without_one_it_fails()
+    {
+        var step = new Step("Aktywuj kupon SIM t-1 rabat", ProposalOnly: @"\brabat$");
+        TranscriptTurn Turn(int confirmations, params string[] proposals) =>
+            new()
+            {
+                User = step.Message,
+                Assistant = "Proponuję aktywację kuponu „SIM t-1 rabat”.",
+                Done = true,
+                Confirmations = confirmations,
+                Proposals = [.. proposals],
+            };
+
+        Assert.All(step.Check(Turn(1, "SIM t-1 rabat")), c => Assert.True(c.Ok));
+        Assert.Contains(step.Check(Turn(1, "SIM t-1 hot dog")), c => !c.Ok);
+        // An older transcript: a proposal with no recorded target is not taken as right.
+        Assert.Contains(step.Check(Turn(1)), c => !c.Ok);
+        Assert.All(step.Check(Turn(0)), c => Assert.True(c.Ok));
     }
 
     [Fact]

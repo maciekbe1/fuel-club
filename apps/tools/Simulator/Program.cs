@@ -5,12 +5,14 @@ using FuelClub.Simulator;
 // Synthetic traffic for the demo instance (ADR 0017). Public HTTP API only.
 //
 //   populate --run <id> [--accounts 5] [--api http://localhost:5301] [--manifest path]
-//   converse --run <id> [--conversations 10] [--chat-per-minute 60] [--regressions-each 3]
+//   converse --run <id> [--conversations 10] [--chat-per-minute 60] [--regressions-each 3] [--pass v8]
+//            (--pass: the same conversations again as new ones, e.g. after an adapter change)
 //   cleanup  --run <id> [--manifest path]     (SIM_DEMO_DATABASE: connection string)
 //   prune    [--days 14]                      (deletes transcripts and judge files past the retention)
 //   judge    --run <id> [--random 40] [--errors 20] [--regressions 10] [--max-usd 0.20] [--model M]
 //   calibrate --run <id> [--size 30]           (blind sheet for human grades)
 //   agreement --run <id>                       (human vs judge on the filled sheet)
+//   compare  --run <id> --pass <name>          (the same turns before and after, today's checks)
 //
 // The judge's Gemini key: GEMINI_API_KEY, else the API's user-secrets (Assistant:Gemini:ApiKey).
 //
@@ -35,11 +37,12 @@ if (
             or "judge"
             or "calibrate"
             or "agreement"
+            or "compare"
         )
 )
 {
     Console.WriteLine(
-        "usage: populate|converse|cleanup|judge|calibrate|agreement --run <id> [options] | prune [--days 14]"
+        "usage: populate|converse|cleanup|judge|calibrate|agreement|compare --run <id> [options] | prune [--days 14]"
     );
     return 64;
 }
@@ -59,6 +62,31 @@ var run = options.Get("run") ?? throw new ArgumentException("--run is required")
 if (!Regex.IsMatch(run, "^[a-z0-9][a-z0-9-]{0,39}$"))
     throw new ArgumentException("--run: 1-40 characters a-z, 0-9, '-'");
 var manifestPath = options.Get("manifest") ?? Path.Combine(".simulation", run, "manifest.json");
+
+var pass = options.Get("pass");
+if (pass is not null && !Regex.IsMatch(pass, "^[a-z0-9][a-z0-9-]{0,19}$"))
+    throw new ArgumentException("--pass: 1-20 characters a-z, 0-9, '-'");
+
+if (args[0] == "compare")
+{
+    if (pass is null)
+        throw new ArgumentException("compare needs --pass");
+    var baseFolder = Path.GetDirectoryName(manifestPath)!;
+    var passFolder = Path.Combine(baseFolder, "passes", pass);
+    if (!Directory.Exists(passFolder))
+    {
+        Console.WriteLine($"no pass {pass} in {baseFolder} (run converse --pass {pass} first)");
+        return 1;
+    }
+    var (rows, changes, skipped) = Comparison.Compare(
+        TranscriptFile.LoadRun(baseFolder),
+        TranscriptFile.LoadRun(passFolder)
+    );
+    var comparison = Path.Combine(passFolder, "report-comparison.md");
+    File.WriteAllText(comparison, Comparison.Report(run, pass, rows, changes, skipped));
+    Console.WriteLine($"{changes.Count} changed turns: {comparison}");
+    return 0;
+}
 
 if (args[0] is "judge" or "calibrate" or "agreement")
     return await JudgeCommand.RunAsync(args[0], run, manifestPath, options, cancel.Token);
@@ -134,14 +162,18 @@ if (conversing)
 {
     var clock = System.Diagnostics.Stopwatch.StartNew();
     // A global pace; each account also stays under the API's 20 turns/min (ChatScenarios).
-    await new ChatScenarios(
+    var chat = new ChatScenarios(
         manifest,
         settings,
         options.Int("chat-per-minute", 60),
-        options.Int("regressions-each", 3)
-    ).RunAsync(options.Int("conversations", 10), cancel.Token);
+        options.Int("regressions-each", 3),
+        pass
+    );
+    await chat.RunAsync(options.Int("conversations", 10), cancel.Token);
     var (technical, correctness) = Reports.Write(
         manifest,
+        chat.RunFolder,
+        pass,
         provider,
         modelName,
         clock.Elapsed,

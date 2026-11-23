@@ -29,7 +29,8 @@ public sealed record Step(
     string[]? Tools = null,
     string? Answer = null,
     bool? Handoff = null,
-    bool NoTools = false
+    bool NoTools = false,
+    string? ProposalOnly = null
 )
 {
     public List<TurnCheck> Check(TranscriptTurn turn)
@@ -59,6 +60,21 @@ public sealed record Step(
             );
         if (Handoff is { } handoff)
             checks.Add(new(handoff ? "handoff" : "no handoff", turn.Handoff == handoff));
+        // The target, not the wording: every proposed activation is for a matching offer.
+        if (ProposalOnly is not null)
+            checks.Add(
+                new(
+                    $"proposal only /{ProposalOnly}/",
+                    turn.Proposals.Count == turn.Confirmations
+                        && turn.Proposals.All(p =>
+                            System.Text.RegularExpressions.Regex.IsMatch(
+                                p,
+                                ProposalOnly,
+                                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                            )
+                        )
+                )
+            );
         return checks;
     }
 }
@@ -90,12 +106,52 @@ public sealed class ChatScenarios(
     Manifest manifest,
     Settings settings,
     int chatPerMinute,
-    int regressionsEach = 3
+    int regressionsEach = 3,
+    // A second pass over the same conversations (e.g. after an adapter change): the same
+    // scenario, account and decisions as the base run, new conversations, its own folder.
+    string? pass = null
 )
 {
+    public string RunFolder { get; } =
+        pass is null
+            ? Path.GetDirectoryName(manifest.Path)!
+            : Path.Combine(Path.GetDirectoryName(manifest.Path)!, "passes", pass);
+
+    private static string BaseKey(int index) => $"c{index:00000}";
+
+    private string? BaseTranscriptScenario(int index)
+    {
+        var file = Path.Combine(
+            Path.GetDirectoryName(manifest.Path)!,
+            "transcripts",
+            $"{BaseKey(index)}.json"
+        );
+        if (!File.Exists(file))
+            return null;
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(file));
+            return document.RootElement.TryGetProperty("scenario", out var name)
+                ? name.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    public string Key(int index) => pass is null ? BaseKey(index) : $"{pass}/{BaseKey(index)}";
+
+    /// <summary>Seeds ignore the pass, so a pass makes the same choices as the base run.</summary>
+    private static string SeedKey(string key) => key[(key.IndexOf('/') + 1)..];
+
     private const string Balance = "get_my_balance";
     private const string Coupons = "list_my_coupons";
     private const string Rules = "search_program_rules:ok";
+
+    /// <summary>A proposal, if any, is for the named offer (checked on the event, not the text).</summary>
+    private const string NamedCouponOnly = @"\brabat$";
 
     public static readonly Scenario[] All =
     [
@@ -146,10 +202,12 @@ public sealed class ChatScenarios(
             ScenarioEnd.Client
         ),
         // Confirmed most of the time, else left: activation with and without the button.
+        // Named "rabat": a proposal of that coupon, or "you do not have it", or which one - never
+        // another coupon in its place (found by the judge in demo-1).
         new(
             "aktywacja",
-            8,
-            [new("Aktywuj kupon SIM {run} rabat", [Coupons])],
+            7,
+            [new("Aktywuj kupon SIM {run} rabat", [Coupons], ProposalOnly: NamedCouponOnly)],
             ScenarioEnd.ConfirmIfProposed
         ),
         new(
@@ -229,6 +287,14 @@ public sealed class ChatScenarios(
             ScenarioEnd.Client,
             Regression: true
         ),
+        // demo-1 (judge): the only coupon proposed though another one was named.
+        new(
+            "regresja-nazwany-kupon",
+            1,
+            [new("Aktywuj kupon SIM {run} rabat", [Coupons], ProposalOnly: NamedCouponOnly)],
+            ScenarioEnd.Client,
+            Regression: true
+        ),
         new(
             "regresja-zbieranie-punktow",
             1,
@@ -249,23 +315,54 @@ public sealed class ChatScenarios(
 
     /// <summary>Per account, under the API's 20 turns/min per user whatever the global pace.</summary>
     private const int AccountTurnsPerMinute = 18;
-    private readonly string _transcripts = Path.Combine(
-        Path.GetDirectoryName(manifest.Path)!,
-        "transcripts"
-    );
+    private string Transcripts => Path.Combine(RunFolder, "transcripts");
+
+    /// <summary>
+    /// The account of each conversation. One that already has an operation keeps the account
+    /// recorded there: after more accounts are populated the index would map to another user, and
+    /// the same idempotency key under another user would start a second conversation. A recorded
+    /// account that is not usable now gives null (the conversation fails, it is not moved). New
+    /// indices go round the current accounts.
+    /// </summary>
+    public List<(int Index, SimAccount? Account)> AssignAccounts(
+        int conversations,
+        IReadOnlyList<SimAccount> accounts
+    )
+    {
+        var byEmail = accounts.ToDictionary(a => a.Email);
+        var known = manifest
+            .Operations.Where(o => o.Kind == "conversation")
+            .ToDictionary(o => o.Key, o => o.Account);
+        return Enumerable
+            .Range(0, conversations)
+            .Select(i =>
+                known.TryGetValue(Key(i), out var email) || known.TryGetValue(BaseKey(i), out email)
+                    ? (i, byEmail.GetValueOrDefault(email))
+                    : (i, (SimAccount?)accounts[i % accounts.Count])
+            )
+            .ToList();
+    }
 
     public async Task RunAsync(int conversations, CancellationToken ct)
     {
         var accounts = manifest.Accounts.Where(a => a.UserId is not null).ToArray();
         if (accounts.Length == 0)
             throw new InvalidOperationException("No populated accounts: run populate first.");
-        Directory.CreateDirectory(_transcripts);
+        Directory.CreateDirectory(Transcripts);
         var failures = 0;
         var byScenario = new Dictionary<string, int>();
+        var assigned = AssignAccounts(conversations, accounts);
+        foreach (var (index, _) in assigned.Where(p => p.Account is null))
+        {
+            failures++;
+            Console.WriteLine(
+                $"{Key(index)}: its account ({manifest.Find(Key(index))?.Account ?? manifest.Find(BaseKey(index))?.Account}) is not populated; not moved to another"
+            );
+        }
         // One worker per account at a time: an account's turns stay in order and under its limit.
-        var queues = Enumerable
-            .Range(0, conversations)
-            .GroupBy(i => accounts[i % accounts.Length])
+        var queues = assigned
+            .Where(p => p.Account is not null)
+            .GroupBy(p => p.Account!, p => p.Index)
             .ToArray();
         await Parallel.ForEachAsync(
             queues,
@@ -325,14 +422,14 @@ public sealed class ChatScenarios(
                         when (e is not OperationCanceledException || !token.IsCancellationRequested)
                     {
                         Interlocked.Increment(ref failures);
-                        Console.WriteLine($"c{index}: {e.GetType().Name}: {e.Message}");
+                        Console.WriteLine($"{Key(index)}: {e.GetType().Name}: {e.Message}");
                     }
                 }
             }
         );
-        var done = manifest.Operations.Count(o =>
-            o.Kind == "conversation" && o.Status == OperationStatus.Done
-        );
+        var done = Enumerable
+            .Range(0, conversations)
+            .Count(i => manifest.Find(Key(i))?.Status == OperationStatus.Done);
         Console.WriteLine(
             $"run {manifest.RunId}: {done}/{conversations} conversations done, {failures} failed; "
                 + string.Join(
@@ -350,9 +447,21 @@ public sealed class ChatScenarios(
     /// </summary>
     public Scenario ScenarioFor(int index, string accountEmail)
     {
-        var op = manifest.Operation($"c{index:00000}", "conversation", accountEmail);
-        if (op.Scenario is { } stored && All.FirstOrDefault(s => s.Name == stored) is { } known)
+        var op = manifest.Operation(Key(index), "conversation", accountEmail);
+        // A pass takes the base run's scenario: from its operation, or from its transcript when the
+        // base ran before scenarios were stored in the manifest.
+        var stored =
+            op.Scenario
+            ?? (
+                pass is null
+                    ? null
+                    : manifest.Find(BaseKey(index))?.Scenario ?? BaseTranscriptScenario(index)
+            );
+        if (stored is not null && All.FirstOrDefault(s => s.Name == stored) is { } known)
+        {
+            op.Scenario ??= known.Name;
             return known;
+        }
         var picked = Pick(index);
         op.Scenario = picked.Name;
         manifest.Save();
@@ -394,7 +503,7 @@ public sealed class ChatScenarios(
         CancellationToken ct
     )
     {
-        var key = $"c{index:00000}";
+        var key = Key(index);
         var op = manifest.Operation(key, "conversation", account.Email);
         if (op.Status == OperationStatus.Done)
             return false;
@@ -426,11 +535,15 @@ public sealed class ChatScenarios(
             StartedAt = DateTimeOffset.UtcNow,
         };
         var history = new List<object>();
-        var file = Path.Combine(_transcripts, $"{key}.json");
+        var file = Path.Combine(Transcripts, $"{BaseKey(index)}.json");
         string outcome;
+        var resumed = false;
         try
         {
-            foreach (var step in scenario.Steps)
+            // The talk of an earlier run that stopped before its end is not repeated: the same
+            // conversation goes straight to the end (tokens are never saved, so no confirmation).
+            resumed = await ResumeTalkAsync(file, transcript, conversationId, ct);
+            foreach (var step in resumed ? [] : scenario.Steps)
             {
                 var message = step.Message;
                 await accountPace.WaitAsync(ct);
@@ -474,6 +587,15 @@ public sealed class ChatScenarios(
                 : manifest.IsDone($"{key}:case") ? "handoff"
                 : "ended-earlier";
         }
+        // Resumed without its tokens: a proposal is not confirmed now, but what went through
+        // before (a confirm or a case in the manifest) is the outcome.
+        if (resumed)
+            outcome =
+                (
+                    manifest.IsDone($"{key}:confirm") ? "activated"
+                    : manifest.IsDone($"{key}:case") ? "handoff"
+                    : outcome
+                ) + "-resumed";
         transcript.Outcome = outcome;
         // A rerun that found it ended keeps the transcript of the run that did the talking; only
         // an end left unconfirmed gets the outcome, a confirmed one stays as it was.
@@ -488,6 +610,38 @@ public sealed class ChatScenarios(
         op.Error = null;
         manifest.Save();
         return true;
+    }
+
+    /// <summary>Loads the turns saved before an end that did not get confirmed.</summary>
+    private static async Task<bool> ResumeTalkAsync(
+        string file,
+        Transcript transcript,
+        Guid conversationId,
+        CancellationToken ct
+    )
+    {
+        if (!File.Exists(file))
+            return false;
+        try
+        {
+            var saved = JsonSerializer.Deserialize<TranscriptFile>(
+                await File.ReadAllTextAsync(file, ct),
+                Manifest.Json
+            );
+            // Only the same conversation: after the start key expired, the start returns a new
+            // (empty) one, which must get its own talk, not the old one's turns.
+            if (
+                saved is not { Outcome: EndPending, Turns.Count: > 0 }
+                || saved.ConversationId != conversationId
+            )
+                return false;
+            transcript.Turns.AddRange(saved.Turns);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Written before the end call; replaced by the outcome once the end is confirmed.</summary>
@@ -579,7 +733,7 @@ public sealed class ChatScenarios(
             case ScenarioEnd.Abandon:
                 return "abandoned";
             case ScenarioEnd.HandoffIfProposed
-                when HandoffShown(transcript) && Seed($"{op.Key}:case") % 10 < 7:
+                when HandoffShown(transcript) && Seed($"{SeedKey(op.Key)}:case") % 10 < 7:
                 var caseOp = manifest.Operation($"{op.Key}:case", "case", account.Email);
                 using (
                     var created = await session.PostAsync(
@@ -609,7 +763,7 @@ public sealed class ChatScenarios(
                 return "handoff";
             case ScenarioEnd.ConfirmIfProposed
                 when ConfirmationToken(transcript) is { } token
-                    && Seed($"{op.Key}:confirm") % 10 < 7:
+                    && Seed($"{SeedKey(op.Key)}:confirm") % 10 < 7:
                 var confirmOp = manifest.Operation($"{op.Key}:confirm", "confirm", account.Email);
                 // The answer carries the coupon code: read the status only, keep nothing else.
                 using (
@@ -739,6 +893,9 @@ public sealed class ChatScenarios(
             case "confirmation":
                 turn.Confirmations++;
                 turn.Tokens.Add(root.GetProperty("token").GetString()!);
+                // The target of the proposal (never the token): what the rule checks and the
+                // judge can verify instead of the reply's wording.
+                turn.Proposals.Add(root.GetProperty("offerName").GetString() ?? "");
                 break;
             case "handoff":
                 turn.Handoff = true;
@@ -797,6 +954,9 @@ public sealed class TranscriptTurn
     public string? CorrelationId { get; set; }
     public List<string> Tools { get; init; } = [];
     public int Confirmations { get; set; }
+
+    /// <summary>Offer names of the activations proposed in this turn (from the confirmation event).</summary>
+    public List<string> Proposals { get; init; } = [];
 
     [System.Text.Json.Serialization.JsonIgnore]
     public List<string> Tokens { get; } = [];

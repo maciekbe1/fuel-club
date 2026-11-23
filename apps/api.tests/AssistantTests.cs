@@ -779,6 +779,61 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_named_coupon_the_user_lacks_is_never_replaced_by_their_only_one()
+    {
+        // Found by the judge in demo-1: "rabat" named, the only coupon (hot dog) was proposed.
+        var customer = await AccountAsync();
+        await CouponAsync(customer, "Hot dog");
+
+        var lacking = await ChatAsync(customer.Client, $"Aktywuj kupon Rabat {_tag}");
+
+        Assert.Empty(lacking.Of("confirmation"));
+        Assert.Contains("Nie masz takiego kuponu", lacking.Text);
+        Assert.Contains($"Hot dog {_tag}", lacking.Text);
+
+        // A general request names nothing: the only coupon may be proposed.
+        var general = await ChatAsync(customer.Client, "Aktywuj mój kupon");
+        Assert.Single(general.Of("confirmation"));
+    }
+
+    [Fact]
+    public async Task Named_words_match_whole_words_or_their_inflection_not_parts_of_others()
+    {
+        var customer = await AccountAsync();
+        var pizza = await CouponAsync(customer, "Kawałek pizzy");
+
+        // "kawa" is not "kawałek": the only coupon is not proposed for coffee.
+        var coffee = await ChatAsync(customer.Client, $"aktywuj kupon kawa {_tag}");
+        Assert.Empty(coffee.Of("confirmation"));
+        Assert.Contains("Nie masz takiego kuponu", coffee.Text);
+
+        // Inflected, with a greeting and a stand-alone dash: still the named coupon.
+        var named = await ChatAsync(customer.Client, $"Hej, aktywuj kupon - kawałka pizzy {_tag}");
+        Assert.Equal(pizza.Id, named.Of("confirmation").Single().GetProperty("couponId").GetGuid());
+    }
+
+    [Fact]
+    public async Task A_name_that_fits_several_offers_is_asked_about_not_guessed()
+    {
+        var customer = await AccountAsync();
+        await CouponAsync(customer, "Weekend paliwo");
+        await CouponAsync(customer, "Weekend myjnia");
+        var other = await CouponAsync(customer, "Kawa");
+
+        var several = await ChatAsync(customer.Client, $"aktywuj kupon weekend {_tag}");
+
+        Assert.Empty(several.Of("confirmation"));
+        Assert.Contains("Który kupon", several.Text);
+        Assert.Contains($"Weekend paliwo {_tag}", several.Text);
+        Assert.Contains($"Weekend myjnia {_tag}", several.Text);
+        // Only the matching ones are offered to choose from.
+        Assert.DoesNotContain($"Kawa {_tag}", several.Text);
+
+        var one = await ChatAsync(customer.Client, $"aktywuj kupon kawa {_tag}");
+        Assert.Equal(other.Id, one.Of("confirmation").Single().GetProperty("couponId").GetGuid());
+    }
+
+    [Fact]
     public async Task The_model_never_sees_the_confirmation_token()
     {
         var seen = new List<ToolResult>();

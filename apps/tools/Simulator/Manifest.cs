@@ -72,6 +72,12 @@ public sealed class Manifest
         return manifest;
     }
 
+    public Operation? Find(string key)
+    {
+        lock (_lock)
+            return Operations.FirstOrDefault(o => o.Key == key);
+    }
+
     public bool IsDone(string key)
     {
         lock (_lock)
