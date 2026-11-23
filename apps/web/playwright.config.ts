@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { ADMIN, CASHIER } from "./e2e/accounts";
+import { ADMIN, CASHIER, SUPPORT } from "./e2e/accounts";
 
 /**
  * E2E against the real API and a dedicated database (fuelclub_e2e on the postgres-test container).
@@ -58,6 +58,8 @@ export default defineConfig({
         BootstrapCashier__RegisterCode: "K1",
         BootstrapAdmin__Email: ADMIN.email,
         BootstrapAdmin__Password: ADMIN.password,
+        BootstrapSupport__Email: SUPPORT.email,
+        BootstrapSupport__Password: SUPPORT.password,
       },
       // Never reuse: a running server may skip the migration or point at another database.
       reuseExistingServer: false,

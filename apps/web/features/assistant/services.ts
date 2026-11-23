@@ -13,14 +13,17 @@ export type ChatConfirmation = Schemas["ChatConfirmationEvent"];
 export type ChatHistoryItem = Schemas["ChatHistoryItem"];
 export type ChatToolEvent = Schemas["ChatToolEvent"];
 
-const NAMES = new Set<string>([
-  "meta",
-  "tool",
-  "delta",
-  "confirmation",
-  "done",
-  "error",
-]);
+// Every event of the contract: the compiler fails when the API adds one this list lacks.
+const EVENTS: Record<ChatEventName, true> = {
+  meta: true,
+  tool: true,
+  delta: true,
+  confirmation: true,
+  handoff: true,
+  done: true,
+  error: true,
+};
+const NAMES = new Set<string>(Object.keys(EVENTS));
 
 /** The stream ended without `done` or `error`: the answer is incomplete, never a success. */
 export class StreamInterruptedError extends Error {

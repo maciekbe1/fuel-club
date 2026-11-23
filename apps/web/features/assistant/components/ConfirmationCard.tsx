@@ -8,7 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, NetworkError } from "@/lib/api/problem";
 import { benefitTerms, isProduct } from "@/lib/format";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
-import { useConfirmActivation } from "../hooks";
+import { HANDOFF_ACTIVE, useConfirmActivation } from "../hooks";
 import type { Turn } from "../hooks";
 import type { ChatConfirmation } from "../services";
 
@@ -27,6 +27,8 @@ function confirmationError(error: Error) {
   if (error instanceof ApiError) {
     if (error.code === "assistant.confirmation_expired")
       return "Propozycja wygasła. Poproś asystenta o nową.";
+    if (error.code === HANDOFF_ACTIVE)
+      return "Aktywacja jest niedostępna, gdy rozmowę prowadzi konsultant.";
     if (error.code === "rewards.coupon_redeemed")
       return "Ten kupon został już wykorzystany.";
     if (error.status === 401) return "Sesja wygasła. Zaloguj się ponownie.";
@@ -42,9 +44,12 @@ function confirmationError(error: Error) {
 export function ConfirmationCard({
   confirmation,
   turnStatus,
+  locked = false,
 }: {
   confirmation: ChatConfirmation;
   turnStatus: Turn["status"];
+  /** A support case is open: the proposal cannot be confirmed (the API refuses it too). */
+  locked?: boolean;
 }) {
   const waiting = turnStatus === "streaming";
   const available = turnStatus === "done" || waiting;
@@ -82,6 +87,10 @@ export function ConfirmationCard({
             Moje kupony
           </Link>
           .
+        </p>
+      ) : locked ? (
+        <p className="text-sm text-muted-foreground">
+          Aktywacja niedostępna podczas rozmowy z konsultantem.
         </p>
       ) : declined ? (
         <p className="text-sm text-muted-foreground">

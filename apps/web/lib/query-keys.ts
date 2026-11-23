@@ -13,6 +13,14 @@ export const queryKeys = {
     /** Mutation key of the reward handover: the purchase form is locked while it runs. */
     rewardHandover: ["cashier", "reward-handover"] as const,
   },
+  support: {
+    all: ["support"] as const,
+    current: ["support", "current"] as const,
+    queue: ["support", "queue"] as const,
+    conversations: ["support", "conversation"] as const,
+    conversation: (side: string, id: string) =>
+      ["support", "conversation", side, id] as const,
+  },
   admin: {
     all: ["admin"] as const,
     users: ["admin", "users"] as const,

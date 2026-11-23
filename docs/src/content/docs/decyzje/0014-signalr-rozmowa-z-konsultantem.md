@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-23), P11. Zmienia transport z [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/) (polling co 3 s). Hub zrealizowany ([Support](/moduly/support/#hub-signalr)); UI planowane.
+Decyzja przyjęta (2026-11-23), P11. Zmienia transport z [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/) (polling co 3 s). Zrealizowana: hub ([Support](/moduly/support/#hub-signalr)) i UI ([interfejs](/moduly/support/#interfejs)). Proxy E2E przekazuje WebSocket, więc E2E sprawdza połączenie na żywo, nie tylko polling.
 
 ## Problem
 

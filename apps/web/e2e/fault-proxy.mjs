@@ -2,13 +2,24 @@
 // fails /api/auth/me on purpose, so a single test can simulate an API outage without affecting others.
 // For the chat stream (POST /api/chat): `sse-split` re-sends the stream in 3-byte pieces and holds it
 // before the first `delta` frame; `sse-cut` closes the connection there (no done, no error).
+// WebSocket upgrades (the support hub) are tunnelled as is; `POST /__e2e/drop-ws` cuts every open
+// tunnel, so a test can make the SignalR client reconnect.
 import http from "node:http";
+import net from "node:net";
 
 const port = Number(process.env.PROXY_PORT);
 const target = new URL(process.env.PROXY_TARGET);
 
-http
+const tunnels = new Set();
+
+const server = http
   .createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/__e2e/drop-ws") {
+      for (const socket of tunnels) socket.destroy();
+      tunnels.clear();
+      res.writeHead(204);
+      return res.end();
+    }
     const fault = /(?:^|;\s*)e2e-fault=([^;]+)/.exec(
       req.headers.cookie ?? "",
     )?.[1];
@@ -42,6 +53,27 @@ http
     req.pipe(upstream);
   })
   .listen(port);
+
+server.on("upgrade", (req, socket, head) => {
+  const upstream = net.connect(Number(target.port), target.hostname, () => {
+    const headers = [];
+    for (let i = 0; i < req.rawHeaders.length; i += 2)
+      headers.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
+    upstream.write(
+      `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n${headers.join("\r\n")}\r\n\r\n`,
+    );
+    if (head.length) upstream.write(head);
+    socket.pipe(upstream).pipe(socket);
+  });
+  tunnels.add(socket);
+  const close = () => {
+    tunnels.delete(socket);
+    socket.destroy();
+    upstream.destroy();
+  };
+  socket.on("error", close).on("close", close);
+  upstream.on("error", close).on("close", close);
+});
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

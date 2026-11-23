@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Headset,
   ChevronRight,
   CreditCard,
   History,
@@ -25,7 +26,8 @@ export function HomeScreen() {
   const isCustomer = me?.roles.includes("User") ?? false;
   const isCashier = me?.roles.includes("Cashier") ?? false;
   const isAdmin = me?.roles.includes("Admin") ?? false;
-  const staffShortcuts = (isCashier || isAdmin) && (
+  const isSupport = me?.roles.includes("Support") ?? false;
+  const staffShortcuts = (isCashier || isAdmin || isSupport) && (
     <>
       {isCashier && (
         <Shortcut
@@ -33,6 +35,14 @@ export function HomeScreen() {
           icon={ScanLine}
           title="Kasa"
           description="Zarejestruj zakup paliwa"
+        />
+      )}
+      {isSupport && (
+        <Shortcut
+          href="/konsultant"
+          icon={Headset}
+          title="Konsultant"
+          description="Rozmowy z klientami z kolejki"
         />
       )}
       {isAdmin && (
@@ -130,6 +140,7 @@ function Shortcut({
     | "/kupony"
     | "/czat"
     | "/kasa"
+    | "/konsultant"
     | "/admin/oferty"
     | "/admin/obserwowalnosc";
   icon: ComponentType<{ className?: string }>;

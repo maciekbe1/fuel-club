@@ -14,6 +14,8 @@ import {
 } from "./services";
 
 export const MAX_MESSAGE_LENGTH = 1000;
+/** A support case is open: the chat and its confirmations are off (ADR 0012). */
+export const HANDOFF_ACTIVE = "assistant.handoff_active";
 const MAX_HISTORY_ITEMS = 20;
 const MAX_HISTORY_TEXT = 2000;
 
@@ -30,6 +32,8 @@ export type Turn = {
   /** `done` only after the server's done event; anything else is not a successful answer. */
   status: "streaming" | "done" | "error" | "cancelled";
   error?: string;
+  /** API error code of a failed turn (e.g. assistant.handoff_active). */
+  errorCode?: string;
 };
 
 type State = { turns: Turn[]; demo: boolean | null };
@@ -37,7 +41,7 @@ type State = { turns: Turn[]; demo: boolean | null };
 type Action =
   | { type: "start"; id: number; question: string }
   | { type: "event"; id: number; event: ChatEvent }
-  | { type: "fail"; id: number; message: string }
+  | { type: "fail"; id: number; message: string; code?: string }
   | { type: "cancel"; id: number };
 
 function update(state: State, id: number, change: (turn: Turn) => Turn) {
@@ -77,6 +81,7 @@ function reducer(state: State, action: Action): State {
         ...turn,
         status: "error",
         error: action.message,
+        errorCode: action.code,
       }));
     case "event": {
       const { event } = action;
@@ -97,7 +102,12 @@ function reducer(state: State, action: Action): State {
           case "done":
             return { ...turn, status: "done" };
           case "error":
-            return { ...turn, status: "error", error: event.data.message };
+            return {
+              ...turn,
+              status: "error",
+              error: event.data.message,
+              errorCode: event.data.code,
+            };
         }
       });
     }
@@ -120,6 +130,8 @@ function failureMessage(error: unknown) {
     if (error.status === 429)
       return "Za dużo pytań w krótkim czasie. Spróbuj za chwilę.";
     if (error.status === 401) return "Sesja wygasła. Zaloguj się ponownie.";
+    if (error.code === HANDOFF_ACTIVE)
+      return "Rozmowę prowadzi teraz konsultant - asystent jest wyłączony.";
     if (error.status === 403)
       return "Asystent jest dostępny tylko dla kont klientów.";
     if (error.status === 400 && error.problem.errors?.message)
@@ -181,7 +193,12 @@ export function useChat() {
           }
           // Close the request too, so the server stops the turn.
           controller.abort();
-          dispatch({ type: "fail", id, message: failureMessage(error) });
+          dispatch({
+            type: "fail",
+            id,
+            message: failureMessage(error),
+            code: error instanceof ApiError ? error.code : undefined,
+          });
         } finally {
           release();
         }
@@ -194,7 +211,17 @@ export function useChat() {
 
   const cancel = useCallback(() => active.current?.abort(), []);
 
-  return { turns: state.turns, demo: state.demo, streaming, send, cancel };
+  /** Completed turns as the history a support case may attach. */
+  const history = useCallback(() => historyOf(state.turns), [state.turns]);
+
+  return {
+    turns: state.turns,
+    demo: state.demo,
+    streaming,
+    send,
+    cancel,
+    history,
+  };
 }
 
 /**

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChatScreen } from "@/features/assistant/components/ChatScreen";
+import { ChatWithSupport } from "@/components/chat/ChatWithSupport";
 
 export default function ChatPage() {
   return (
@@ -13,7 +13,7 @@ export default function ChatPage() {
         </Link>
         <h1 className="text-2xl font-semibold">Asystent</h1>
       </div>
-      <ChatScreen />
+      <ChatWithSupport />
     </div>
   );
 }

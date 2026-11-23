@@ -5,8 +5,8 @@ sidebar:
   order: 6
 ---
 
-:::caution[W trakcie - P11]
-Zrealizowane (API): rola `Support`, model, wszystkie endpointy klienta i konsultanta, blokada czatu (także tura trwająca w chwili przekazania i wyścig z aktywacją), worker (wygaśnięcie, bezczynność, retencja), `BootstrapSupport` i konto demo. Zrealizowane także `propose_handoff` (zdarzenie `handoff`). Zrealizowany hub SignalR ([ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)). Planowane: interfejs klienta i konsultanta, E2E. Decyzja: [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/).
+:::note[P11]
+Zrealizowane: rola `Support`, model, endpointy klienta i konsultanta, blokada czatu (także tura trwająca w chwili przekazania i wyścig z aktywacją), worker (wygaśnięcie, bezczynność, retencja), `BootstrapSupport` i konto demo, `propose_handoff` (zdarzenie `handoff`), hub SignalR ([ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)), interfejs klienta (`/czat`) i konsultanta (`/konsultant`), E2E. Decyzja: [ADR 0012](/decyzje/0012-przekazanie-do-konsultanta/).
 :::
 
 ## Co robi
@@ -26,6 +26,9 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
 | Konsultant: przejęcie; kolejka, wiadomości, oddanie, zamknięcie | `Agent/ClaimCaseEndpoint.cs`, `Agent/AgentCaseEndpoints.cs` |
 | Blokada czatu i potwierdzeń; zatrzymanie trwającej tury | `apps/api/Modules/Assistant/Chat/ChatEndpoints.cs`, `Chat/ChatService.cs` |
 | Hub SignalR, powiadomienia, kontrola originu, schemat zdarzeń | `SupportHub.cs` |
+| Web: serwisy (HTTP, hub), hooki (kursor, hub, „pisze”), teksty | `apps/web/features/support/{services,hooks,texts}.ts` |
+| Web: rozmowa (obie strony), formularz zgody, klient, panel konsultanta | `features/support/components/*.tsx` (jeden komponent na plik) |
+| Web: czat + konsultant na `/czat` | `components/chat/ChatWithSupport.tsx`; `/konsultant` - `app/(app)/konsultant/page.tsx` |
 | Konto konsultanta (`BootstrapSupport`), konto demo | `Modules/Accounts/Infrastructure/SupportAccountProvisioner.cs`, `Infrastructure/DemoData/DemoAccountsSeeder.cs` |
 
 ## Przepływ
@@ -60,6 +63,16 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
 - Role `User` i `Support`; anonimowy `401`, `Cashier`/`Admin` `403`.
 - `messageAdded { caseId, seq }`, `caseChanged { caseId, status }` - do właściciela i aktualnego opiekuna; odbiorcy **i stan** czytane z bazy w chwili wysyłki (`Clients.User`), więc spóźnione zdarzenie nie niesie nieaktualnego stanu. Przy oddaniu i powrocie do kolejki raz także do byłego opiekuna, potem już nigdy. `queueChanged {}` - do grupy konsultantów; przebieg workera wysyła je raz. Odpowiedź z błędem (zmiana wycofana) nie wysyła niczego.
 - `Typing(caseId)`: przekazane drugiej stronie tylko, gdy wołający jest właścicielem albo opiekunem zgłoszenia `Assigned` (sprawdzane w bazie przy każdym wywołaniu); najwyżej 1/s na połączenie i zgłoszenie, liczone tylko dla przekazanych sygnałów; bez zapisu i logów.
+
+## Interfejs
+
+- **Klient (`/czat`)**: przycisk „Porozmawiaj z konsultantem” zawsze pod polem czatu i przy propozycji asystenta (`handoff`). Formularz: zgoda „Rozmowa z konsultantem jest zapisywana i przechowywana 30 dni od zakończenia.”, pole „Dołącz dotychczasową rozmowę z asystentem” (domyślnie wyłączone, tylko gdy są ukończone tury), pierwsza wiadomość. Wysłanie najpierw przerywa trwającą odpowiedź bota. Utracona odpowiedź → ponowienie z tym samym kluczem; `409 support.case_open` → pokazanie istniejącego zgłoszenia.
+- W trakcie zgłoszenia tury asystenta zostają na ekranie, ale bez pola pytania i z wyłączonymi propozycjami aktywacji. Zgłoszenie otwarte przy wejściu (inna karta, ponowne logowanie) pokazuje się od razu; po zamknięciu lub wygaśnięciu zostaje z komunikatem do „Wróć do asystenta”.
+- **Konsultant (`/konsultant`, skrót na stronie startowej dla roli `Support`)**: „Moje rozmowy” i „Kolejka”, „Przejmij”, rozmowa z historią pod nagłówkiem „Tekst przekazany przez klienta - niepotwierdzony”, „Oddaj do kolejki”, „Zamknij zgłoszenie”. Utrata zgłoszenia (`403 not_assignee`, `404`) wraca do kolejki z komunikatem.
+- Treść zawsze z kursora (`useConversation` dociąga tylko nowsze niż ostatnia trzymana); zdarzenia huba unieważniają zapytania; po połączeniu i każdym ponownym - odczyt wszystkiego. Bez połączenia: odczyt co 3 s i dopisek „odświeżanie co kilka sekund”.
+- Połączenie: automatyczne ponowienia SignalR (0, 2, 5, 10, 30 s), po ich wyczerpaniu - nowe połączenie co 5 s. Opuszczenie rozmowy usuwa ją z pamięci zapytań (stary `403` nie wyrzuca po ponownym przejęciu).
+- „Pisze”: wysyłane przy pisaniu najwyżej co 2 s, tylko w zgłoszeniu `Assigned`; pokazywane 5 s od ostatniego sygnału, gaszone przez `messageAdded`.
+- Biblioteki: `@microsoft/signalr` (hub), `use-stick-to-bottom` (przewijanie rozmowy), shadcn `textarea`, `checkbox`.
 
 ## Konto konsultanta
 
@@ -115,7 +128,8 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
 | `apps/api.tests/SupportConversationTests.cs` | rozmowa: `current`, kolejka (nazwa klienta, pierwsza wiadomość klienta - nie historia), odczyt przed przejęciem `403`, przejęcie przenosi do „moich”, historia + wiadomość + `claimed`, odpowiedź konsultanta z `Seq`, ten sam kursor - te same wiadomości; obcy klient `404`, obcy konsultant `403 support.not_assignee`, każda strona tylko na swoich ścieżkach, zły kursor i tekst `400`; **po oddaniu były opiekun: wiadomość, odczyt, oddanie, zamknięcie → `403`, inny przejmuje i pisze, były dalej `403`**; **wiadomość w wyścigu z oddaniem (bramka trzyma niezatwierdzone oddanie) czeka na blokadę wiersza i dostaje `403`, nic nie zapisane**; zamknięte: wiadomości obu stron `409`, oddanie `409`, `current` → `204`, odczyt ze stanem `Closed`; 12 równoległych wiadomości → `Seq` bez luk, odczyt małymi krokami zbiera każdą raz; ten sam klucz → jedna wiadomość |
 | `apps/api.tests/SupportHandoffTurnTests.cs` | **tura wstrzymana w modelu, w tym czasie zgłoszenie: spóźniona odpowiedź nie wychodzi (`meta`, `error handoff_active`); spóźniona propozycja aktywacji - bez `tool` i `confirmation`, kupon nieaktywny**; ślad tury zatrzymanej przekazaniem ma wynik `Cancelled`, nie `Error` (kolejka przeglądu i reguła powtarzających się błędów go nie liczą); bez zgłoszenia tura odpowiada normalnie; **„chcę porozmawiać z konsultantem” (model demo) → `tool propose_handoff ok`, `handoff`, odpowiedź z nazwą przycisku, żadnego zgłoszenia**; `propose_handoff` z argumentami → odrzucone, bez `handoff` |
 | `apps/api.tests/SupportHousekeepingTests.cs` | przejęte: 23 h bez zmian, 25 h → kolejka, `idle_returned`, były opiekun `403`; czekające: 6 dni bez zmian, 8 dni → `Expired`, `expired`, czat wolny, wiadomość `409`, nowe zgłoszenie; retencja: po 29 dniach zamknięte i wygasłe zostają, po 31 usunięte z wiadomościami; **wiadomość klienta nie zatrzymuje zgłoszenia przy konsultancie nieaktywnym 25 h, wiadomość konsultanta tak** |
-
 | `apps/api.tests/SupportHubTests.cs` | klient SignalR (long polling przez `TestServer`, ciasteczko sesji): kolejka → `queueChanged`, przejęcie → `caseChanged Assigned` u klienta, wiadomość → `messageAdded` z `seq` bez treści u obu stron, „pisze” w obie strony z autorem; **po oddaniu: były opiekun (który pisał w zgłoszeniu) dostaje jedno `caseChanged Waiting`, potem ani `messageAdded`, ani `typing`, a jego `Typing` nie dociera do klienta**; obcy klient i obcy konsultant - ich `Typing` nie dociera, nie dostają zdarzeń zgłoszenia; dwa sygnały w sekundę → jeden, ale konsultant przełączający się między dwoma zgłoszeniami - oba dochodzą; **long polling jak przeglądarka: origin tylko przy negocjacji, potem bez - działa**; obcy origin i brak originu przy negocjacji `403`, anonimowy `401`, `Cashier`/`Admin` `403`; walidacja `HubAllowedOrigins` (ukośnik, ścieżka, brak schematu, `ftp`) |
+
+| `apps/web/e2e/support.spec.ts` | demo: „chcę porozmawiać z konsultantem” → propozycja → zgoda, dołączona historia, pierwsza wiadomość → „Czekasz na konsultanta”, pole czatu znika; konsultant (`BootstrapSupport` w E2E) przejmuje z kolejki, widzi historię jako niepotwierdzoną; klient widzi przejęcie; **na żywo (bez dopisku o odświeżaniu): „Konsultant pisze…”, wiadomość, „Klient pisze…”, odpowiedź**; **zerwanie WebSocketów w proxy E2E (`POST /__e2e/drop-ws`) → znów „Konsultant pisze…” (tylko przez hub, więc obie strony połączyły się ponownie), potem wiadomość wysłana po zerwaniu dociera**; przeładowanie pokazuje otwartą rozmowę; zamknięcie przez klienta → „Rozmowa zakończona” u obu, powrót do asystenta; bez ukończonych tur brak pola dołączenia historii, „Anuluj” wraca do czatu |
 
 Mutacje sprawdzone: bez blokady klienta w potwierdzeniu - 2 testy wyścigu padają; przejęcie bez warunku `Waiting` - 2 testy przejęcia; tura bez ponownego sprawdzenia - 2 testy tury; bezczynność liczona od dowolnej aktywności - test wiadomości klienta; zapis konsultanta bez warunku opiekuna - 3 testy rozmowy; `Typing` konsultanta bez sprawdzenia opiekuna - 2 testy huba; odbiorcy `messageAdded` z autorów wiadomości zamiast stanu - test oddania; origin wymagany na każdym żądaniu - test long pollingu; ograniczenie „pisze” na połączenie zamiast na zgłoszenie - test przełączania.

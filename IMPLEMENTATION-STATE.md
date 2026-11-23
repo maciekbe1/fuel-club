@@ -409,6 +409,10 @@ Transport rozmowy: właściciel zdecydował SignalR (status „pisze”, wiadomo
 Krok 4 - hub SignalR (ADR 0014): `/api/support/hub`, kontrola originu, odbiorcy z bazy w chwili wysyłki, `Typing` sprawdzany przy każdym wywołaniu (1/s), powiadomienia po zatwierdzeniu (endpointy `Response.OnCompleted`, worker po commicie), schemat `SupportHubContract` w OpenAPI; testy `SupportHubTests` 4 (klient SignalR w testach); mutacje: `Typing` bez sprawdzenia opiekuna - 2 testy, odbiorcy z autorów wiadomości - 1 test (po wzmocnieniu: były opiekun pisze przed oddaniem); API 533/533 (1 pominięty).
 - review (`/code-review high`, 8 uwag, przyjęte): origin wymagany tylko przy negocjacji i WebSocket (przeglądarka nie wysyła go przy GET transportów zapasowych - inaczej fallback SSE/long polling dostawał `403`); stan w `caseChanged` czytany przy wysyłce (spóźnione zdarzenie nie niesie starego stanu); brak powiadomień przy odpowiedzi z błędem; „pisze” ograniczane per zgłoszenie i tylko po przekazaniu; walidacja `HubAllowedOrigins`; jedno `queueChanged` na przebieg workera; `CloseOnAuthenticationExpiration` (wylogowanie w innej karcie - opisane ograniczenie); opis UI w docs bez trybu, którego jeszcze nie ma; mutacje: origin na każdym żądaniu, ograniczenie per połączenie - po 1 teście.
 
+Krok 5 - UI i E2E: `/czat` (przycisk, zgoda, historia opcjonalna, rozmowa na żywo, blokada czatu i propozycji), `/konsultant` (kolejka, przejęcie, rozmowa, oddanie, zamknięcie); `@microsoft/signalr`, `use-stick-to-bottom`, shadcn `textarea`/`checkbox`; jeden komponent na plik (uwaga właściciela), także `ChatScreen` → `ChatTurn`, `ToolChip`; proxy E2E tuneluje WebSocket i umie go zerwać; naprawiony błąd kroku 3 (web pomijał zdarzenie `handoff` - lista zdarzeń typowana kontraktem); E2E 148/148.
+- review (`/code-review high`, 7 uwag, przyjęte): zapamiętany `403` wyrzucał konsultanta po ponownym przejęciu (rozmowa usuwana z pamięci przy wyjściu); przewijanie do dołu nie działało ponad 60vh (limit na elemencie przewijanym przez bibliotekę); hub nie wracał po wyczerpaniu ponowień; drugie odrzucenie czatu nie pokazywało zgłoszenia; historia brana przy kliknięciu zamiast przy wysłaniu; ręczne typy żądania → z `schema.d.ts`; test zerwania sprawdza „pisze” (tylko hub), nie tylko dotarcie wiadomości.
+- audyt reszty kodu (podział plików, biblioteki zamiast własnego kodu) - raport przekazany właścicielowi, zmiany czekają na decyzję.
+
 ## Następny krok
 
 Otwarte:
@@ -417,4 +421,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: API, `propose_handoff` i hub gotowe; dalej UI klienta i konsultanta, E2E.
+P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11: API, `propose_handoff`, hub, UI i E2E gotowe; dalej refaktor z audytu (zgoda właściciela): podziały plików, wspólny błąd wczytywania, shadcn `skeleton`/`alert`, martwy kod; potem osobno skaner QR i API.

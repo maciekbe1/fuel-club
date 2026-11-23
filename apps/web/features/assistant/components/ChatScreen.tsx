@@ -1,31 +1,12 @@
 "use client";
 
-import { Bot, Check, CircleAlert, Send, Square, Wrench } from "lucide-react";
+import { Headset, Send, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import {
-  MAX_MESSAGE_LENGTH,
-  useChat,
-  type ToolCall,
-  type Turn,
-} from "../hooks";
-import { ConfirmationCard } from "./ConfirmationCard";
-
-const TOOL_LABELS: Record<string, string> = {
-  get_my_balance: "Saldo punktów",
-  list_available_rewards: "Dostępne oferty",
-  list_my_coupons: "Twoje kupony",
-  propose_coupon_activation: "Propozycja aktywacji",
-  compare_coupons: "Porównanie kuponów",
-  explain_purchase_points: "Rachunek punktów",
-};
-
-const TOOL_STATUS: Record<string, string> = {
-  ok: "sprawdzono",
-  rejected: "odrzucono",
-  error: "błąd",
-};
+import { Textarea } from "@/components/ui/textarea";
+import { HANDOFF_ACTIVE, MAX_MESSAGE_LENGTH, useChat } from "../hooks";
+import type { ChatHistoryItem } from "../services";
+import { ChatTurn } from "./ChatTurn";
 
 const SUGGESTIONS = [
   "Ile mam punktów?",
@@ -36,8 +17,33 @@ const SUGGESTIONS = [
   "Aktywuj mój kupon",
 ];
 
-export function ChatScreen() {
+/**
+ * @param onTalkToAgent The customer asked for an agent: completed turns (to attach, if they agree)
+ *   and a way to stop the answer in progress before the case is created.
+ * @param locked A support case is shown: no new questions, no confirmations.
+ * @param onHandoffActive A turn was refused because a case is open (e.g. opened in another tab).
+ */
+export function ChatScreen({
+  onTalkToAgent,
+  locked = false,
+  onHandoffActive,
+}: {
+  onTalkToAgent?: (history: () => ChatHistoryItem[], stop: () => void) => void;
+  locked?: boolean;
+  onHandoffActive?: () => void;
+} = {}) {
   const chat = useChat();
+  // Each refused turn, not just the first: a later case may be opened in another tab too.
+  const refused = chat.turns.findLast(
+    (turn) => turn.errorCode === HANDOFF_ACTIVE,
+  )?.id;
+  useEffect(() => {
+    if (refused !== undefined) onHandoffActive?.();
+  }, [refused, onHandoffActive]);
+  const talkToAgent =
+    onTalkToAgent && !locked
+      ? () => onTalkToAgent(chat.history, chat.cancel)
+      : undefined;
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
   const last = chat.turns.at(-1);
@@ -69,7 +75,7 @@ export function ChatScreen() {
         aria-live="polite"
         className="flex flex-col gap-4"
       >
-        {chat.turns.length === 0 && (
+        {chat.turns.length === 0 && !locked && (
           <div className="flex flex-col gap-3 rounded-3xl border p-5">
             <p className="text-muted-foreground">
               Zapytaj o saldo, oferty albo swoje kupony. Aktywację kuponu
@@ -91,140 +97,88 @@ export function ChatScreen() {
           </div>
         )}
         {chat.turns.map((turn) => (
-          <TurnView key={turn.id} turn={turn} />
+          <ChatTurn
+            key={turn.id}
+            turn={turn}
+            locked={locked}
+            onTalkToAgent={talkToAgent}
+          />
         ))}
         <div ref={end} />
       </div>
 
-      <form
-        className="sticky bottom-0 flex flex-col gap-2 bg-background pt-2 pb-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <label htmlFor="chat-message" className="sr-only">
-          Wiadomość do asystenta
-        </label>
-        <div className="flex items-end gap-2">
-          <textarea
-            id="chat-message"
-            rows={2}
-            maxLength={MAX_MESSAGE_LENGTH}
-            value={draft}
-            placeholder="Napisz pytanie…"
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              // Not while an input method is composing a character.
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                submit();
-              }
-            }}
-            className="min-h-12 flex-1 resize-none rounded-xl border bg-transparent px-4 py-3 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
-          {chat.streaming ? (
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              className="h-12"
-              onClick={chat.cancel}
-            >
-              <Square className="size-4" /> Zatrzymaj
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              size="lg"
-              className="h-12"
-              disabled={!draft.trim()}
-            >
-              <Send className="size-4" /> Wyślij
-            </Button>
-          )}
-        </div>
-        <p className="text-right text-xs text-muted-foreground">
-          {draft.length}/{MAX_MESSAGE_LENGTH}
-        </p>
-      </form>
-    </div>
-  );
-}
-
-function TurnView({ turn }: { turn: Turn }) {
-  return (
-    <section
-      aria-label={`Pytanie: ${turn.question}`}
-      data-testid="chat-turn"
-      data-status={turn.status}
-      className="flex flex-col gap-2"
-    >
-      <p className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-4 py-2 whitespace-pre-wrap text-primary-foreground">
-        {turn.question}
-      </p>
-      <div className="flex max-w-[95%] flex-col gap-2 self-start">
-        {turn.tools.length > 0 && (
-          <ul aria-label="Użyte narzędzia" className="flex flex-wrap gap-1.5">
-            {turn.tools.map((tool, index) => (
-              <ToolChip key={index} tool={tool} />
-            ))}
-          </ul>
-        )}
-        {(turn.text || turn.status === "streaming") && (
-          <div className="flex gap-2 rounded-2xl rounded-bl-sm bg-muted px-4 py-3">
-            <Bot className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <p data-testid="chat-answer" className="whitespace-pre-wrap">
-              {turn.text ||
-                (turn.status === "streaming" && (
-                  <span className="text-muted-foreground">Asystent pisze…</span>
-                ))}
+      {!locked && (
+        <form
+          className="sticky bottom-0 flex flex-col gap-2 bg-background pt-2 pb-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <label htmlFor="chat-message" className="sr-only">
+            Wiadomość do asystenta
+          </label>
+          <div className="flex items-end gap-2">
+            <Textarea
+              id="chat-message"
+              rows={2}
+              maxLength={MAX_MESSAGE_LENGTH}
+              value={draft}
+              placeholder="Napisz pytanie…"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // Not while an input method is composing a character.
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  submit();
+                }
+              }}
+              className="min-h-12 flex-1 resize-none rounded-xl px-4 py-3"
+            />
+            {chat.streaming ? (
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="h-12"
+                onClick={chat.cancel}
+              >
+                <Square className="size-4" /> Zatrzymaj
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="lg"
+                className="h-12"
+                disabled={!draft.trim()}
+              >
+                <Send className="size-4" /> Wyślij
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            {talkToAgent ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={talkToAgent}
+              >
+                <Headset className="size-4" /> Porozmawiaj z konsultantem
+              </Button>
+            ) : (
+              <span />
+            )}
+            <p className="text-xs text-muted-foreground">
+              {draft.length}/{MAX_MESSAGE_LENGTH}
             </p>
           </div>
-        )}
-        {turn.confirmations.map((confirmation) => (
-          <ConfirmationCard
-            key={confirmation.proposalId}
-            confirmation={confirmation}
-            // Offered only once the answer finished; a failed turn's proposal is not offered.
-            turnStatus={turn.status}
-          />
-        ))}
-        {turn.status === "error" && (
-          <p
-            role="alert"
-            className="flex items-start gap-2 rounded-2xl border border-destructive/40 px-4 py-2 text-sm"
-          >
-            <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-            {turn.error}
-          </p>
-        )}
-        {turn.status === "cancelled" && (
-          <p className="text-sm text-muted-foreground">
-            Zatrzymano - odpowiedź jest niepełna.
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function ToolChip({ tool }: { tool: ToolCall }) {
-  const label = TOOL_LABELS[tool.name] ?? "Nieznane narzędzie";
-  const ok = tool.status === "ok";
-  return (
-    <li
-      className={cn(
-        "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs",
-        !ok && "border-amber-500/50 text-amber-900 dark:text-amber-100",
+        </form>
       )}
-    >
-      {ok ? <Check className="size-3" /> : <Wrench className="size-3" />}
-      {label}: {TOOL_STATUS[tool.status] ?? tool.status}
-    </li>
+    </div>
   );
 }
