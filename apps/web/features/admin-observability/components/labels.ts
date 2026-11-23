@@ -39,5 +39,23 @@ export const percent = new Intl.NumberFormat("pl-PL", {
   maximumFractionDigits: 1,
 });
 
+export const usd = new Intl.NumberFormat("pl-PL", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 4,
+});
+
+/** "x z y (z%)": the denominator is always shown next to a share. */
+export const share = (part: number, whole: number) =>
+  whole === 0
+    ? "brak danych"
+    : `${number.format(part)} z ${number.format(whole)} (${percent.format(part / whole)})`;
+
+export const TRAFFIC = {
+  real: "Rzeczywisty",
+  synthetic: "Syntetyczny",
+  all: "Wszystko",
+} as const;
+
 export const ms = (value: number | null | undefined) =>
   value == null ? "brak danych" : `${number.format(value)} ms`;

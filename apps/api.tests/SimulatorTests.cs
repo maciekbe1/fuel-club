@@ -86,10 +86,50 @@ public sealed class SimulatorTests : IDisposable
     public void Scenario_weights_add_up_and_every_scenario_has_a_turn()
     {
         Assert.Equal(100, ChatScenarios.All.Sum(s => s.Weight));
-        Assert.All(ChatScenarios.All, s => Assert.NotEmpty(s.Messages));
+        Assert.All(ChatScenarios.All, s => Assert.NotEmpty(s.Steps));
+        // The known wrong questions stay as regression scenarios, apart from the reworded ones.
+        Assert.Equal(
+            [
+                "Za co dostaję punkty?",
+                "Jakie nagrody mogę wybrać?",
+                "Jak działa zbieranie punktów?",
+            ],
+            ChatScenarios.All.Where(s => s.Regression).SelectMany(s => s.Messages)
+        );
         Assert.Equal(
             ChatScenarios.All.Length,
             ChatScenarios.All.Select(s => s.Name).Distinct().Count()
+        );
+    }
+
+    [Fact]
+    public void A_turn_passes_only_when_every_rule_check_does()
+    {
+        var step = new Step(
+            "Za co dostaję punkty?",
+            ["search_program_rules:ok"],
+            @"§\s?3\.1",
+            Handoff: false
+        );
+        var right = new TranscriptTurn
+        {
+            User = step.Message,
+            Assistant = "Za paliwo: Regulamin, §3.1.",
+            Done = true,
+            Tools = ["search_program_rules:ok"],
+        };
+        var wrong = new TranscriptTurn
+        {
+            User = step.Message,
+            Assistant = "Masz 0 pkt.",
+            Done = true,
+            Tools = ["get_my_balance:ok"],
+        };
+
+        Assert.All(step.Check(right), c => Assert.True(c.Ok, c.Name));
+        Assert.Equal(
+            ["tool search_program_rules:ok", @"answer /§\s?3\.1/"],
+            step.Check(wrong).Where(c => !c.Ok).Select(c => c.Name)
         );
     }
 

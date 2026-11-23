@@ -26,6 +26,7 @@ public sealed class ChatService(
     TimeProvider clock,
     IOptions<AssistantOptions> options,
     IOptions<SimulationOptions> simulation,
+    ModelPricing pricing,
     ILogger<ChatService> logger
 )
 {
@@ -54,6 +55,7 @@ public sealed class ChatService(
         }
         finally
         {
+            recorder.Price(pricing);
             await recorder.SaveAsync(scopes, settings.TraceSaveTimeout, logger);
         }
     }
@@ -138,6 +140,7 @@ public sealed class ChatService(
                     .Select(r => r with { Confirmation = null, Handoff = null })
                     .ToList();
                 ModelStep step;
+                recorder.ModelStep();
                 try
                 {
                     step = await model.NextAsync(

@@ -36,6 +36,16 @@ public sealed class AssistantTurn
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
 
+    /// <summary>Model calls in the turn (failed ones too); null for turns recorded before P16c.</summary>
+    public int? ModelSteps { get; set; }
+
+    /// <summary>
+    /// Estimated when the turn was recorded, from the price version next to it (ADR 0018). Null:
+    /// not applicable (Demo) or unknown (no usage or no price) - never zero by default.
+    /// </summary>
+    public decimal? CostUsd { get; set; }
+    public string? PriceVersion { get; set; }
+
     /// <summary>The conversation of this turn (ADR 0017); null for turns recorded before P16b.</summary>
     public Guid? ConversationId { get; set; }
 

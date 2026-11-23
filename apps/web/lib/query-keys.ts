@@ -27,8 +27,8 @@ export const queryKeys = {
     rewards: ["admin", "rewards"] as const,
     reward: (id: string) => ["admin", "rewards", id] as const,
     observability: ["admin", "observability"] as const,
-    observabilitySummary: (hours: number) =>
-      ["admin", "observability", "summary", hours] as const,
+    observabilitySummary: (hours: number, filters: object) =>
+      ["admin", "observability", "summary", hours, filters] as const,
     reviewQueue: ["admin", "observability", "review"] as const,
   },
 };

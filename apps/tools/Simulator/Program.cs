@@ -5,7 +5,7 @@ using FuelClub.Simulator;
 // Synthetic traffic for the demo instance (ADR 0017). Public HTTP API only.
 //
 //   populate --run <id> [--accounts 5] [--api http://localhost:5301] [--manifest path]
-//   converse --run <id> [--conversations 10] [--chat-per-minute 60]   (after populate)
+//   converse --run <id> [--conversations 10] [--chat-per-minute 60] [--regressions-each 3]
 //   cleanup  --run <id> [--manifest path]     (SIM_DEMO_DATABASE: connection string)
 //   prune    [--days 14]                      (deletes transcripts older than the retention)
 //
@@ -68,6 +68,8 @@ if (manifest.CleanedAt is not null)
     throw new InvalidOperationException("This run was cleaned up; start a new run id.");
 
 // The server decides the run and the model; the simulator only checks it reached the right one.
+string provider,
+    modelName;
 using (var probe = new HttpClient { BaseAddress = new Uri(api) })
 {
     var response = await probe.GetAsync("/api/simulation", cancel.Token);
@@ -93,6 +95,8 @@ using (var probe = new HttpClient { BaseAddress = new Uri(api) })
         return 2;
     }
     Console.WriteLine($"run {run} at {api}: {simulation.Provider}/{simulation.Model}");
+    provider = simulation.Provider;
+    modelName = simulation.Model;
 }
 
 var conversing = args[0] == "converse";
@@ -107,11 +111,24 @@ var settings = new Settings(
     PurchasesPerMinute: options.Int("purchases-per-minute", 50)
 );
 if (conversing)
+{
+    var clock = System.Diagnostics.Stopwatch.StartNew();
     // A global pace; each account also stays under the API's 20 turns/min (ChatScenarios).
-    await new ChatScenarios(manifest, settings, options.Int("chat-per-minute", 60)).RunAsync(
-        options.Int("conversations", 10),
-        cancel.Token
+    await new ChatScenarios(
+        manifest,
+        settings,
+        options.Int("chat-per-minute", 60),
+        options.Int("regressions-each", 3)
+    ).RunAsync(options.Int("conversations", 10), cancel.Token);
+    var (technical, correctness) = Reports.Write(
+        manifest,
+        provider,
+        modelName,
+        clock.Elapsed,
+        ApiSession.RateLimitWaits
     );
+    Console.WriteLine($"reports: {technical}, {correctness}");
+}
 else
     await new Population(manifest, settings).RunAsync(options.Int("accounts", 5), cancel.Token);
 return Environment.ExitCode;

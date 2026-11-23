@@ -36,6 +36,7 @@ public sealed class TurnRecorder : IDisposable
             Model = model.Model,
             PromptVersion = model.PromptVersion,
             Demo = model.Demo,
+            ModelSteps = 0,
             StartedAt = now,
             ConversationId = conversationId,
             Synthetic = synthetic,
@@ -125,6 +126,17 @@ public sealed class TurnRecorder : IDisposable
             span?.SetStatus(ActivityStatusCode.Error);
             throw;
         }
+    }
+
+    /// <summary>A model call starts (counted even if it fails).</summary>
+    public void ModelStep() => _turn.ModelSteps = (_turn.ModelSteps ?? 0) + 1;
+
+    /// <summary>The cost from the usage so far and the price of the turn's model and date.</summary>
+    public void Price(ModelPricing pricing)
+    {
+        var cost = pricing.For(_turn);
+        _turn.CostUsd = cost.Usd;
+        _turn.PriceVersion = cost.PriceVersion;
     }
 
     public void Finish(TurnOutcome outcome, string? errorCode = null)

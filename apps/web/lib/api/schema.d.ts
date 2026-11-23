@@ -2178,11 +2178,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Metrics over the last `hours` (1-720, default 24): chat turns, p95 times, tools, security events and the anomaly rules. Metadata only, users as pseudonyms. */
+        /** @description Metrics over the last `hours` (1-720, default 24), ADR 0018: turns (p50/p95, model steps), tool calls, cost (demo: not applicable; no usage or price: unknown), conversations (handoff once per conversation; Idle is not a resolution), security events and the anomaly rules. `traffic` real (default) | synthetic | all, `runId`, `model`, `promptVersion` filter turns and conversations; security and anomalies are not filtered. Metadata only, users as pseudonyms. */
         get: {
             parameters: {
                 query?: {
                     hours?: number;
+                    traffic?: string;
+                    runId?: string;
+                    model?: string;
+                    promptVersion?: string;
                 };
                 header?: never;
                 path?: never;
@@ -2197,6 +2201,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ObservabilitySummary"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
                     };
                 };
             };
@@ -2386,28 +2399,6 @@ export interface components {
             promptVersion: string;
             demo: boolean;
         };
-        ChatMetrics: {
-            /** Format: int32 */
-            turns: number;
-            /** Format: int32 */
-            done: number;
-            /** Format: int32 */
-            errors: number;
-            /** Format: int32 */
-            cancelled: number;
-            /** Format: double */
-            p95FirstEventMs: null | number;
-            /** Format: double */
-            p95TotalMs: null | number;
-            errorCodes: components["schemas"]["CountItem"][];
-            tools: components["schemas"]["ToolCount"][];
-            /** Format: int64 */
-            inputTokens: null | number;
-            /** Format: int64 */
-            outputTokens: null | number;
-            /** Format: int32 */
-            turnsWithoutTokenData: number;
-        };
         ChatRequest: {
             message: null | string;
             history: null | components["schemas"]["ChatHistoryItem"][];
@@ -2430,6 +2421,26 @@ export interface components {
         ConfirmationRequest: {
             token: null | string;
         };
+        ConversationMetrics: {
+            /** Format: int32 */
+            started: number;
+            /** Format: int32 */
+            open: number;
+            /** Format: int32 */
+            ended: number;
+            /** Format: int32 */
+            endedByClient: number;
+            /** Format: int32 */
+            endedIdle: number;
+            /** Format: int32 */
+            endedByHandoff: number;
+            /** Format: int32 */
+            withHandoffProposal: number;
+            /** Format: int32 */
+            withCase: number;
+            /** Format: int32 */
+            endedWithoutCase: number;
+        };
         ConversationResponse: {
             /** Format: uuid */
             id: string;
@@ -2440,6 +2451,17 @@ export interface components {
             endReason: null | string;
             /** Format: int32 */
             turns: number;
+        };
+        CostMetrics: {
+            /** Format: double */
+            usd: null | number;
+            /** Format: int32 */
+            knownTurns: number;
+            /** Format: int32 */
+            unknownTurns: number;
+            /** Format: int32 */
+            notApplicableTurns: number;
+            priceVersions: string[];
         };
         CountItem: {
             key: string;
@@ -2526,6 +2548,11 @@ export interface components {
             /** Format: int32 */
             balance: number;
         };
+        FilterOptions: {
+            runIds: string[];
+            models: string[];
+            promptVersions: string[];
+        };
         FuelPurchaseRequest: {
             cardCode: null | string;
             /** Format: double */
@@ -2567,7 +2594,11 @@ export interface components {
             from: string;
             /** Format: date-time */
             to: string;
-            chat: components["schemas"]["ChatMetrics"];
+            filters: components["schemas"]["SummaryFilters"];
+            options: components["schemas"]["FilterOptions"];
+            turns: components["schemas"]["TurnMetrics"];
+            cost: components["schemas"]["CostMetrics"];
+            conversations: components["schemas"]["ConversationMetrics"];
             security: components["schemas"]["CountItem"][];
             anomalies: components["schemas"]["AnomalyResult"][];
         };
@@ -2649,6 +2680,12 @@ export interface components {
         };
         RewardsResponse: {
             items: components["schemas"]["RewardResponse"][];
+        };
+        SummaryFilters: {
+            traffic: string;
+            runId: null | string;
+            model: null | string;
+            promptVersion: null | string;
         };
         SupportCaseResponse: {
             /** Format: uuid */
@@ -2775,6 +2812,44 @@ export interface components {
         TransactionsResponse: {
             items: components["schemas"]["TransactionItem"][];
             nextCursor: null | string;
+        };
+        TurnMetrics: {
+            /** Format: int32 */
+            turns: number;
+            /** Format: int32 */
+            done: number;
+            /** Format: int32 */
+            errors: number;
+            /** Format: int32 */
+            cancelled: number;
+            /** Format: double */
+            p50FirstEventMs: null | number;
+            /** Format: double */
+            p95FirstEventMs: null | number;
+            /** Format: double */
+            p50TotalMs: null | number;
+            /** Format: double */
+            p95TotalMs: null | number;
+            /** Format: int64 */
+            modelSteps: number;
+            /** Format: int32 */
+            turnsWithStepData: number;
+            /** Format: double */
+            p95ModelSteps: null | number;
+            /** Format: int64 */
+            toolCalls: number;
+            /** Format: int64 */
+            toolCallsNotOk: number;
+            errorCodes: components["schemas"]["CountItem"][];
+            tools: components["schemas"]["ToolCount"][];
+            /** Format: int64 */
+            inputTokens: null | number;
+            /** Format: int64 */
+            outputTokens: null | number;
+            /** Format: int32 */
+            turnsWithoutTokenData: number;
+            /** Format: int32 */
+            demoTurns: number;
         };
         UpdateRewardRequest: {
             name: null | string;

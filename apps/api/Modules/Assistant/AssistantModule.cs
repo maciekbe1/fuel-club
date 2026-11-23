@@ -90,6 +90,12 @@ public static class AssistantModule
         services.AddScoped<AssistantTools>();
         services.AddScoped<ChatService>();
         services.AddScoped<Conversations.Conversations>();
+        services
+            .AddOptions<ModelPricingOptions>()
+            .Bind(configuration.GetSection(ModelPricingOptions.Section))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ModelPricingOptions>, ModelPricingValidator>();
+        services.AddSingleton<ModelPricing>();
         services.AddRateLimiter(options =>
         {
             options.AddPolicy(

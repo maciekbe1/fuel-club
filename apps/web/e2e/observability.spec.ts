@@ -31,6 +31,24 @@ test("admin sees chat metrics and rules, and clears a suspicious turn from the r
   const metrics = admin.getByTestId("chat-metrics");
   await expect(metrics).toContainText("Tury");
   await expect(admin.getByTestId("anomaly-rule")).toHaveCount(8);
+  // P16c: conversations counted on their own, demo cost is "not applicable", never zero.
+  await expect(admin.getByTestId("conversation-metrics")).toContainText(
+    "Odsetek rozmów bez przekazania",
+  );
+  // The shared E2E database may hold older non-demo turns: narrow to the demo model.
+  await admin.getByLabel("Model").selectOption("demo-rules");
+  await expect(admin.getByText("nie dotyczy (demo)")).toBeVisible();
+  await expect(admin.getByTestId("demo-only")).toContainText(
+    "nie jest pomiar wydajności",
+  );
+  await admin.getByLabel("Model").selectOption("");
+  // Synthetic traffic is a separate view; the run list follows it.
+  await admin.getByRole("button", { name: "Syntetyczny" }).click();
+  await expect(
+    admin.getByRole("button", { name: "Syntetyczny" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(metrics.getByText("Tury", { exact: true })).toBeVisible();
+  await admin.getByRole("button", { name: "Rzeczywisty" }).click();
   await admin.getByRole("button", { name: "1 h" }).click();
   await expect(admin.getByRole("button", { name: "1 h" })).toHaveAttribute(
     "aria-pressed",

@@ -203,6 +203,10 @@ namespace FuelClub.Api.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<decimal?>("CostUsd")
+                        .HasPrecision(12, 6)
+                        .HasColumnType("numeric(12,6)");
+
                     b.Property<bool>("Demo")
                         .HasColumnType("boolean");
 
@@ -224,6 +228,9 @@ namespace FuelClub.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("ModelSteps")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Outcome")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -231,6 +238,10 @@ namespace FuelClub.Api.Migrations
 
                     b.Property<int?>("OutputTokens")
                         .HasColumnType("integer");
+
+                    b.Property<string>("PriceVersion")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
                     b.Property<string>("PromptVersion")
                         .IsRequired()
@@ -283,6 +294,8 @@ namespace FuelClub.Api.Migrations
 
                     b.ToTable("assistant_turns", null, t =>
                         {
+                            t.HasCheckConstraint("ck_assistant_turns_cost", "\"CostUsd\" IS NULL OR \"CostUsd\" >= 0");
+
                             t.HasCheckConstraint("ck_assistant_turns_run", "\"RunId\" IS NULL OR \"Synthetic\"");
 
                             t.HasCheckConstraint("ck_assistant_turns_tool_calls", "\"ToolCalls\" >= 0");

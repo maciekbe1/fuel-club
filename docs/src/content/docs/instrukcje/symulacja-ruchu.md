@@ -8,7 +8,7 @@ sidebar:
 Decyzje: [ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/). Symulator: `apps/tools/Simulator` (.NET, tylko publiczne HTTP API).
 
 :::caution[Planowane]
-P16c: metryki rozmów w panelu (P15b) i przebieg 200 kont / 2000 tur. P16d: judge na transkryptach. Rozmowy na Gemini (`--expect-provider gemini` z limitem kosztu) - jeszcze nie: `converse` działa na adapterze demo. Teraz działa populacja kont (P16a) i rozmowy według scenariuszy (P16b).
+P16d: judge na transkryptach (szacuje jakość znaczenia, wymaga kalibracji ocenami człowieka). Rozmowy na Gemini (`--expect-provider gemini` z limitem kosztu) - jeszcze nie: `converse` działa na adapterze demo. Teraz działa populacja kont (P16a), rozmowy według scenariuszy (P16b) i metryki w panelu (P16c).
 :::
 
 ## Baza i instancja demo
@@ -102,6 +102,20 @@ dotnet run --project apps/tools/Simulator -- converse --run pilot-6 --conversati
 | `cudzy-kupon` | 3 | aktywacja kuponu o cudzym/nieznanym id | klient |
 | `spoza-tematu` | 4 | pogoda | klient |
 | `porzucona` | 5 | saldo | bez zakończenia - serwer zamknie jako `Idle` |
+| `regresja-za-co-punkty` | 1 | „Za co dostaję punkty?” | klient; regresja |
+| `regresja-wybor-nagrody` | 1 | „Jakie nagrody mogę wybrać?” | klient; regresja |
+| `regresja-zbieranie-punktow` | 1 | „Jak działa zbieranie punktów?” | klient; regresja |
+
+- Scenariusze regresyjne to pytania, na które agent odpowiadał źle (znaleziska P16b), w oryginalnym brzmieniu. Przeformułowane wersje w scenariuszach zwykłych tylko generują ruch - nie oznaczają poprawy agenta. Pierwsze rozmowy przebiegu idą na regresje (`--regressions-each`, domyślnie 3 na scenariusz), więc mały przebieg też je ma.
+- Każda tura ma sprawdzenia regułowe (`Step`): wymagane narzędzia (`nazwa` albo `nazwa:stan`), wzorzec odpowiedzi, propozycja konsultanta (musi / nie może), brak narzędzi. To przybliżenie znaczenia, nie ocena człowieka ani judge'a.
+
+### Raporty
+
+Po `converse` w folderze przebiegu, z wszystkich transkryptów przebiegu:
+- `report-technical.md` - przebieg techniczny: operacje rozmów (zakończone, nieudane, w toku), wyniki rozmów, tury z `done` i z błędem strumienia, czas tury po stronie klienta (p50/p95), oczekiwania na `429`. Na demo z dopiskiem, że to nie pomiar Gemini.
+- `report-correctness.md` - poprawność odpowiedzi: tury zgodne ze sprawdzeniami w każdym scenariuszu, przykłady niezgodności, osobno scenariusze zwykłe i regresyjne.
+
+Przebieg może być technicznie czysty przy złych odpowiedziach - dlatego raporty są osobne.
 
 - Zgłoszenie dostaje `conversationId` (przekazanie liczone raz) i jest od razu zamykane przez klienta, żeby konto mogło dalej pisać.
 - Tempo: jedno konto naraz prowadzi swoje rozmowy po kolei, globalnie `--chat-per-minute` (domyślnie 60) - poniżej limitu czatu 20/min na użytkownika przy rozłożeniu na konta; `429` czeka `Retry-After`.
@@ -129,6 +143,11 @@ dotnet run --project apps/tools/Simulator -- cleanup --run pilot-1
 `pilot-1`, 5 kont: 26/26 operacji. Ponowienie: bez zmian w bazie. Ponowienie z trzema operacjami oznaczonymi `Pending` (zakup, realizacja kuponu, wymiana): bez podwojeń. Sprzątanie na bazie testowej: odmowa; na demo: 5 kont, 7 zakupów, 5 kuponów, 2 oferty usunięte, konta demo zostały.
 
 `pilot-2` (po review): 26/26; ponowienie z dwiema rejestracjami `Pending` - bez błędów; sprzątanie z kontem bez id w manifeście - usunięte wszystkie 5 kont i 21 rekordów idempotencji.
+
+`control-1` (P16c, przebieg kontrolny przed dużym, adapter demo): 10 kont, 80 rozmów, 109 tur.
+- Technicznie: 80/80 rozmów, 109/109 tur z `done`, 0 błędów strumienia, 0 oczekiwań na `429`; czas tury u klienta p50 23 ms, p95 35 ms (demo - nie pomiar Gemini).
+- Poprawność: scenariusze zwykłe 99/99 tur zgodnych; regresyjne 0/10 - wszystkie trzy znane pomyłki nadal występują (saldo zamiast regulaminu, pytanie o litry zamiast ofert, brak źródła i propozycja konsultanta dla „zbierania punktów”).
+- Panel (`traffic=synthetic`, `runId=control-1`) zgodny z raportem: 109 tur, 208 kroków modelu, 99 wywołań narzędzi (1 nie `ok`), 80 rozmów (67 klient, 8 przekazanych ze zgłoszeniem, 5 otwartych porzuconych), 15 z propozycją konsultanta, koszt „nie dotyczy” (109 tur demo). Widok rzeczywisty: 0 tur.
 
 `pilot-8` (P16b, pełna lista scenariuszy, adapter demo): 8 kont, 60 rozmów, 89 tur.
 - Wszystkie tury i rozmowy z `Synthetic` i `RunId=pilot-8`; zero tur bez `RunId` w tym czasie.

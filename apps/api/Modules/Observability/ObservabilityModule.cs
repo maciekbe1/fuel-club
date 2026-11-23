@@ -42,9 +42,14 @@ public static class ObservabilityModule
             .RequireCsrf();
         admin
             .MapGet("", ObservabilityEndpoints.Summary)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .WithDescription(
-                "Metrics over the last `hours` (1-720, default 24): chat turns, p95 times, tools, "
-                    + "security events and the anomaly rules. Metadata only, users as pseudonyms."
+                "Metrics over the last `hours` (1-720, default 24), ADR 0018: turns (p50/p95, model steps), "
+                    + "tool calls, cost (demo: not applicable; no usage or price: unknown), conversations "
+                    + "(handoff once per conversation; Idle is not a resolution), security events and the "
+                    + "anomaly rules. `traffic` real (default) | synthetic | all, `runId`, `model`, "
+                    + "`promptVersion` filter turns and conversations; security and anomalies are not "
+                    + "filtered. Metadata only, users as pseudonyms."
             );
         admin.MapGet("/review", ObservabilityEndpoints.Queue);
         admin

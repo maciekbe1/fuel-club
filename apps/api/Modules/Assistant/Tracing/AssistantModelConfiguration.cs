@@ -14,6 +14,10 @@ public sealed class AssistantTurnConfiguration : IEntityTypeConfiguration<Assist
                 table.HasCheckConstraint("ck_assistant_turns_total_ms", "\"TotalMs\" >= 0");
                 table.HasCheckConstraint("ck_assistant_turns_tool_calls", "\"ToolCalls\" >= 0");
                 table.HasCheckConstraint(
+                    "ck_assistant_turns_cost",
+                    "\"CostUsd\" IS NULL OR \"CostUsd\" >= 0"
+                );
+                table.HasCheckConstraint(
                     "ck_assistant_turns_run",
                     "\"RunId\" IS NULL OR \"Synthetic\""
                 );
@@ -28,6 +32,8 @@ public sealed class AssistantTurnConfiguration : IEntityTypeConfiguration<Assist
         builder.Property(turn => turn.ErrorCode).HasMaxLength(100);
         builder.Property(turn => turn.ReviewedBy).HasMaxLength(450);
         builder.Property(turn => turn.RunId).HasMaxLength(40);
+        builder.Property(turn => turn.PriceVersion).HasMaxLength(60);
+        builder.Property(turn => turn.CostUsd).HasPrecision(12, 6);
         builder.Property(turn => turn.Outcome).HasConversion<string>().HasMaxLength(20);
         builder.OwnsMany(
             turn => turn.Tools,

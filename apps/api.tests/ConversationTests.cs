@@ -134,6 +134,10 @@ public sealed class ConversationTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(2, turns.Count);
         Assert.All(turns, t => Assert.False(t.Synthetic));
         Assert.All(turns, t => Assert.Null(t.RunId));
+        // Demo: model calls counted, cost not applicable (no price version).
+        Assert.All(turns, t => Assert.True(t.ModelSteps >= 1));
+        Assert.All(turns, t => Assert.Null(t.CostUsd));
+        Assert.All(turns, t => Assert.Null(t.PriceVersion));
     }
 
     [Fact]

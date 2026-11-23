@@ -4,6 +4,7 @@ using System.Text.Json;
 using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
+using FuelClub.Api.Modules.Assistant.Conversations;
 using FuelClub.Api.Modules.Assistant.Tracing;
 using FuelClub.Api.Modules.Loyalty.Domain;
 using FuelClub.Api.Modules.Observability;
@@ -48,6 +49,11 @@ public sealed class ObservabilityTests(ApiFactory factory) : IAsyncLifetime
             await db
                 .AssistantTurns.Where(t =>
                     t.StartedAt > _now.AddDays(-400) && t.StartedAt < _now.AddDays(1)
+                )
+                .ExecuteDeleteAsync();
+            await db
+                .AssistantConversations.Where(c =>
+                    c.StartedAt > _now.AddDays(-400) && c.StartedAt < _now.AddDays(1)
                 )
                 .ExecuteDeleteAsync();
             await db
@@ -565,13 +571,13 @@ public sealed class ObservabilityTests(ApiFactory factory) : IAsyncLifetime
         )!;
         Assert.Equal(
             (4, 2, 1, 1),
-            (summary.Chat.Turns, summary.Chat.Done, summary.Chat.Errors, summary.Chat.Cancelled)
+            (summary.Turns.Turns, summary.Turns.Done, summary.Turns.Errors, summary.Turns.Cancelled)
         );
-        Assert.Equal("assistant.timeout", Assert.Single(summary.Chat.ErrorCodes).Key);
-        Assert.Equal(880, summary.Chat.P95TotalMs); // percentile_cont: 200 + 0.85 x (1000 - 200)
-        Assert.Equal(new ToolCount("get_my_balance", "ok", 4), Assert.Single(summary.Chat.Tools));
-        Assert.Null(summary.Chat.InputTokens);
-        Assert.Equal(4, summary.Chat.TurnsWithoutTokenData);
+        Assert.Equal("assistant.timeout", Assert.Single(summary.Turns.ErrorCodes).Key);
+        Assert.Equal(880, summary.Turns.P95TotalMs); // percentile_cont: 200 + 0.85 x (1000 - 200)
+        Assert.Equal(new ToolCount("get_my_balance", "ok", 4), Assert.Single(summary.Turns.Tools));
+        Assert.Null(summary.Turns.InputTokens);
+        Assert.Equal(4, summary.Turns.TurnsWithoutTokenData);
         Assert.Equal(new CountItem("AccessDenied", 1), Assert.Single(summary.Security));
         Assert.Equal(AnomalyRules.All, summary.Anomalies.Select(a => a.Rule));
         Assert.DoesNotContain(customer.UserId, raw);
@@ -589,6 +595,237 @@ public sealed class ObservabilityTests(ApiFactory factory) : IAsyncLifetime
             HttpStatusCode.BadRequest,
             (await admin.Client.GetAsync($"{Summary}?hours=0")).StatusCode
         );
+    }
+
+    // ---- P16c metrics (ADR 0018) ----
+
+    private AssistantTurn MetricTurn(
+        string run,
+        bool demo,
+        int steps,
+        decimal? cost = null,
+        int? input = null,
+        string model = "m",
+        string prompt = "v",
+        Guid? conversation = null,
+        bool proposed = false
+    )
+    {
+        var turn = Turn(TurnOutcome.Done);
+        turn.Synthetic = true;
+        turn.RunId = run;
+        turn.Demo = demo;
+        turn.Provider = demo ? "demo" : "gemini";
+        turn.Model = model;
+        turn.PromptVersion = prompt;
+        turn.ModelSteps = steps;
+        turn.CostUsd = cost;
+        turn.PriceVersion = cost is null ? null : "price-test";
+        turn.InputTokens = input;
+        turn.OutputTokens = input is null ? null : 10;
+        turn.ConversationId = conversation;
+        turn.HandoffProposed = proposed;
+        turn.ToolCalls = 2;
+        turn.Tools.Add(
+            new TurnToolCall
+            {
+                Name = "search_program_rules",
+                Status = "no_match",
+                DurationMs = 1,
+            }
+        );
+        return turn;
+    }
+
+    private async Task<ObservabilitySummary> SummaryAsync(HttpClient admin, string query)
+    {
+        var response = await admin.GetAsync($"{Summary}?hours=1&{query}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<ObservabilitySummary>())!;
+    }
+
+    [Fact]
+    public async Task Turns_steps_and_tool_calls_are_separate_counters_and_cost_tells_demo_from_unknown()
+    {
+        var run = $"m-{_tag}";
+        await SeedAsync(
+            MetricTurn(run, demo: true, steps: 1),
+            MetricTurn(run, demo: false, steps: 2, cost: 0.0015m, input: 1000),
+            // Gemini without usage: unknown, not zero.
+            MetricTurn(run, demo: false, steps: 3)
+        );
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var synthetic = await SummaryAsync(admin, $"traffic=synthetic&runId={run}");
+        var real = await SummaryAsync(admin, $"runId={run}");
+
+        Assert.Equal(3, synthetic.Turns.Turns);
+        Assert.Equal((6L, 3), (synthetic.Turns.ModelSteps, synthetic.Turns.TurnsWithStepData));
+        Assert.Equal(6L, synthetic.Turns.ToolCalls);
+        Assert.Equal(3L, synthetic.Turns.ToolCallsNotOk);
+        Assert.Equal(1, synthetic.Turns.DemoTurns);
+        Assert.Equal(1, synthetic.Turns.TurnsWithoutTokenData);
+        Assert.Equal(
+            (0.0015m, 1, 1, 1),
+            (
+                synthetic.Cost.Usd,
+                synthetic.Cost.KnownTurns,
+                synthetic.Cost.UnknownTurns,
+                synthetic.Cost.NotApplicableTurns
+            )
+        );
+        Assert.Equal(["price-test"], synthetic.Cost.PriceVersions);
+        Assert.Contains(run, synthetic.Options.RunIds);
+        // The real view (default) never shows synthetic traffic.
+        Assert.Equal(0, real.Turns.Turns);
+        Assert.Equal("real", real.Filters.Traffic);
+    }
+
+    [Fact]
+    public async Task Demo_only_traffic_has_no_cost_at_all_not_a_zero_cost()
+    {
+        var run = $"d-{_tag}";
+        await SeedAsync(
+            MetricTurn(run, demo: true, steps: 1),
+            MetricTurn(run, demo: true, steps: 1)
+        );
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var summary = await SummaryAsync(admin, $"traffic=synthetic&runId={run}");
+
+        Assert.Null(summary.Cost.Usd);
+        Assert.Equal(
+            (0, 0, 2),
+            (summary.Cost.KnownTurns, summary.Cost.UnknownTurns, summary.Cost.NotApplicableTurns)
+        );
+        Assert.Equal(0, summary.Turns.TurnsWithoutTokenData);
+    }
+
+    [Fact]
+    public async Task Model_and_prompt_filters_narrow_turns_and_conversations()
+    {
+        var run = $"f-{_tag}";
+        var a = Conversation(run, ConversationEndReason.Client);
+        var b = Conversation(run, ConversationEndReason.Client);
+        await SeedAsync(
+            a,
+            b,
+            MetricTurn(
+                run,
+                demo: true,
+                steps: 1,
+                model: "demo-rules",
+                prompt: "v7",
+                conversation: a.Id
+            ),
+            MetricTurn(
+                run,
+                demo: false,
+                steps: 1,
+                model: "gemini-x",
+                prompt: "g7",
+                conversation: b.Id
+            )
+        );
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var byModel = await SummaryAsync(admin, $"traffic=synthetic&runId={run}&model=gemini-x");
+        var byPrompt = await SummaryAsync(admin, $"traffic=synthetic&runId={run}&promptVersion=v7");
+
+        Assert.Equal((1, 1), (byModel.Turns.Turns, byModel.Conversations.Started));
+        Assert.Equal(1, byModel.Turns.Turns - byModel.Turns.DemoTurns);
+        Assert.Equal((1, 1), (byPrompt.Turns.Turns, byPrompt.Conversations.Started));
+        Assert.Equal(1, byPrompt.Turns.DemoTurns);
+        Assert.Equal(
+            ["demo-rules", "gemini-x"],
+            byModel.Options.Models.Where(m => m is "demo-rules" or "gemini-x")
+        );
+    }
+
+    private AssistantConversation Conversation(
+        string run,
+        ConversationEndReason? end,
+        TimeSpan? lastActivityAgo = null,
+        Guid? supportCase = null
+    )
+    {
+        var last = _now - (lastActivityAgo ?? TimeSpan.FromMinutes(2));
+        return new AssistantConversation
+        {
+            Id = Guid.CreateVersion7(),
+            UserPseudonym = "p-test",
+            StartedAt = _now - TimeSpan.FromMinutes(50),
+            LastActivityAt = last,
+            EndedAt = end is null ? null : last,
+            EndReason = end,
+            Turns = 1,
+            SupportCaseId = supportCase,
+            Synthetic = true,
+            RunId = run,
+        };
+    }
+
+    [Fact]
+    public async Task Handoff_counts_once_per_conversation_and_idle_is_not_a_resolution()
+    {
+        var run = $"c-{_tag}";
+        var handedOver = Conversation(
+            run,
+            ConversationEndReason.Handoff,
+            supportCase: Guid.NewGuid()
+        );
+        var declined = Conversation(run, ConversationEndReason.Client);
+        var idle = Conversation(run, ConversationEndReason.Idle);
+        // Past the idle limit but never touched again: idle already, though nobody closed it.
+        var stale = Conversation(run, null, lastActivityAgo: TimeSpan.FromMinutes(45));
+        var open = Conversation(run, null);
+        var plain = Conversation(run, ConversationEndReason.Client);
+        await SeedAsync(
+            handedOver,
+            declined,
+            idle,
+            stale,
+            open,
+            plain,
+            // Two proposals in one conversation: one conversation with a proposal.
+            MetricTurn(run, demo: true, steps: 1, conversation: handedOver.Id, proposed: true),
+            MetricTurn(run, demo: true, steps: 1, conversation: handedOver.Id, proposed: true),
+            MetricTurn(run, demo: true, steps: 1, conversation: declined.Id, proposed: true)
+        );
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var summary = await SummaryAsync(admin, $"traffic=synthetic&runId={run}");
+
+        Assert.Equal(
+            new ConversationMetrics(
+                Started: 6,
+                Open: 1,
+                Ended: 5,
+                EndedByClient: 2,
+                EndedIdle: 2,
+                EndedByHandoff: 1,
+                WithHandoffProposal: 2,
+                WithCase: 1,
+                EndedWithoutCase: 4
+            ),
+            summary.Conversations
+        );
+    }
+
+    [Theory]
+    [InlineData("traffic=bogus")]
+    [InlineData("runId=")]
+    public async Task Bad_filters_are_rejected(string query)
+    {
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var response = await admin.GetAsync($"{Summary}?{query}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

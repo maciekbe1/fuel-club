@@ -12,6 +12,10 @@ public sealed class ApiSession : IDisposable
 {
     private const string CsrfHeader = "X-CSRF-TOKEN";
     private const int MaxRateLimitRetries = 5;
+    private static int _rateLimitWaits;
+
+    /// <summary>429 answers waited out in this process (the technical report).</summary>
+    public static int RateLimitWaits => _rateLimitWaits;
     private readonly HttpClient _http;
 
     public ApiSession(string apiUrl)
@@ -86,6 +90,7 @@ public sealed class ApiSession : IDisposable
                 return response;
             var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5);
             response.Dispose();
+            Interlocked.Increment(ref _rateLimitWaits);
             Console.WriteLine($"  429 on {request.RequestUri}: waiting {wait.TotalSeconds:F0} s");
             await Task.Delay(wait + TimeSpan.FromMilliseconds(Random.Shared.Next(100, 600)), ct);
         }

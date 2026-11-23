@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { SummaryFilters } from "../services";
 import { Queue } from "./Queue";
 import { Summary } from "./Summary";
 
@@ -14,6 +15,7 @@ const WINDOWS = [
 /** Metadata only: counts, times, rules and pseudonymous turns - never conversation content. */
 export function ObservabilityDashboard() {
   const [hours, setHours] = useState<number>(24);
+  const [filters, setFilters] = useState<SummaryFilters>({ traffic: "real" });
   return (
     <div className="flex flex-col gap-8">
       <ToggleGroup
@@ -30,7 +32,7 @@ export function ObservabilityDashboard() {
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <Summary hours={hours} />
+      <Summary hours={hours} filters={filters} onFiltersChange={setFilters} />
       <Queue />
     </div>
   );
