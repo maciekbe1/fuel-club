@@ -448,11 +448,13 @@ public sealed class AssistantTools(
                 m.Text
             ))
             .ToList();
+        // No source: the consultant is proposed here, not left to the model's wording (ADR 0016).
         return new(
             SearchProgramRules,
             ToolStatus.Ok,
             new ProgramRulesData(ProgramRules.CurrentVersion, fragments),
-            Reason: fragments.Count == 0 ? "no_match" : null
+            Reason: fragments.Count == 0 ? "no_match" : null,
+            Handoff: fragments.Count == 0 ? new ChatHandoffEvent() : null
         );
     }
 

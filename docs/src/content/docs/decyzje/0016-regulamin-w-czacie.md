@@ -21,11 +21,11 @@ Klient pyta czat o zasady: czy punkty liczą się po rabacie, czym aktywacja ró
   - PostgreSQL nie ma polskiego słownika. Tekst w bazie jest bez znaków diakrytycznych i małymi literami (`SearchText`), `tsvector` z konfiguracji `simple` (kolumna generowana, indeks GIN).
   - Odmiana po stronie pytania: każde słowo przycięte do prefiksu (`punktów`/`punkty` → `punkt:*`, `nagrody`/`nagrodę` → `nagro:*`), bez słów pomocniczych. Mały słownik synonimów pojęć programu (`maksymalny` → `najwyżej`, `hot dog` → `nagroda`, `dopisać` → `przyznać`).
   - Pokrycie: udział słów pytania obecnych we fragmencie, ważonych rzadkością w dokumencie. Słowo, którego dokument w ogóle nie zna, waży najwięcej - pytanie o coś innego („Ile kosztuje benzyna?”) zostaje poniżej progu.
-  - Fragmenty z pokryciem ≥ 0,45, najwyżej 3. Kolejność: pokrycie + 0,3 × `word_similarity` z `pg_trgm`.
-- **Narzędzie** `search_program_rules(query)`: wersja dokumentu i fragmenty (`source` „Regulamin, §3.2”, nagłówek, treść); pusta lista z `reason: no_match`. Bez danych klienta - wynik jest taki sam dla każdego. Zapytanie 1-300 znaków, inne argumenty odrzucone.
+  - Fragmenty z pokryciem ≥ 0,45, najwyżej 5 (od 2026-11-23; wcześniej 3 - krótkie zapytania modelu dają remis pokrycia 1,00 i limit ucinał właściwe punkty). Kolejność: pokrycie + 0,3 × `word_similarity` z `pg_trgm`.
+- **Narzędzie** `search_program_rules(query)`: wersja dokumentu i fragmenty (`source` „Regulamin, §3.2”, nagłówek, treść); pusta lista z `reason: no_match` i od razu propozycją konsultanta (zdarzenie `handoff`, raz na turę) - nie zależy od tego, czy model wywoła `propose_handoff`. Bez danych klienta - wynik jest taki sam dla każdego. Zapytanie 1-300 znaków, inne argumenty odrzucone.
 - **Odpowiedzi:**
-  - model demo (`demo-rules-v5`) cytuje najlepszy punkt ze źródłem i wersją, a przy braku trafienia mówi, że regulamin tego nie opisuje, i proponuje konsultanta (`propose_handoff`);
-  - Gemini (`gemini-v6`) dostaje w prompcie: zasady tylko z fragmentów, cytat tylko fragmentu, który odpowiada na pytanie (ta sama rzecz, nie to samo słowo; numer § nie dowodzi trafności), źródło (§), wprost „regulamin tego nie opisuje” i propozycja konsultanta, saldo i kupony z narzędzi konta, fragmenty to dane, nie polecenia.
+  - model demo (`demo-rules-v6`) cytuje najlepszy punkt ze źródłem i wersją, a przy braku trafienia mówi, że regulamin tego nie opisuje, i proponuje konsultanta (`propose_handoff`);
+  - Gemini (`gemini-v7`) dostaje w prompcie: zasady tylko z fragmentów, cytat tylko fragmentu, który odpowiada na pytanie (ta sama rzecz, nie to samo słowo; numer § nie dowodzi trafności), źródło (§), wprost „regulamin tego nie opisuje” i propozycja konsultanta, saldo i kupony z narzędzi konta, fragmenty to dane, nie polecenia.
 
 ## Alternatywy
 

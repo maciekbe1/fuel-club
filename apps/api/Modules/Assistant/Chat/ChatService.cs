@@ -108,6 +108,7 @@ public sealed class ChatService(
 
         var results = new List<ToolResult>();
         var calls = new List<ToolCall>();
+        var handoffProposed = false;
         var history = request.History ?? [];
         try
         {
@@ -193,8 +194,12 @@ public sealed class ChatService(
                     await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
                     if (result.Confirmation is { } confirmation)
                         await Send("confirmation", confirmation, turn.Token);
-                    if (result.Handoff is { } handoff)
+                    // Once per turn: the rules tool and the model may both propose it.
+                    if (result.Handoff is { } handoff && !handoffProposed)
+                    {
+                        handoffProposed = true;
                         await Send("handoff", handoff, turn.Token);
+                    }
                 }
             }
         }

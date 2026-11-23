@@ -98,6 +98,14 @@ public sealed class ProgramRulesSearchTests(ApiFactory factory)
     [InlineData("karta lojalnościowa", "2.1|2.2|2.3")]
     [InlineData("Do czego służy karta lojalnościowa?", "2.3")]
     [InlineData("Co regulamin mówi o karcie lojalnościowej?", "2.1|2.2|2.3")]
+    // Regression (Gemini, 2026-11-23): short model queries tie at full coverage; both points
+    // behind "punkty za hot doga" (purchase §3.1, reward pickup §3.6) must be among the results.
+    [InlineData("punkty za hot doga", "3.1")]
+    [InlineData("punkty za hot doga", "3.6")]
+    [InlineData("hot doga", "3.1")]
+    [InlineData("hot doga", "3.6")]
+    [InlineData("Czy dostanę punkty, jeśli kupię hot doga?", "3.1")]
+    [InlineData("Czy dostanę punkty za odebranie hot doga z kuponu?", "3.6")]
     public async Task A_question_finds_its_point_among_the_results(string question, string sections)
     {
         var found = await SearchAsync(question);

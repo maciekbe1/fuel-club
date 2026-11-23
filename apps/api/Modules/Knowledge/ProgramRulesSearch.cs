@@ -24,7 +24,7 @@ public sealed record RuleMatch(
 /// </summary>
 public sealed partial class ProgramRulesSearch(AppDbContext db)
 {
-    public const int MaxResults = 3;
+    public const int MaxResults = 5;
     public const double MinCoverage = 0.45;
     private const double SimilarityWeight = 0.3;
 
@@ -47,8 +47,8 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
     )[]
     {
         ("maksymalny", ["najwy", "limit"]),
-        ("hot", ["nagro", "produ"]),
-        ("doga", ["nagro", "produ"]),
+        ("hot", ["nagro", "produ", "paliw"]),
+        ("doga", ["nagro", "produ", "paliw"]),
         ("kawa", ["nagro"]),
         ("myjnia", ["nagro"]),
         ("dodac", ["przyz"]),

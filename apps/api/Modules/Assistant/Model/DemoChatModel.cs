@@ -21,7 +21,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v5";
+    public string PromptVersion => "demo-rules-v6";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -64,6 +64,21 @@ public sealed partial class DemoChatModel : IChatModel
         // patterns. Only rule wording counts ("wygasa", "zasady", "cofnąć"), so a question about the
         // user's own coupon or points still reaches its tool below. One intent per message: in
         // "Ile mam punktów? Czy punkty wygasają?" only the rules are answered.
+        // "Punkty za hot doga?" is a purchase (§3.1, points only for fuel) or a reward pickup
+        // (§3.6): different answers, so it asks first.
+        if (
+            context.ToolResults.Count == 0
+            && PointsForProduct().IsMatch(text)
+            && !PurchaseOrPickup().IsMatch(text)
+        )
+            return Task.FromResult<ModelStep>(
+                new ModelStep.Reply(
+                    intro
+                        + "Pytasz o zakup tego produktu w sklepie stacji czy o odbiór nagrody "
+                        + "z kuponu za punkty? Zasady są różne - napisz, o które chodzi."
+                )
+            );
+
         if (aboutPeople || RulesQuestion().IsMatch(text))
             return Task.FromResult(NextRulesStep(context, intro));
 
@@ -175,10 +190,7 @@ public sealed partial class DemoChatModel : IChatModel
             return new ModelStep.Reply(
                 intro + "Nie udało się sprawdzić regulaminu - spróbuj ponownie za chwilę."
             );
-        if (context.ToolResults.All(r => r.Name != AssistantTools.ProposeHandoff))
-            return new ModelStep.Tool(
-                new ToolCall(AssistantTools.ProposeHandoff, Arguments(new { }))
-            );
+        // No source: the tool itself proposed the consultant (handoff event).
         return new ModelStep.Reply(
             intro
                 + "Regulamin programu tego nie opisuje. Mogę przekazać pytanie konsultantowi - "
@@ -382,6 +394,14 @@ public sealed partial class DemoChatModel : IChatModel
         @"regulamin|zasad|wygasa|termin|waznos|zwrot|anulow|cofn|limit|maksymal|najwiecej|jednorazow|dwoch\s+kupon|licza?\s+sie|liczon|czy\s+(dostane|dostaje)\s+punkt|jak\s+(dziala|odebrac)|do\s+czego\s+sluz\w*\s+(karta|kod|program|punkt)"
     )]
     private static partial Regex RulesQuestion();
+
+    [GeneratedRegex(
+        @"punkt\w*.*(hot\s*dog|kaw[aey]\b|kawk|myjni)|(hot\s*dog|kaw[aey]\b|kawk|myjni).*punkt"
+    )]
+    private static partial Regex PointsForProduct();
+
+    [GeneratedRegex(@"kup|zaplac|place|odbi|odbier|odebr|kupon|wymian|wymien|nagrod|sklep")]
+    private static partial Regex PurchaseOrPickup();
 
     [GeneratedRegex(@"czy\s+(konsultant|asystent)\w*\s+(moze|widzi|ma|zmien)")]
     private static partial Regex PeopleQuestion();

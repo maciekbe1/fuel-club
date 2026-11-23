@@ -29,8 +29,8 @@ Czat odpowiada na pytania o zasady programu z zatwierdzonego regulaminu i podaje
 
 1. Model woła `search_program_rules` z pytaniem (demo: cała wiadomość, przycięta do 300 znaków).
 2. Pytanie: małe litery bez znaków diakrytycznych, bez słów pomocniczych, każde słowo przycięte do prefiksu (do 5 liter), z synonimami pojęć programu.
-3. Jedno zapytanie SQL liczy wagę każdego słowa (rzadkość w dokumencie), pokrycie każdego punktu i podobieństwo trygramowe. Zwraca najwyżej 3 punkty z pokryciem ≥ 0,45.
-4. Model dostaje wersję dokumentu i fragmenty jako dane. Pusta lista (`no_match`) oznacza: regulamin tego nie opisuje.
+3. Jedno zapytanie SQL liczy wagę każdego słowa (rzadkość w dokumencie), pokrycie każdego punktu i podobieństwo trygramowe. Zwraca najwyżej 5 punktów z pokryciem ≥ 0,45.
+4. Model dostaje wersję dokumentu i fragmenty jako dane. Pusta lista (`no_match`) oznacza: regulamin tego nie opisuje; narzędzie samo dołącza propozycję konsultanta.
 
 ## Dane
 
@@ -58,7 +58,7 @@ Rozszerzenie `pg_trgm` (migracja). Wiersze zapisuje tylko migracja; nowa wersja 
 
 | Plik | Co sprawdza |
 | --- | --- |
-| `apps/api.tests/ProgramRulesSearchTests.cs` | skrót `regulamin-v1`, podział na 32 punkty, baza = plik; 23 pytania (13 strojących, 10 kontrolnych) trafiają właściwy punkt w pierwszej trójce; 9 pytań spoza regulaminu nic nie znajduje; odmiana („punktów/punkty”, „nagrody/nagrodę”) daje ten sam termin; do zapytania trafiają tylko litery i cyfry |
+| `apps/api.tests/ProgramRulesSearchTests.cs` | skrót `regulamin-v1`, podział na 32 punkty, baza = plik; 23 pytania (13 strojących, 10 kontrolnych) trafiają właściwy punkt wśród wyników; 9 pytań spoza regulaminu nic nie znajduje; odmiana („punktów/punkty”, „nagrody/nagrodę”) daje ten sam termin; do zapytania trafiają tylko litery i cyfry |
 | `apps/api.tests/AssistantTests.cs` | demo cytuje §6.1 z wersją; brak odpowiedzi → `propose_handoff` i zdarzenie `handoff`; złe argumenty odrzucone; model dostaje fragmenty jako dane |
 | `apps/api.tests/GeminiTests.cs` | fragmenty wracają do Gemini ze źródłem i wersją |
 | `apps/api.tests/Evals/assistant-cases.v2.json` | 6 przypadków regulaminu (kategorie `regulamin-*`) |

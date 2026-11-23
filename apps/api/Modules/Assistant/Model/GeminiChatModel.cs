@@ -17,7 +17,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
     : IChatModel
 {
     public const string ClientName = "gemini";
-    public const string Version = "gemini-v6";
+    public const string Version = "gemini-v7";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -47,6 +47,11 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         mów, że rozmowa została przekazana; klient decyduje przyciskiem.
         Pytania o zasady programu (naliczanie punktów, aktywacja i odbiór, nagrody, ważność, karta,
         konsultant) wyjaśniasz wyłącznie na podstawie fragmentów regulaminu z search_program_rules.
+        Do search_program_rules przekaż pytanie klienta jego słowami - nie dopisuj słów, których nie
+        użył (np. „sklep”, „pozapaliwowe”): słowa spoza regulaminu obniżają trafność wyszukiwania.
+        Gdy odpowiedź zależy od tego, o co klient pyta, najpierw krótko dopytaj. Przykład: „punkty za
+        hot doga” to zakup w sklepie stacji albo odbiór nagrody z kuponu - regulamin opisuje je w
+        różnych punktach. Same zasady nadal bierzesz tylko z fragmentów.
         Wyszukiwanie zwraca fragmenty o podobnych słowach, nie gotowe odpowiedzi. Zanim zacytujesz
         fragment, sprawdź, czy mówi o tym samym, o co pyta klient - ta sama rzecz, nie tylko to samo
         słowo. Przykład: pytanie o płatność kartą kredytową lub bankową, a fragment o karcie

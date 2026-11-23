@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
+using FuelClub.Api.Modules.Assistant;
 using FuelClub.Api.Modules.Assistant.Model;
 using FuelClub.Api.Modules.Assistant.Tools;
 using FuelClub.Api.Modules.Assistant.Tracing;
@@ -60,6 +61,7 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         "regulamin-waznosc",
         "regulamin-brak-odpowiedzi",
         "regulamin-karta",
+        "regulamin-dopytanie",
         "regulamin-wstrzykniecie",
     ];
 
@@ -97,7 +99,12 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         List<string>? AnswerContains,
         List<string>? MustNotContain,
         // Real models word answers their own way: regexes checked instead of AnswerContains.
-        List<string>? AnswerPatterns = null
+        List<string>? AnswerPatterns = null,
+        // A consultant proposal (handoff event) must reach the client, whoever proposed it.
+        bool? Handoff = null,
+        // Tools a real model may skip, e.g. refusing without trying a foreign coupon. The forced
+        // call is still checked on the demo and scripted models (backend owner check).
+        List<string>? GeminiOptionalTools = null
     );
 
     public static IEnumerable<object[]> Cases() =>
@@ -179,6 +186,9 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         var mode = GeminiEvalFactAttribute.Mode!;
         var repeats =
             mode == "full"
+            || !string.IsNullOrEmpty(
+                Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_EVAL_CASES")
+            )
                 ? int.TryParse(
                     Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_EVAL_REPEATS"),
                     out var r
@@ -212,8 +222,15 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             ["Assistant:Gemini:Model"] = model,
         };
         var applicable = Suite.Value.Cases.Where(c => c.Model is null or "demo").ToList();
+        // A chosen subset (e.g. the cases a change touched), FUELCLUB_GEMINI_EVAL_REPEATS times.
+        var chosen = Environment
+            .GetEnvironmentVariable("FUELCLUB_GEMINI_EVAL_CASES")
+            ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var selected =
-            mode == "full" ? applicable : applicable.Where(c => PilotCases.Contains(c.Id)).ToList();
+            chosen is { Length: > 0 } ? applicable.Where(c => chosen.Contains(c.Id)).ToList()
+            : mode == "full" ? applicable
+            : applicable.Where(c => PilotCases.Contains(c.Id)).ToList();
+        Assert.NotEmpty(selected);
 
         var runs = new List<CaseReport>();
         var skipped = new List<string>();
@@ -318,7 +335,48 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         int? OutputTokens,
         int TotalMs,
         List<Check> Checks
+    )
+    {
+        /// <summary>Gemini runs only: each tool call, redacted (test data only).</summary>
+        public List<ToolDiagnostic>? Calls { get; init; }
+    }
+
+    /// <summary>
+    /// A tool call as the model made it, for diagnosing a real-model run: arguments with test ids,
+    /// codes and the e-mail replaced; for search_program_rules the returned sources and, scored
+    /// again with the same search, every point at or above the threshold with its coverage.
+    /// </summary>
+    public sealed record ToolDiagnostic(
+        int Step,
+        string Name,
+        string Arguments,
+        string? Status,
+        string? Reason,
+        List<string>? Sources = null,
+        List<string>? Scores = null
     );
+
+    /// <summary>Wraps the real model in an eval host and keeps what it saw last.</summary>
+    private sealed class RecordingModel(IChatModel inner) : IChatModel
+    {
+        public ChatModelContext? Last { get; private set; }
+        public List<ToolCall> Unanswered { get; } = [];
+
+        public string Provider => inner.Provider;
+        public string Model => inner.Model;
+        public string PromptVersion => inner.PromptVersion;
+        public bool Demo => inner.Demo;
+
+        public async Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken ct)
+        {
+            Last = context;
+            Unanswered.Clear();
+            var step = await inner.NextAsync(context, ct);
+            if (step is ModelStep.Tool tool)
+                Unanswered.AddRange(tool.Calls);
+            return step;
+        }
+    }
 
     /// <summary>
     /// Runs one case and records every check instead of stopping at the first failure. The demo
@@ -386,11 +444,28 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                 .Replace("{otherOffer}", other?.Name ?? "\u0000")
                 .Replace("{ownCode}", own.FirstOrDefault().Code ?? "\u0000");
 
-        await using var host = Host(gemini is null ? evalCase.Model : null, other?.Id, gemini);
+        var recorder = gemini is null ? null : new Recorder();
+        await using var host = Host(
+            gemini is null ? evalCase.Model : null,
+            other?.Id,
+            gemini,
+            recorder
+        );
         var client = await LoginAsync(host, customer.Email);
         var before = await StateAsync(customer.UserId);
 
         var stream = await ChatAsync(client, Fill(evalCase.Message));
+        // Before the planted point goes: the scores must see what the model saw.
+        var calls = recorder?.Model is { } recorded
+            ? await DiagnoseAsync(host, recorded, Redact)
+            : null;
+        string Redact(string text) =>
+            own.Aggregate(
+                text.Replace(customer.Email, "{email}")
+                    .Replace(other?.Id.ToString() ?? "\u0000", "{otherCouponId}"),
+                (t, o) =>
+                    t.Replace(o.Id.ToString(), "{ownCouponId}").Replace(o.Code ?? "\u0000", "[kod]")
+            );
         // Removed at once: later cases of the same run must not find it.
         if (setup.RuleFragment is not null)
             await DbAsync(db =>
@@ -412,12 +487,22 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                 expect.Tools.SequenceEqual(tools),
                 $"expected [{string.Join(", ", expect.Tools)}], got [{string.Join(", ", tools)}]"
             );
+        var required = expect
+            .Tools.Except(gemini is null ? [] : expect.GeminiOptionalTools ?? [])
+            .ToList();
         Check(
             "tools",
             "required",
-            !expect.Tools.Except(tools).Any(),
-            $"missing [{string.Join(", ", expect.Tools.Except(tools))}]"
+            !required.Except(tools).Any(),
+            $"missing [{string.Join(", ", required.Except(tools))}]"
         );
+        if (expect.Handoff is { } handoff)
+            Check(
+                "tools",
+                "handoff",
+                handoff == stream.Of("handoff").Any(),
+                $"expected {handoff}, got {stream.Of("handoff").Count()}"
+            );
         Check(
             "arguments",
             "no-unexpected-rejections",
@@ -554,7 +639,82 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             trace.OutputTokens,
             trace.TotalMs,
             checks
-        );
+        )
+        {
+            Calls = calls,
+        };
+    }
+
+    private sealed class Recorder
+    {
+        public RecordingModel? Model { get; set; }
+    }
+
+    private static async Task<List<ToolDiagnostic>> DiagnoseAsync(
+        WebApplicationFactory<Program> host,
+        RecordingModel model,
+        Func<string, string> redact
+    )
+    {
+        var last = model.Last;
+        var answered = last is null
+            ? []
+            : last.ToolCalls.Zip(last.ToolResults, (call, result) => (call, (ToolResult?)result));
+        var all = answered.Concat(model.Unanswered.Select(c => (call: c, (ToolResult?)null)));
+        var diagnostics = new List<ToolDiagnostic>();
+        foreach (var (call, result) in all)
+        {
+            List<string>? sources = null,
+                scores = null;
+            if (
+                call.Name == AssistantTools.SearchProgramRules
+                && call.Arguments.ValueKind == JsonValueKind.Object
+                && call.Arguments.TryGetProperty("query", out var q)
+                && q.ValueKind == JsonValueKind.String
+                && q.GetString() is { Length: > 0 } query
+            )
+            {
+                sources = (result?.Data as ProgramRulesData)
+                    ?.Fragments.Select(f => f.Source)
+                    .ToList();
+                await using var scope = host.Services.CreateAsyncScope();
+                scores = (
+                    await scope
+                        .ServiceProvider.GetRequiredService<ProgramRulesSearch>()
+                        .SearchAsync(query.Trim(), CancellationToken.None)
+                )
+                    .Select(m =>
+                        $"§{m.Section} {m.Coverage.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}"
+                    )
+                    .ToList();
+            }
+            diagnostics.Add(
+                new(
+                    call.Step,
+                    call.Name,
+                    redact(
+                        JsonSerializer.Serialize(
+                            call.Arguments,
+                            new JsonSerializerOptions
+                            {
+                                // Readable Polish in the report; it is never rendered as HTML.
+                                Encoder = System
+                                    .Text
+                                    .Encodings
+                                    .Web
+                                    .JavaScriptEncoder
+                                    .UnsafeRelaxedJsonEscaping,
+                            }
+                        )
+                    ),
+                    result?.Status,
+                    result?.Reason,
+                    sources,
+                    scores
+                )
+            );
+        }
+        return diagnostics;
     }
 
     private static string Excerpt(string text) => text.Length <= 200 ? text : text[..200] + "…";
@@ -605,7 +765,8 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
     private WebApplicationFactory<Program> Host(
         string? model,
         Guid? otherCouponId,
-        IReadOnlyDictionary<string, string?>? settings = null
+        IReadOnlyDictionary<string, string?>? settings = null,
+        Recorder? recorder = null
     )
     {
         var scripted = Scripted(model, otherCouponId);
@@ -618,6 +779,20 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                 );
             if (scripted is not null)
                 builder.ConfigureTestServices(services => services.AddSingleton(scripted));
+            // One turn per host: the model of that turn records its calls.
+            if (recorder is not null)
+                builder.ConfigureTestServices(services =>
+                    services.AddTransient<IChatModel>(provider =>
+                        recorder.Model = new RecordingModel(
+                            new GeminiChatModel(
+                                provider
+                                    .GetRequiredService<IHttpClientFactory>()
+                                    .CreateClient(GeminiChatModel.ClientName),
+                                provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AssistantOptions>>()
+                            )
+                        )
+                    )
+                );
         });
     }
 

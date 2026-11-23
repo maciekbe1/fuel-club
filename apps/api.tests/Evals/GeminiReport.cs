@@ -180,6 +180,24 @@ public static class GeminiReport
         }
         foreach (var id in skipped)
             md.AppendLine($"| {id} | pominięty (limit) | | | | |");
+        // Diagnosis of the run (test data, redacted): what the model called and what it got.
+        md.AppendLine();
+        md.AppendLine("## Wywołania narzędzi");
+        md.AppendLine();
+        foreach (var r in runs.Where(r => r.Calls is { Count: > 0 }))
+        foreach (var call in r.Calls!)
+        {
+            var found =
+                call.Sources is null ? ""
+                : call.Sources.Count == 0 ? " → brak fragmentów"
+                : $" → {string.Join(", ", call.Sources)}";
+            var scores = call.Scores is { Count: > 0 }
+                ? $" (pokrycie: {string.Join(", ", call.Scores)})"
+                : "";
+            md.AppendLine(
+                $"- `{r.Id}` krok {call.Step}: `{call.Name}` `{call.Arguments.Replace("`", "'")}` - {call.Status ?? "nie wykonane"}{(call.Reason is null ? "" : $" ({call.Reason})")}{found}{scores}"
+            );
+        }
         File.WriteAllText(path, md.ToString());
         return path;
     }

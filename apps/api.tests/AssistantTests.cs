@@ -1109,9 +1109,53 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
             "Co regulamin mówi o płatności kartą kredytową?"
         );
 
-        Assert.Equal(["search_program_rules:ok", "propose_handoff:ok"], ToolsOf(stream));
+        // The consultant comes from the empty result itself, not from the model's wording.
+        Assert.Equal(["search_program_rules:ok"], ToolsOf(stream));
         Assert.Contains("Regulamin programu tego nie opisuje", stream.Text);
         Assert.Single(stream.Of("handoff"));
+    }
+
+    [Fact]
+    public async Task An_empty_rules_result_proposes_an_agent_once_even_when_the_model_also_does()
+    {
+        await using var host = Host(
+            model: new ScriptedModel(
+                (context, _) =>
+                    Task.FromResult(
+                        context.ToolResults.Count switch
+                        {
+                            0 => Tool(
+                                AssistantTools.SearchProgramRules,
+                                new { query = "karta kredytowa" }
+                            ),
+                            1 => Tool(AssistantTools.ProposeHandoff),
+                            _ => new ModelStep.Reply("Regulamin tego nie opisuje."),
+                        }
+                    )
+            )
+        );
+        var customer = await AccountAsync(host: host);
+
+        var stream = await ChatAsync(customer.Client, "karta kredytowa?");
+
+        Assert.Equal(["search_program_rules:ok", "propose_handoff:ok"], ToolsOf(stream));
+        Assert.Single(stream.Of("handoff"));
+    }
+
+    [Theory]
+    [InlineData("Czy dostanę punkty za hot doga?")]
+    [InlineData("Dostanę punkty za kawę?")]
+    public async Task Demo_asks_whether_a_product_question_means_a_purchase_or_a_pickup(
+        string message
+    )
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(customer.Client, message);
+
+        Assert.Empty(ToolsOf(stream));
+        Assert.Contains("zakup", stream.Text);
+        Assert.Contains("odbiór nagrody", stream.Text);
     }
 
     [Theory]

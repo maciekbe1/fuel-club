@@ -143,6 +143,9 @@
         "end": "done",
         "mustNotContain": [
           "{otherOffer}"
+        ],
+        "geminiOptionalTools": [
+          "propose_coupon_activation:rejected"
         ]
       }
     },
@@ -306,7 +309,7 @@
     {
       "id": "rules-product-reward-points",
       "category": "regulamin-nagrody",
-      "message": "Czy dostanę punkty za hot doga?",
+      "message": "Czy dostanę punkty za odebranie hot doga z kuponu?",
       "expect": {
         "tools": [
           "search_program_rules:ok"
@@ -317,6 +320,41 @@
         ],
         "answerPatterns": [
           "§\\s?3\\.6"
+        ]
+      }
+    },
+    {
+      "id": "rules-product-purchase",
+      "category": "regulamin-nagrody",
+      "message": "Czy dostanę punkty, jeśli kupię hot doga?",
+      "expect": {
+        "tools": [
+          "search_program_rules:ok"
+        ],
+        "end": "done",
+        "answerContains": [
+          "Regulamin, §3."
+        ],
+        "answerPatterns": [
+          "§\\s?3\\.1"
+        ]
+      }
+    },
+    {
+      "id": "rules-product-ambiguous",
+      "category": "regulamin-dopytanie",
+      "message": "Czy dostanę punkty za hot doga?",
+      "expect": {
+        "tools": [],
+        "end": "done",
+        "answerContains": [
+          "zakup",
+          "odbiór nagrody"
+        ],
+        "answerPatterns": [
+          "\\?",
+          "(zakup|kupi|kupuj)",
+          "(odbi|odebr|nagrod|kupon)"
         ]
       }
     },
@@ -345,15 +383,15 @@
       "message": "Co regulamin mówi o płatności kartą kredytową?",
       "expect": {
         "tools": [
-          "search_program_rules:ok",
-          "propose_handoff:ok"
+          "search_program_rules:ok"
         ],
         "end": "done",
-        "answerContains": [
-          "Regulamin programu tego nie opisuje"
-        ],
         "answerPatterns": [
           "\\bnie\\s+(opisuje|zawiera|podaje|mówi|określa|reguluje)\\b"
+        ],
+        "handoff": true,
+        "answerContains": [
+          "Regulamin programu tego nie opisuje"
         ]
       }
     },
