@@ -193,6 +193,39 @@ Testy: `apps/api.tests/JudgeTests.cs` - rozłączne i deterministyczne próbki b
 Kalibracja ocenami człowieka - arkusz `demo-1` czeka na oceny. Do tego czasu wyniki judge'a to nieskalibrowany szacunek. Judge online na próbce prawdziwego ruchu - P15e.
 :::
 
+## Wybór kuponu - kontrolowane porównanie
+
+Dowód poprawki `demo-rules-v8` odtwarzalny ze świeżego klona: dwie instancje na osobnych, pustych bazach, te same dane, te same przypadki. Kod: `apps/tools/Simulator/CouponCases.cs`.
+
+Dane (tworzy je polecenie, odmawia, gdy oferty już są): oferty „CMP rabat” (rabat na paliwo), „CMP hot dog”, „CMP kawa”, „CMP kawa duża” (po 10 pkt); konta (zakup 500 zł, potem wymiany): `a` - hot dog; `b` - wszystkie cztery; `c` - żaden kupon. Każdy przypadek w nowej rozmowie, bez potwierdzania (stan się nie zmienia). Wynik z celu propozycji w zdarzeniu `confirmation` - dokładnie oczekiwane oferty albo żadna.
+
+| # | Konto | Wiadomość | Oczekiwane |
+| --- | --- | --- | --- |
+| 1 | a | „Aktywuj kupon CMP rabat” (nie ma, ma inny) | brak propozycji |
+| 2 | a | „Aktywuj mój kupon” | hot dog |
+| 3 | a | „Chcę aktywować kupon na hot doga” | hot dog |
+| 4 | a | „Aktywuj kupon kawa” (nie ma) | brak |
+| 5 | b | „Aktywuj kupon CMP rabat” | rabat |
+| 6 | b | „Aktywuj mój kupon” (kilka) | brak - dopytanie |
+| 7 | b | „Aktywuj kupon kawa” (dwie oferty) | brak - dopytanie |
+| 8 | b | „Aktywuj kupon kawa duża” | kawa duża |
+| 9 | b | „Aktywuj kupon <ID własnej kawy>” | kawa |
+| 10 | b | „Aktywuj kupon <ID hot doga konta a>” | brak |
+| 11 | c | „Aktywuj kupon CMP rabat” | brak |
+
+```sh
+source .simulation/demo.env
+export SIM_ADMIN_PASSWORD="$SIM_DEMO_PASSWORD" SIM_CASHIER_PASSWORD="$SIM_DEMO_PASSWORD"
+git worktree add ../fuel-club-v7 38f9d7e          # demo-rules-v7
+# dla v in v7 v8: pusta baza fuelclub_cmp_$v (5435), dotnet ef database update na niej,
+# instancja jak wyżej z Simulation__RunId=cmp-$v i tą bazą (v7 z worktree, port 5302; v8 z main, 5303)
+dotnet run --project apps/tools/Simulator -- coupon-cases --run cmp-v7 --api http://localhost:5302
+dotnet run --project apps/tools/Simulator -- coupon-cases --run cmp-v8 --api http://localhost:5303
+dotnet run --project apps/tools/Simulator -- coupon-cases-report --run cmp-v8 --base cmp-v7
+```
+
+Wyniki: `.simulation/cmp-<v>/coupon-cases.json`, raport `.simulation/cmp-v8/report-coupon-cases-vs-cmp-v7.md`. Między v7 a v8 w `apps/api` różni się tylko `DemoChatModel.cs`. Wynik 2026-11-23: v7 8/11, v8 11/11 - miarodajny dla tych 11 przypadków, nie dla całego agenta.
+
 ## Sprzątanie przebiegu
 
 ```sh
@@ -220,7 +253,7 @@ Przejście `demo-1 / v8-same` (`demo-rules-v8`, test techniczny):
 - 1453/1460 rozmów, 2104 tury z `done`, 0 błędów strumienia. 7 rozmów z przekazaniem stanęło na limicie zgłoszeń (5 na konto na godzinę, te same konta co w `demo-1`): symulator przeczekiwał `Retry-After` do godziny - poprawione (limit 60 s, wznowienie bez powtarzania tur); 7 pozostaje do ponowienia po oknie limitu.
 - Porównanie: 2043 → 2050 z 2113 tur zgodnych, 7 poprawionych w `aktywacja`. 6 z nich to efekt danych (kupon „hot dog” aktywowany w `demo-1`, więc klient nie ma kuponów), zachowanie v8 widać tylko w 1 (`c01315`). 0 aktywacji: kupony do aktywacji zostały tylko tam, gdzie `demo-1` nie potwierdził, a decyzje są te same. Dlatego to nie jest porównanie jakości.
 
-Wybór kuponu v7/v8 - kontrolowane porównanie (porównanie jakości dla tej poprawki): dwie instancje na osobnych świeżych bazach, te same dane z jednego skryptu (4 oferty, 3 konta: jeden kupon, cztery, żaden), 11 przypadków, wynik z celu propozycji w zdarzeniu `confirmation`. v7 8/11, v8 11/11. Błędy v7: jedyny kupon podstawiony za nazwany, którego klient nie ma (2 przypadki, błąd z `demo-1`), i dopytanie zamiast propozycji przy „kawa duża”, gdy klient ma też „kawa”. Zestaw ułożył autor poprawki pod regułę właściciela; adapter demo, nie Gemini. Raport i skrypt: `.simulation/coupon-cmp/`.
+Wybór kuponu v7/v8 - kontrolowane porównanie (porównanie jakości dla tej poprawki): dwie instancje na osobnych świeżych bazach, te same dane z jednego skryptu (4 oferty, 3 konta: jeden kupon, cztery, żaden), 11 przypadków, wynik z celu propozycji w zdarzeniu `confirmation`. v7 8/11, v8 11/11. Błędy v7: jedyny kupon podstawiony za nazwany, którego klient nie ma (2 przypadki, błąd z `demo-1`), i dopytanie zamiast propozycji przy „kawa duża”, gdy klient ma też „kawa”. Zestaw ułożył autor poprawki pod regułę właściciela; adapter demo, nie Gemini. Odtworzenie: [Wybór kuponu - kontrolowane porównanie](#wybór-kuponu---kontrolowane-porównanie).
 
 `demo-1` (P16c, 200 kont, adapter demo): 1460 rozmów, 2113 tur.
 - Technicznie: 1460/1460 rozmów, 2113/2113 tur z `done`, 0 błędów strumienia, 0 oczekiwań na `429`, 7,3 min; czas tury u klienta p50 21 ms, p95 36 ms. To czas aplikacji z adapterem reguł - nie pomiar wydajności ani kosztu Gemini.

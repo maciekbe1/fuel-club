@@ -13,6 +13,8 @@ using FuelClub.Simulator;
 //   calibrate --run <id> [--size 30]           (blind sheet for human grades)
 //   agreement --run <id>                       (human vs judge on the filled sheet)
 //   compare  --run <id> --pass <name>          (the same turns before and after, today's checks)
+//   coupon-cases --run <id> [--api]            (11 coupon-selection cases on a fresh instance)
+//   coupon-cases-report --run <id> --base <id> (the same cases from two runs side by side)
 //
 // The judge's Gemini key: GEMINI_API_KEY, else the API's user-secrets (Assistant:Gemini:ApiKey).
 //
@@ -38,11 +40,13 @@ if (
             or "calibrate"
             or "agreement"
             or "compare"
+            or "coupon-cases"
+            or "coupon-cases-report"
         )
 )
 {
     Console.WriteLine(
-        "usage: populate|converse|cleanup|judge|calibrate|agreement|compare --run <id> [options] | prune [--days 14]"
+        "usage: populate|converse|cleanup|judge|calibrate|agreement|compare|coupon-cases|coupon-cases-report --run <id> [options] | prune [--days 14]"
     );
     return 64;
 }
@@ -88,6 +92,20 @@ if (args[0] == "compare")
     return 0;
 }
 
+if (args[0] == "coupon-cases-report")
+{
+    var baseRun = options.Get("base") ?? throw new ArgumentException("--base <run> is required");
+    var load = (string id) =>
+        System.Text.Json.JsonSerializer.Deserialize<CouponCases.ResultFile>(
+            File.ReadAllText(Path.Combine(".simulation", id, "coupon-cases.json")),
+            Manifest.Json
+        )!;
+    var report = Path.Combine(".simulation", run, $"report-coupon-cases-vs-{baseRun}.md");
+    File.WriteAllText(report, CouponCases.Report(load(baseRun), load(run)));
+    Console.WriteLine(report);
+    return 0;
+}
+
 if (args[0] is "judge" or "calibrate" or "agreement")
     return await JudgeCommand.RunAsync(args[0], run, manifestPath, options, cancel.Token);
 
@@ -103,10 +121,20 @@ if (args[0] == "cleanup")
 }
 
 var api = options.Get("api") ?? "http://localhost:5301";
+
+// Its own accounts and offers, no manifest: the run folder holds only the results.
+var checking = args[0] == "coupon-cases";
 if (args[0] == "converse" && !File.Exists(manifestPath))
     throw new ArgumentException("No manifest for this run: run populate first.");
-var manifest = File.Exists(manifestPath)
-    ? Manifest.Load(manifestPath)
+var manifest =
+    checking
+        ? new Manifest
+        {
+            RunId = run,
+            ApiUrl = api,
+            SaleDate = DateOnly.FromDateTime(DateTime.Today),
+        }
+    : File.Exists(manifestPath) ? Manifest.Load(manifestPath)
     : Manifest.Create(manifestPath, run, api, options.Get("station-time-zone") ?? "Europe/Warsaw");
 if (manifest.RunId != run || manifest.ApiUrl != api)
     throw new ArgumentException(
@@ -148,6 +176,25 @@ using (var probe = new HttpClient { BaseAddress = new Uri(api) })
 }
 
 var conversing = args[0] == "converse";
+if (checking)
+    return await CouponCases.RunAsync(
+        api,
+        run,
+        Path.Combine(".simulation", run),
+        new Settings(
+            Required("SIM_SECRET"),
+            Required("SIM_CASHIER_EMAIL"),
+            Required("SIM_CASHIER_PASSWORD"),
+            Required("SIM_ADMIN_EMAIL"),
+            Required("SIM_ADMIN_PASSWORD"),
+            1,
+            8,
+            50
+        ),
+        provider,
+        modelName,
+        cancel.Token
+    );
 var settings = new Settings(
     Secret: Required("SIM_SECRET"),
     CashierEmail: conversing ? "" : Required("SIM_CASHIER_EMAIL"),

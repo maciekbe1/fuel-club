@@ -825,7 +825,7 @@ public sealed class ChatScenarios(
         await ApiSession.EnsureAsync(ended, "end conversation", ct);
     }
 
-    private static async Task<TranscriptTurn> TurnAsync(
+    internal static async Task<TranscriptTurn> TurnAsync(
         ApiSession session,
         Guid conversationId,
         string message,
