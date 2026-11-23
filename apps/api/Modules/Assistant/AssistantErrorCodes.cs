@@ -8,6 +8,7 @@ public static class AssistantErrorCodes
     public const string InvalidFormat = "assistant.invalid_format";
     public const string ConfirmationInvalid = "assistant.confirmation_invalid";
     public const string ConfirmationExpired = "assistant.confirmation_expired";
+    public const string HandoffActive = "assistant.handoff_active";
 
     // Stream errors (the `error` event), not HTTP statuses.
     public const string Timeout = "assistant.timeout";

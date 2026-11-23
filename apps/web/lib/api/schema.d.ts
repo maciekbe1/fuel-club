@@ -1281,7 +1281,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description One chat turn as a server-sent event stream (POST, read with fetch). Events: meta (first), tool, delta, confirmation, then exactly one of done or error; payloads are in ChatStreamContract. Comment lines (': ping') are heartbeats. Validation errors and 429 come as ProblemDetails before the stream starts. */
+        /** @description One chat turn as a server-sent event stream (POST, read with fetch). Events: meta (first), tool, delta, confirmation, then exactly one of done or error; payloads are in ChatStreamContract. Comment lines (': ping') are heartbeats. Validation errors, 429 and 409 assistant.handoff_active (an open support case) come as ProblemDetails before the stream starts. */
         post: {
             parameters: {
                 query?: never;
@@ -1306,6 +1306,15 @@ export interface paths {
                 };
                 /** @description Bad Request */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1339,7 +1348,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Confirms an activation proposed in the chat (the token from a confirmation event) and activates the coupon with the same logic as /api/me/coupons/{id}/activate. 404 for a token that is invalid or issued to someone else, 410 when it expired. Retrying is safe: an active coupon keeps its code. */
+        /** @description Confirms an activation proposed in the chat (the token from a confirmation event) and activates the coupon with the same logic as /api/me/coupons/{id}/activate. 404 for a token that is invalid or issued to someone else, 410 when it expired, 409 assistant.handoff_active while a support case is open. Retrying is safe: an active coupon keeps its code. */
         post: {
             parameters: {
                 query?: never;
@@ -1394,6 +1403,197 @@ export interface paths {
                 };
                 /** @description Gone */
                 410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Opens a support case with the customer's first message and, when the customer chose to attach it, the chat history (stored as untrusted client-provided text). While a case is open the chat and its confirmations return 409 assistant.handoff_active. An open case already exists -> 409 support.case_open with its caseId. */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description UUID chosen by the client; reuse it only to retry the same request. */
+                    "Idempotency-Key": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateSupportCaseRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SupportCaseResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["SupportConflictProblem"];
+                    };
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/cases/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Closes the session user's own open case and re-enables the chat. Repeating it returns the current state. Someone else's or an unknown case -> 404 support.case_not_found. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SupportCaseResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/agent/cases/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Claims a waiting case for the session agent. Another agent was first -> 409 support.case_taken; a repeated claim by the same agent -> 200; closed or expired -> 409 support.case_closed. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentCaseResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1552,6 +1752,15 @@ export interface components {
         };
         AdminRewardsResponse: {
             items: components["schemas"]["AdminRewardResponse"][];
+        };
+        AgentCaseResponse: {
+            /** Format: uuid */
+            id: string;
+            status: string;
+            customerName: string;
+            /** Format: date-time */
+            createdAt: string;
+            assignedToMe: boolean;
         };
         AnomalyResult: {
             rule: string;
@@ -1720,6 +1929,10 @@ export interface components {
             maxLiters: null | number;
             isActive: null | boolean;
         };
+        CreateSupportCaseRequest: {
+            message: null | string;
+            history: null | components["schemas"]["SupportHistoryItem"][];
+        };
         CsrfTokenResponse: {
             token: string;
         };
@@ -1855,6 +2068,28 @@ export interface components {
         };
         RewardsResponse: {
             items: components["schemas"]["RewardResponse"][];
+        };
+        SupportCaseResponse: {
+            /** Format: uuid */
+            id: string;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            closedAt: null | string;
+        };
+        SupportConflictProblem: {
+            code: string;
+            type?: null | string;
+            title?: null | string;
+            /** Format: int32 */
+            status?: null | number;
+            /** Format: uuid */
+            caseId?: null | string;
+        };
+        SupportHistoryItem: {
+            role: null | string;
+            text: null | string;
         };
         ToolCount: {
             name: string;

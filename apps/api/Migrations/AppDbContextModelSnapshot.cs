@@ -716,6 +716,124 @@ namespace FuelClub.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelClub.Api.Modules.Support.Domain.SupportCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AssignedToUserId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTimeOffset>("LastActivityAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("LastSeq")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedToUserId");
+
+                    b.HasIndex("ClosedAt");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_SupportCases_OpenPerUser")
+                        .HasFilter("\"Status\" IN ('Waiting', 'Assigned')");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("SupportCases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SupportCases_Assignee", "(\"Status\" = 'Assigned' AND \"AssignedToUserId\" IS NOT NULL)\nOR (\"Status\" = 'Waiting' AND \"AssignedToUserId\" IS NULL)\nOR \"Status\" IN ('Closed', 'Expired')");
+
+                            t.HasCheckConstraint("CK_SupportCases_ClosedAt", "(\"Status\" IN ('Closed', 'Expired')) = (\"ClosedAt\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_SupportCases_LastSeq", "\"LastSeq\" >= 0");
+
+                            t.HasCheckConstraint("CK_SupportCases_Status", "\"Status\" IN ('Waiting', 'Assigned', 'Closed', 'Expired')");
+                        });
+                });
+
+            modelBuilder.Entity("FuelClub.Api.Modules.Support.Domain.SupportMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Author")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("AuthorUserId")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ClientProvidedHistory")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("clock_timestamp()");
+
+                    b.Property<string>("HistoryRole")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("Seq")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorUserId");
+
+                    b.HasIndex("CaseId", "Seq")
+                        .IsUnique()
+                        .HasDatabaseName("UX_SupportMessages_CaseSeq");
+
+                    b.ToTable("SupportMessages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SupportMessages_Author", "\"Author\" IN ('Customer', 'Support', 'System')");
+
+                            t.HasCheckConstraint("CK_SupportMessages_AuthorUser", "(\"Author\" = 'Support') = (\"AuthorUserId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_SupportMessages_History", "(\"ClientProvidedHistory\" AND \"Author\" = 'Customer' AND \"HistoryRole\" IN ('user', 'assistant'))\nOR (NOT \"ClientProvidedHistory\" AND \"HistoryRole\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_SupportMessages_Seq", "\"Seq\" >= 1");
+
+                            t.HasCheckConstraint("CK_SupportMessages_SystemEvent", "\"Author\" <> 'System' OR \"Text\" IN ('claimed', 'released', 'idle_returned', 'closed_by_customer', 'closed_by_support', 'expired')");
+
+                            t.HasCheckConstraint("CK_SupportMessages_Text", "char_length(\"Text\") BETWEEN 1 AND 2000");
+                        });
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
                 {
                     b.Property<int>("Id")
@@ -1004,6 +1122,34 @@ namespace FuelClub.Api.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelClub.Api.Modules.Support.Domain.SupportCase", b =>
+                {
+                    b.HasOne("FuelClub.Api.Modules.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelClub.Api.Modules.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelClub.Api.Modules.Support.Domain.SupportMessage", b =>
+                {
+                    b.HasOne("FuelClub.Api.Modules.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelClub.Api.Modules.Support.Domain.SupportCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

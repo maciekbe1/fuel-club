@@ -13,6 +13,8 @@ Zrealizowane: `POST /api/chat` (SSE), sześć narzędzi, deterministyczny adapte
 
 Klient pyta o saldo, oferty i swoje kupony, może też poprosić o aktywację kuponu. Asystent odpowiada strumieniem zdarzeń. Aktywację tylko **proponuje**: zmiana następuje dopiero po naciśnięciu przycisku potwierdzenia. Kontrakt, czas ważności potwierdzenia i ponowienia: [ADR 0007](/decyzje/0007-czat-i-potwierdzenia/).
 
+Gdy klient ma otwarte zgłoszenie do konsultanta, czat i potwierdzenia odpowiadają `409 assistant.handoff_active` - potwierdzenie sprawdza to pod blokadą klienta ([Support](/moduly/support/)).
+
 ## Gdzie jest kod
 
 | Co | Plik |

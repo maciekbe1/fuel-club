@@ -77,6 +77,7 @@ public static class AssistantModule
             .WithDescription(ChatEndpoints.ChatDescription)
             .Produces<ChatStreamContract>(StatusCodes.Status200OK, "text/event-stream")
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
         // The response carries the coupon code: no-store on the group, so replays get it too.
         var confirmations = app.MapGroup("/api/chat/confirmations")
@@ -90,7 +91,8 @@ public static class AssistantModule
             .WithDescription(ChatEndpoints.ConfirmDescription)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
-            .ProducesProblem(StatusCodes.Status410Gone);
+            .ProducesProblem(StatusCodes.Status410Gone)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
         return app;
     }
 }

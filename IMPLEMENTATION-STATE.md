@@ -379,6 +379,19 @@ Dziewiąte review (`/code-review high`): bez błędów blokujących, 5 drobnych 
 
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
+## P11 - przekazanie do konsultanta (2026-11-23), w realizacji
+
+Doprecyzowanie P13 przed startem (właściciel): `409` odebranej nagrody nie dowodzi, że wcześniejsza próba się nie udała. Kasa pokazuje stan („Nagroda jest odebrana: zapisano wydanie … na tej kasie / na stanowisku X, kasa Y”), bez czerwonego błędu i bez przycisku „Wydaj nagrodę”; E2E `product-rewards`, `cashier-coupon`, `demo` 26/26.
+
+Krok 1 - model, przejęcie, wyścig z aktywacją (kolejność od właściciela):
+- rola `Support`; tabele `SupportCases` (częściowy `UNIQUE` jednego otwartego zgłoszenia, `CHECK` stanu, opiekuna, `ClosedAt`) i `SupportMessages` (`UNIQUE (CaseId, Seq)`, historia klienta tylko jako `Customer` - `CHECK`, wiadomości systemowe jako kody zdarzeń); `Down` odmawia przy istniejących zgłoszeniach;
+- `Seq` przez `UPDATE ... "LastSeq" + n RETURNING` - blokada wiersza zgłoszenia porządkuje piszących;
+- `POST /api/support/cases` pod blokadą klienta; `POST /api/support/agent/cases/{id}/claim` warunkowym `UPDATE`;
+- czat `409 assistant.handoff_active` przed strumieniem; potwierdzenie sprawdza zgłoszenie pod blokadą klienta w transakcji idempotencji;
+- zmiany względem ADR 0012 (opisane w ADR): blokada to `CustomerLock` (advisory), nie `loyalty_accounts FOR UPDATE` - klient bez konta nie ma wiersza; ścieżki konsultanta pod `/api/support/agent/...`; znacznik `ClientProvidedHistory` (ADR miał dwie nazwy).
+- review (`/code-review high`, 4 uwagi, przyjęte): bez zamknięcia klient blokował sobie czat na stałe → `POST /api/support/cases/{id}/close` już w tym kroku (worker wygaszania dalej planowany); `Location` wskazywał nieistniejący zasób - usunięty; `AppendAsync` zwraca `false` dla braku zgłoszenia zamiast wyjątku; odmowa `handoff_active` zapisana pod kluczem - ponowienie nowym kluczem, opisane;
+- testy: `SupportTests` 10/10 (przejęcie z bramką i równoległe, wyścig w obu kolejnościach, czat, role, ograniczenia bazy); mutacje (bez blokady w potwierdzeniu, przejęcie bez warunku `Waiting`) wywracają po 2 testy; API 512/512 (1 pominięty, Gemini na żywo).
+
 ## Następny krok
 
 Otwarte:
@@ -387,4 +400,4 @@ Otwarte:
 - test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
 - CI na GitHubie (push - decyzja właściciela).
 
-P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). Dalej: P11 przekazanie do konsultanta (ADR 0012 przyjęty).
+P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11 w realizacji: dalej pozostałe endpointy (stan, wiadomości z kursorem, oddanie, zamknięcie, kolejka), worker, bootstrap, `propose_handoff`, UI klienta i konsultanta, E2E.

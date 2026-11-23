@@ -21,6 +21,10 @@ namespace FuelClub.Api.Infrastructure
         public DbSet<RewardOffer> RewardOffers => Set<RewardOffer>();
         public DbSet<Coupon> Coupons => Set<Coupon>();
         public DbSet<RewardHandover> RewardHandovers => Set<RewardHandover>();
+        public DbSet<Modules.Support.Domain.SupportCase> SupportCases =>
+            Set<Modules.Support.Domain.SupportCase>();
+        public DbSet<Modules.Support.Domain.SupportMessage> SupportMessages =>
+            Set<Modules.Support.Domain.SupportMessage>();
         public DbSet<Modules.Assistant.Tracing.AssistantTurn> AssistantTurns =>
             Set<Modules.Assistant.Tracing.AssistantTurn>();
         public DbSet<Modules.Observability.SecurityEvent> SecurityEvents =>

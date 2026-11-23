@@ -7,6 +7,7 @@ using FuelClub.Api.Modules.Assistant;
 using FuelClub.Api.Modules.Loyalty;
 using FuelClub.Api.Modules.Observability;
 using FuelClub.Api.Modules.Rewards;
+using FuelClub.Api.Modules.Support;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,6 +33,7 @@ builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
 builder.Services.AddRewards(builder.Configuration);
 builder.Services.AddAssistant(builder.Configuration);
+builder.Services.AddSupport(builder.Configuration);
 builder.Services.AddTelemetry(builder.Configuration);
 builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddHostedService<DemoAccountsSeeder>();
@@ -73,6 +75,7 @@ app.MapAdminEndpoints();
 app.MapLoyaltyEndpoints();
 app.MapRewardsEndpoints();
 app.MapAssistantEndpoints();
+app.MapSupportEndpoints();
 app.MapObservabilityEndpoints();
 
 foreach (var additional in app.Services.GetServices<IAdditionalEndpoints>())

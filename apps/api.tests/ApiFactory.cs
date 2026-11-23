@@ -137,6 +137,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         IReadOnlyCollection<string> userIds
     )
     {
+        // Messages go with their case (cascade); an agent's messages take the whole case with them.
+        await db
+            .SupportCases.Where(c =>
+                userIds.Contains(c.UserId)
+                || (c.AssignedToUserId != null && userIds.Contains(c.AssignedToUserId))
+                || db.SupportMessages.Any(m =>
+                    m.CaseId == c.Id && m.AuthorUserId != null && userIds.Contains(m.AuthorUserId)
+                )
+            )
+            .ExecuteDeleteAsync();
         await db
             .IdempotencyRecords.Where(record => userIds.Contains(record.UserId))
             .ExecuteDeleteAsync();
@@ -217,6 +227,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                     || user.Email.StartsWith("idempotency-")
                     || user.Email.StartsWith("card-")
                     || user.Email.StartsWith("assistant-")
+                    || user.Email.StartsWith("support-")
                 )
             )
             .ToListAsync();

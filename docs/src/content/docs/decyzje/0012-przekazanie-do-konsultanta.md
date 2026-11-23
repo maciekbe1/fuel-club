@@ -7,7 +7,7 @@ sidebar:
 
 ## Status
 
-Decyzja przyjęta (2026-11-22), P11. Nie zrealizowana - kontrakt przed implementacją.
+Decyzja przyjęta (2026-11-22), P11. W realizacji: model, utworzenie, przejęcie i blokada czatu zrobione ([Support](/moduly/support/)); reszta planowana.
 
 ## Problem
 
@@ -50,7 +50,7 @@ Model nie może sam przekazać rozmowy ani dawać konsultantowi uprawnień, któ
   - pole „Dołącz dotychczasową rozmowę z asystentem” - domyślnie **wyłączone**.
 - Konsultant widzi wiadomości od przekazania.
 - **Dołączona historia to niezaufany tekst klienta**, nie potwierdzony zapis działań systemu. Serwer nie przechowuje rozmów z botem, więc jej nie weryfikuje; klient może wpisać tam cokolwiek, także „asystent aktywował kupon”.
-  - Zapis: wiadomości autora `Customer` ze znacznikiem `ClientProvidedHistory`, nigdy jako `System` ani `Support`.
+  - Zapis: wiadomości autora `Customer` ze znacznikiem `ClientProvidedHistory` i rolą (`user`/`assistant`) podaną przez klienta, nigdy jako `System` ani `Support` (`CHECK` w bazie).
   - Panel konsultanta pokazuje je osobno, pod nagłówkiem „Tekst przekazany przez klienta - niepotwierdzony”, jako zwykły tekst.
   - Limity jak historia czatu (20 wpisów, 2000 znaków).
 
@@ -61,7 +61,7 @@ Model nie może sam przekazać rozmowy ani dawać konsultantowi uprawnień, któ
   - `POST /api/chat` → `409 assistant.handoff_active` przed strumieniem;
   - `POST /api/chat/confirmations` → `409 assistant.handoff_active` - stare przyciski aktywacji są wyłączone w UI, a backend odrzuca ich użycie.
 - **Wyścig przekazanie-aktywacja.** Sam odczyt stanu przed zapisem nie wystarcza: przekazanie mogłoby się zatwierdzić między sprawdzeniem a aktywacją.
-  - Utworzenie zgłoszenia i aktywacja z czatu blokują ten sam wiersz klienta (`loyalty_accounts ... FOR UPDATE`) w swojej transakcji.
+  - Utworzenie zgłoszenia i aktywacja z czatu biorą tę samą blokadę klienta w swojej transakcji: transakcyjny advisory lock `CustomerLock` (zakup, wymiana, karta). Pierwotny zapis „`loyalty_accounts ... FOR UPDATE`” zmieniony przy realizacji - klient bez konta lojalnościowego nie ma takiego wiersza, a advisory lock daje tę samą gwarancję.
   - Aktywacja sprawdza brak otwartego zgłoszenia **pod tą blokadą** i w tej samej transakcji zmienia kupon.
   - Skutek: albo aktywacja zatwierdza się przed zgłoszeniem, albo widzi zgłoszenie i kończy się `409`. Test API uruchamia oba żądania równolegle (bramka blokad jak w testach wyścigów).
 
@@ -77,22 +77,22 @@ Klient (rola `User`, CSRF dla zmian):
 | `POST` | `/api/support/cases/{id}/messages` | `Idempotency-Key`, `{ text }` 1-1000 znaków. Zamknięte → `409 support.case_closed`. |
 | `POST` | `/api/support/cases/{id}/close` | Idempotentne co do skutku. |
 
-Konsultant (rola `Support`, CSRF dla zmian):
+Konsultant (rola `Support`, CSRF dla zmian). Ścieżki pod `/api/support/agent/...` (zmiana przy realizacji: jedna ścieżka dla dwóch ról mieszałaby autoryzację i typy odpowiedzi w jednym handlerze):
 
 | Metoda | Ścieżka | Opis |
 | --- | --- | --- |
-| `GET` | `/api/support/queue` | Oczekujące (najstarsze pierwsze) i moje przejęte: nazwa klienta, czas, pierwsza wiadomość. |
-| `POST` | `/api/support/cases/{id}/claim` | Atomowe przejęcie: warunkowy `UPDATE ... WHERE Status = 'Waiting'`. Przegrany → `409 support.case_taken`; ponowienie przez tego samego konsultanta → `200`. |
-| `GET` | `/api/support/cases/{id}/messages?after={seq}` | Tylko przejmujący. Inny konsultant → `403 support.not_assignee`. |
-| `POST` | `/api/support/cases/{id}/messages` | Tylko przejmujący, `Idempotency-Key`. |
-| `POST` | `/api/support/cases/{id}/release` | Oddanie do kolejki: warunkowy `UPDATE ... WHERE AssignedTo = ja AND Status = 'Assigned'` → `Waiting`. Od tej chwili poprzedni opiekun dostaje `403 support.not_assignee`. Wiadomości zostają, bot dalej wyłączony. |
-| `POST` | `/api/support/cases/{id}/close` | Tylko przejmujący. |
+| `GET` | `/api/support/agent/queue` | Oczekujące (najstarsze pierwsze) i moje przejęte: nazwa klienta, czas, pierwsza wiadomość. |
+| `POST` | `/api/support/agent/cases/{id}/claim` | Atomowe przejęcie: warunkowy `UPDATE ... WHERE Status = 'Waiting'`. Przegrany → `409 support.case_taken`; ponowienie przez tego samego konsultanta → `200`. |
+| `GET` | `/api/support/agent/cases/{id}/messages?after={seq}` | Tylko przejmujący. Inny konsultant → `403 support.not_assignee`. |
+| `POST` | `/api/support/agent/cases/{id}/messages` | Tylko przejmujący, `Idempotency-Key`. |
+| `POST` | `/api/support/agent/cases/{id}/release` | Oddanie do kolejki: warunkowy `UPDATE ... WHERE AssignedTo = ja AND Status = 'Assigned'` → `Waiting`. Od tej chwili poprzedni opiekun dostaje `403 support.not_assignee`. Wiadomości zostają, bot dalej wyłączony. |
+| `POST` | `/api/support/agent/cases/{id}/close` | Tylko przejmujący. |
 
 ### Wiadomości i kursor
 
-- `support_messages(CaseId, Seq)` z UNIQUE. `Seq` nadawany pod blokadą wiersza zgłoszenia (`FOR UPDATE`), więc kolejne wiadomości jednego zgłoszenia są widoczne w kolejności zapisu, bez luk.
+- `SupportMessages(CaseId, Seq)` z UNIQUE. `Seq` nadawany pod blokadą wiersza zgłoszenia (`UPDATE ... "LastSeq" = "LastSeq" + n RETURNING`), więc kolejne wiadomości jednego zgłoszenia są widoczne w kolejności zapisu, bez luk.
 - Odczyt: `after` = ostatni otrzymany `Seq`. Ten sam kursor daje te same wiadomości; nic nie ginie ani się nie dubluje.
-- Autor: `Customer`, `Support`, `System` (np. „Konsultant dołączył”), plus znacznik `FromAssistantHistory` dla dołączonej rozmowy.
+- Autor: `Customer`, `Support`, `System` (kod zdarzenia, np. `claimed` → „Konsultant dołączył”), plus znacznik `ClientProvidedHistory` dla dołączonej rozmowy.
 
 ### Polling
 
