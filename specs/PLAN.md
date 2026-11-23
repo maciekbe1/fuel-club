@@ -60,6 +60,16 @@ Po każdym kroku: testy, niezależne review, dokumentacja i zapis stanu zgodnie 
 - P7c (realizacja w P15e, jedna pozycja zakresu): opcjonalny judge na próbce z budżetem, raportem awarii i kalibracją. Bez klucza etap raportuje tę część jako niewykonaną, nie blokuje lokalnego MVP.
 - Przed gromadzeniem treści rozmów lub wysyłaniem ich do zewnętrznego dostawcy uzgodnij zakres danych, odbiorcę i retencję. Domyślnie tylko metadane; pełne treści nie są automatycznie autoryzowane.
 
+### P16 - ruch syntetyczny i dane demo (decyzje: ADR 0017)
+
+Cel: dane w panelu „Obserwowalność” na pokaz 25.11. Metryki to zakres P15b - P16 dostarcza ruch, oznaczenia i definicję rozmowy, nie drugi zestaw metryk.
+
+1. **P16a - manifest i populacja.** `apps/tools/Simulator` (.NET, tylko publiczne API), osobna baza `fuelclub_demo`, instancja API z `Simulation:Enabled`/`RunId` z konfiguracji. Konta z rozkładem punktów i kuponów, manifest z kluczami idempotencji, ponowne uruchomienie bez podwojeń, sprzątanie jednego przebiegu z kontrolą bazy, limity API. Najpierw przebieg 5 kont.
+2. **P16b - rozmowy.** Serwerowy `conversationId`, jawne zakończenie, przekazanie raz na rozmowę; oznaczenie tur i rozmów `Synthetic`/`RunId`. Symulator scenariuszy z wagami (saldo, oferty, aktywacja z potwierdzeniem i bez, porównanie, regulamin z odpowiedzią i bez, konsultant ze zgłoszeniem, złość, injection, cudzy kupon, spoza tematu, wieloturowe), SSE jak front, adapter demo domyślnie; Gemini tylko na instancji skonfigurowanej na Gemini, z limitem kosztu. Transkrypty lokalnie poza Git.
+3. **P16c - metryki (P15b)** na danych P16: koszt z cennika (null = nieznany), kroki, p50/p95 pierwszego zdarzenia i całości, odsetek rozmów bez przekazania (nie containment), filtr wersji promptu/modelu i ruchu syntetycznego, jawne mianowniki.
+4. **P16d - judge** na syntetycznych transkryptach (P15e w wersji offline): rubryka z wersją, limit kosztu, ocena negatywna ≠ awaria oceniającego.
+5. Później: feedback (kciuki, oznaczane syntetycznie w symulacji), k6.
+
 ## Obowiązkowe dowody
 
 - API: adekwatne testy jednostkowe/integracyjne na PostgreSQL. Migracja: dane sprzed migracji, ograniczenia i nowy zapis; nie migruj działającej bazy dev bez uzgodnionego zatrzymania.
