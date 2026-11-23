@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  useMutationState,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { ApiError } from "@/lib/api/problem";
-import {
-  keepsIdempotencyKey,
-  keepsPendingOperation,
-  useIdempotentMutation,
-} from "@/lib/idempotency";
+import { useIdempotentMutation } from "@/lib/idempotency";
 import { queryKeys } from "@/lib/query-keys";
 import {
   cashierService,
@@ -44,56 +36,6 @@ export function useRegisterPurchase() {
 export const isCertainRefusal = (error: unknown) =>
   error instanceof ApiError &&
   (error.status === 429 || error.code === "loyalty.customer_busy");
-
-type HandoverAttempt = {
-  vars: RewardHandoverBody | undefined;
-  status: string;
-  error: unknown;
-  at: number;
-};
-
-/** Unknown after the last final answer: a later attempt ended without a known outcome. */
-function unresolvedIn(attempts: HandoverAttempt[]) {
-  let unresolved = false;
-  for (const attempt of [...attempts].sort((a, b) => a.at - b.at)) {
-    if (attempt.status === "success") unresolved = false;
-    else if (attempt.status !== "error") continue;
-    else if (!keepsPendingOperation(attempt.error)) unresolved = false;
-    else if (
-      keepsIdempotencyKey(attempt.error) &&
-      !isCertainRefusal(attempt.error)
-    )
-      unresolved = true;
-    // A certain refusal or a 401 leaves the earlier state as it was.
-  }
-  return unresolved;
-}
-
-/**
- * Whether a handover of this pair (or, without one, of any pair) has an unknown outcome. Derived
- * from the mutation cache, not pushed between components: a late answer, a route hidden by
- * Activity and a remounted panel all read the same state, and nothing has to be cleared by hand.
- */
-export function useHandoverUnresolved(pair?: RewardHandoverBody) {
-  const attempts = useMutationState({
-    filters: { mutationKey: queryKeys.cashier.rewardHandover },
-    select: (mutation): HandoverAttempt => ({
-      vars: mutation.state.variables as RewardHandoverBody | undefined,
-      status: mutation.state.status,
-      error: mutation.state.error,
-      at: mutation.state.submittedAt,
-    }),
-  });
-  const pairOf = (vars: RewardHandoverBody | undefined) =>
-    vars ? `${vars.cardCode}:${vars.couponCode}` : "";
-  const byPair = new Map<string, HandoverAttempt[]>();
-  for (const attempt of attempts) {
-    const key = pairOf(attempt.vars);
-    if (pair && key !== pairOf(pair)) continue;
-    byPair.set(key, [...(byPair.get(key) ?? []), attempt]);
-  }
-  return [...byPair.values()].some(unresolvedIn);
-}
 
 /** Same card and code → same Idempotency-Key until a final answer: a lost response is retried safely. */
 export function useHandOverReward() {

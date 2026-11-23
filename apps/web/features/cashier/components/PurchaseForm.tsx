@@ -31,7 +31,6 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
     form,
     unknown,
     locked,
-    formLocked,
     send,
     onSubmit,
     scanner,
@@ -81,7 +80,7 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <FormAlert message={errors.root?.message} />
         <fieldset
-          disabled={formLocked}
+          disabled={locked}
           className="flex flex-col gap-5 disabled:opacity-70"
         >
           <legend className="sr-only">Zakup paliwa</legend>
@@ -99,7 +98,6 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
               className={cn(fieldClass, "font-mono")}
               {...fieldA11y("cardCode", errors.cardCode)}
               {...form.register("cardCode")}
-              disabled={locked}
             />
           </FormField>
           <QrScanner
@@ -170,7 +168,6 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
 
           <Button
             type="submit"
-            disabled={locked}
             size="lg"
             className="h-12 bg-brand-orange text-brand-navy hover:bg-brand-orange/90"
           >

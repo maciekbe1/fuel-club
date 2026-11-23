@@ -7,11 +7,7 @@ import { useForm } from "react-hook-form";
 import { ApiError, applyFieldErrors } from "@/lib/api/problem";
 import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  useForgetCouponPreviews,
-  useHandoverUnresolved,
-  useRegisterPurchase,
-} from "../hooks";
+import { useForgetCouponPreviews, useRegisterPurchase } from "../hooks";
 import {
   purchaseMessages,
   purchaseSchema,
@@ -70,14 +66,11 @@ export function usePurchaseFlow() {
   // late success would clear the next customer's code.
   const handingOver =
     useIsMutating({ mutationKey: queryKeys.cashier.rewardHandover }) > 0;
-  // A handover with an unknown outcome locks the card and coupon fields, scanners and the purchase
-  // submit, so the next customer cannot be served before it is resolved; "Ponów wydanie" stays
-  // enabled (amount, liters, date and receipt too - they change nothing on their own).
-  const handoverUnresolved = useHandoverUnresolved();
+  // An unknown handover outcome does not lock the form (owner's decision): the warning stays in its
+  // panel while that pair is in the form, and any later attempt gets the server's 409 with the time,
+  // station and till of the handover.
   const purchaseLocked = purchase.isPending || unknown !== null;
-  // The whole form (fieldset): not the unresolved handover, whose retry button lives inside it.
-  const formLocked = purchaseLocked || handingOver;
-  const locked = formLocked || handoverUnresolved;
+  const locked = purchaseLocked || handingOver;
 
   const send = async (body: FuelPurchaseBody) => {
     setPending(body);
@@ -116,8 +109,6 @@ export function usePurchaseFlow() {
 
   return {
     purchaseLocked,
-    formLocked,
-    handoverUnresolved,
     purchase,
     pending,
     setPending,

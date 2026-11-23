@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, NetworkError } from "@/lib/api/problem";
 import { benefitTerms, isProduct } from "@/lib/format";
+import { keepsIdempotencyKey, keepsPendingOperation } from "@/lib/idempotency";
 import { cn } from "@/lib/utils";
 import {
   useCashierStation,
@@ -15,7 +16,6 @@ import {
   isCertainRefusal,
   useForgetCouponPreviews,
   useHandOverReward,
-  useHandoverUnresolved,
 } from "../hooks";
 import {
   looksLikeCardCode,
@@ -122,7 +122,6 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           className={cn(fieldClass, "font-mono")}
           {...fieldA11y("couponCode", errors.couponCode)}
           {...couponField}
-          disabled={locked}
           onChange={(event) => {
             forget();
             setHandedOver(null);
@@ -338,25 +337,30 @@ function RewardHandover({
 }) {
   const handOver = useHandOverReward();
   const forgetPreviews = useForgetCouponPreviews();
-  // Unknown since the last final answer (429, 503 and 401 on a retry leave it unknown). Shared with
-  // the purchase form's lock through the mutation cache; after a remount the server's 409 says when
-  // and where the reward was handed over (handedOverMessage).
-  const unknown = useHandoverUnresolved({ cardCode, couponCode });
+  // An attempt in this panel ended without a known outcome: until a final answer, a 429, 503 or
+  // 401 on the retry leaves it unknown. Panel state only (owner's decision): it survives a route
+  // hidden by Activity; once the pair leaves the form the server's 409 says when and where.
+  const [uncertain, setUncertain] = useState(false);
   const error = handOver.isError ? handOver.error : null;
   const busy = error ? busyMessage(error) : null;
   const expired = error instanceof ApiError && error.status === 401;
+  const unknown =
+    error !== null && (uncertain || (keepsIdempotencyKey(error) && !busy));
   const refusal = unknown ? null : busy;
 
   const send = async () => {
     try {
       await handOver.mutateAsync({ cardCode, couponCode });
-      // The fields are locked while it runs, so the form still holds this pair; a route hidden by
-      // Activity keeps the same form, so the late result belongs there too.
+      // The form is locked while it runs, so it still holds this pair; a route hidden by Activity
+      // keeps the same form, so the late result belongs there too.
       forgetPreviews();
       onDone();
-    } catch {
+    } catch (failure) {
       // Shown below from the mutation state. A final answer stays in this panel: no preview
       // refetch, which would unmount it, hide the answer and spend the per-cashier preview limit.
+      if (!keepsPendingOperation(failure)) setUncertain(false);
+      else if (keepsIdempotencyKey(failure) && !isCertainRefusal(failure))
+        setUncertain(true);
     }
   };
 

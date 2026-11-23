@@ -369,6 +369,12 @@ Siódme review (`/code-review high`, 5 uwag, wszystkie przyjęte). Stan „niero
 - dokumentacja: ponowne wpisanie kodu po ostatecznej odpowiedzi pokazuje warunki z pamięci, `409` dopiero po kliknięciu;
 - mutacje (bez blokady w formularzu, `429` jako rozstrzygnięcie) wywracają E2E; pełne E2E 144/144, API 502/502.
 
+Ósme review (`/code-review high`, 5 uwag): pamięć nieznanego wyniku w cache mutacji znikała po 5 min (GC), kasa mogła zablokować się bez przycisku ponowienia, a po przemontowaniu ponowienie szło nowym kluczem. Właściciel wybrał uproszczenie:
+- nieznany wynik tylko w panelu pary (stan komponentu, przetrwa `Activity`), ponowienie tym samym kluczem, dopóki para jest w formularzu;
+- bez blokady formularza przy nieznanym wyniku (zostaje blokada w trakcie żądania); rozstrzyga serwer: `409` z czasem, stanowiskiem i kasą;
+- usunięte `useHandoverUnresolved` i podział blokady; test podglądu sprawdza okno 1 s; dokumentacja i tabela testów zgodne z kodem.
+- wynik: API 502/502; pełne E2E 143/144 - jeden test (`cashier-coupon` skan QR) padł na `ECONNRESET` w sprzątaniu fixture (`PUT` oferty), po powtórzeniu plik 12/12.
+
 Wyszło przy teście cofnięcia: `Down` ustawiał stawce i limitowi `DEFAULT 0`, a ponowne `Up` go nie usuwał. Po `Down`/`Up` kupon bez stawki dostawał `0` zamiast `NULL`. Usunięte; po powtórzeniu brak wartości domyślnych.
 
 ## Następny krok

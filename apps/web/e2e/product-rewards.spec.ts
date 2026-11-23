@@ -196,7 +196,7 @@ test("lost handover response, then 429 on the retry: still unknown, the same key
   ]);
 });
 
-test("an unknown handover locks the till until the retry resolves it; the next code starts clean", async ({
+test("an unknown handover stays in its panel; the next code starts clean and the first one is settled by the server", async ({
   page,
   browser,
   customer,
@@ -219,22 +219,15 @@ test("an unknown handover locks the till until the retry resolves it; the next c
   await expect(handover).toContainText(second);
   await coupon.fill(codes[0]);
   await expect(handover).toContainText(first);
-  // Fails before the server: unknown for the till. The next customer cannot be served meanwhile.
-  await register.route(HANDOVERS, (route) => route.abort("failed"));
+  // Committed, the answer is lost: unknown. The form is not locked (owner's decision).
+  await register.route(HANDOVERS, async (route) => {
+    await route.fetch();
+    await route.abort("failed");
+  });
   await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
   await expect(handover.getByRole("alert")).toContainText("Nie dotarła");
-  await expect(coupon).toBeDisabled();
-  await expect(register.getByLabel("Kod karty klienta")).toBeDisabled();
-  await expect(
-    register.getByRole("button", { name: "Zapisz zakup" }),
-  ).toBeDisabled();
+  await expect(coupon).toBeEnabled();
   await register.unroute(HANDOVERS);
-  await handover.getByRole("button", { name: "Ponów wydanie" }).click();
-  await expect(
-    register
-      .getByRole("status")
-      .filter({ hasText: `Wydano nagrodę „${first}”` }),
-  ).toBeVisible();
 
   // The next code starts with a clean panel.
   await coupon.fill(codes[1]);
@@ -246,13 +239,21 @@ test("an unknown handover locks the till until the retry resolves it; the next c
     .filter({ hasText: `Wydano nagrodę „${second}”` });
   await expect(banner).toBeVisible();
 
+  // Back to the first code: nothing remembered on the client; the fresh preview (previews are
+  // dropped after a handover) gets the server's 409 with when and where.
+  await coupon.fill(codes[0]);
+  await expect(
+    register.getByRole("alert").filter({ hasText: "na tej kasie" }),
+  ).toBeVisible();
+  await expect(handover).toHaveCount(0);
+
   // The next customer: the card field changes (cleared like after a reset), the banner goes.
   await register.getByLabel("Kod karty klienta").fill("");
   await expect(banner).toHaveCount(0);
   await context.close();
 });
 
-test("after an unknown outcome and a 401 the form stays locked, the retry resolves it; the banner does not come back", async ({
+test("after an unknown outcome a 401 keeps it unknown, the same-key retry replays it; the banner does not come back", async ({
   page,
   browser,
   customer,
@@ -296,7 +297,6 @@ test("after an unknown outcome and a 401 the form stays locked, the retry resolv
   await expect(handover.getByRole("alert")).toContainText("Sesja wygasła");
   await expect(handover.getByRole("alert")).toContainText("Nie wiadomo");
 
-  await expect(coupon).toBeDisabled();
   // The retry with the same key replays the committed handover.
   await handover.getByRole("button", { name: "Ponów wydanie" }).click();
   await expect(
@@ -304,7 +304,6 @@ test("after an unknown outcome and a 401 the form stays locked, the retry resolv
       .getByRole("status")
       .filter({ hasText: `Wydano nagrodę „${first}”` }),
   ).toBeVisible();
-  await expect(coupon).toBeEnabled();
   await register.unroute(HANDOVERS);
 
   // While a handover runs the form is locked: its late success cannot clear the next code.
@@ -371,15 +370,18 @@ test("a final 409 from another till stays in the panel with that station and til
   const alert = handover.getByRole("alert");
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(alert).toContainText("14:32");
-  // Not replaced by a refetched preview: no preview request after the answer.
-  await register.waitForLoadState("networkidle");
+  // Not replaced by a refetched preview: none within a second of the answer (it would start at once).
+  await expect
+    .poll(() => previews, { intervals: [100], timeout: 1000 })
+    .not.toBe(beforeHandover)
+    .catch(() => undefined);
   expect(previews).toBe(beforeHandover);
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(register.getByLabel("Kod kuponu")).toBeEnabled();
   await context.close();
 });
 
-test("leaving the till and coming back keeps an unknown handover locked", async ({
+test("leaving the till and coming back keeps the unknown handover in its panel", async ({
   page,
   browser,
   customer,
@@ -405,8 +407,9 @@ test("leaving the till and coming back keeps an unknown handover locked", async 
   await register.waitForURL("/");
   await register.getByRole("link", { name: /Kasa/ }).click();
   await register.waitForURL("/kasa");
-  await expect(register.getByLabel("Kod karty klienta")).toBeDisabled();
-  await expect(register.getByLabel("Kod kuponu")).toBeDisabled();
+  await expect(
+    register.getByTestId("reward-handover").getByRole("alert"),
+  ).toContainText("Nie dotarła");
   await expect(
     register.getByTestId("reward-handover").getByRole("button", {
       name: "Ponów wydanie",
@@ -422,6 +425,5 @@ test("leaving the till and coming back keeps an unknown handover locked", async 
       .getByRole("status")
       .filter({ hasText: `Wydano nagrodę „${name}”` }),
   ).toBeVisible();
-  await expect(register.getByLabel("Kod karty klienta")).toBeEnabled();
   await context.close();
 });
