@@ -52,7 +52,7 @@ Gdy klient ma otwarte zgłoszenie do konsultanta, czat i potwierdzenia odpowiada
 Adapter demo (`DemoChatModel`) rozpoznaje słowa kluczowe bez polskich znaków i wielkości liter:
 
 - „saldo/punkty” → `get_my_balance`;
-- „oferty/nagrody” → `list_available_rewards`;
+- „oferty/nagrody” → `list_available_rewards`; także „jakie nagrody mogę wybrać” - „wybrać” obok „nagrody”, bez kuponu, litrów i innych słów porównania („opłaca”, „zaoszczędzić”, „porównaj”) to katalog, nie porównanie (`demo-rules-v10`);
 - „kupon” → `list_my_coupons`;
 - „który kupon / opłaca / wybrać / porównaj” + litry (np. „40 l”, opcjonalnie „250 zł”) → `compare_coupons`; bez litrów - pytanie o litry;
 - „dostałem / naliczono / przyznano … punktów”, „punkty za tankowanie” → `explain_purchase_points` (po regule odmowy: „nalicz”, „dopisz” w tej samej wiadomości dają odmowę); kwota zakupu to liczba przy „zł”, nie cena za litr („po 6,20 zł/l”). Skarga („skandal”, „nie dostałem”, „reklamacja”) → do tego `propose_handoff` i odpowiedź: przeprosiny, ostatni zakup z punktami, „odśwież aplikację”, przycisk konsultanta; bez zakupu albo przy błędzie narzędzia - przeprosiny i od razu konsultant (`demo-rules-v9`, ocena człowieka `demo-1`);

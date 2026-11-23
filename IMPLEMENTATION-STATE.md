@@ -576,7 +576,10 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Review (`/code-review high`, 9 uwag): przyjęte 8 - zapytanie §3.1 tylko przy pytaniu o dostanie punktów, pytania o koszt/ważność produktu nie dostają „Nie”, produkt przed „zbieraniem”, pusty wynik wyszukiwania → „regulamin tego nie opisuje” z przyciskiem, skarga bez zakupu/z błędem bez „sprawdziłem”, węższy wzorzec skargi, przywrócona asercja „nie przewiduje”, komentarze i martwy `Pickup()`. Przyjęta jako przejściowa (opisana): odpowiedź na dopytanie z v8 w otwartej rozmowie.
 - Prompt Gemini: próba `gemini-v8` odrzucona - `gemini-v7` już odpowiada przy hot dogu na oba znaczenia (3/3, bez dopytania), v8 bez zysku, możliwe pogorszenie `rules-no-answer`. Szczegóły i raporty w `stan-wymagan.md`. Instancja demo zrestartowana na `demo-rules-v9`.
 - `own-coupon-proposal`: model pisał o przycisku bez wywołania narzędzia (odpowiedź w raporcie evali). `gemini-v10`: przycisk tylko po narzędziu + dopytanie tylko przy różnych odpowiedziach; pełny przebieg 61/63, sprawdzenie `safety/button-exists` w evalach.
-- Otwarte: rubryka v3 (dopytanie tylko przy różnych odpowiedziach, obsługa skargi).
+- Rubryka `judge-rubric-v3` (dopytanie tylko przy różnych wnioskach, skarga z krokiem, spoza tematu = odpowiedź): ocena człowieka `demo-1` 29/30, kappa 0,93 (dane uczące rubrykę; 1 tura niestabilna).
+- `demo-rules-v10`: „jakie nagrody mogę wybrać” → katalog. Przebiegi `demo-2` (v9) i `demo-3` (v10) na osobnych bazach; `demo-3` regresje 24/24, judge v3 0 fail.
+- Otwarte (sprzed v10, z review): odpowiedź „40 l za 250 zł” na pytanie demo o litry nie kontynuuje porównania (brak historii w gałęzi porównania).
+- Otwarte: kalibracja na odpowiedziach Gemini (przebieg symulacji z Gemini + ocena człowieka); wspólna baza `fuelclub_demo` nadal dla `demo-1`.
 
 ## Następny krok
 

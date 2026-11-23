@@ -21,7 +21,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v9";
+    public string PromptVersion => "demo-rules-v10";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -117,7 +117,7 @@ public sealed partial class DemoChatModel : IChatModel
         if (activation)
             return Task.FromResult(NextActivationStep(context, text, intro));
 
-        if (Compare().IsMatch(text))
+        if (Compare().IsMatch(text) && !ChoosesReward(text))
             return Task.FromResult(NextComparisonStep(context, text, intro));
 
         foreach (var tool in Wanted(text))
@@ -660,6 +660,20 @@ public sealed partial class DemoChatModel : IChatModel
 
     [GeneratedRegex(@"(ktory|jaki)\s+kupon|oplaca|wybrac|zaoszczedz|porownaj|najwiekszy\s+rabat")]
     private static partial Regex Compare();
+
+    // "Jakie nagrody mogę wybrać?" asks for the catalogue, not for a coupon comparison (demo-1).
+    // Only "wybrać" next to rewards; "która oferta się opłaca" stays a comparison.
+    private static bool ChoosesReward(string text) =>
+        RewardChoice().IsMatch(text)
+        && !StrongCompare().IsMatch(text)
+        && !Coupons().IsMatch(text)
+        && !LitersAmount().IsMatch(text);
+
+    [GeneratedRegex(@"nagrod\w*\s+(\w+\s+){0,3}wybrac|wybrac\s+(\w+\s+){0,2}nagrod")]
+    private static partial Regex RewardChoice();
+
+    [GeneratedRegex(@"(ktory|jaki)\s+kupon|oplaca|zaoszczedz|porownaj|najwiekszy\s+rabat")]
+    private static partial Regex StrongCompare();
 
     [GeneratedRegex(@"(\d+(?:[.,]\d+)?)\s*(?:l\b|litr)")]
     private static partial Regex LitersAmount();

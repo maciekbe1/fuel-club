@@ -1119,6 +1119,14 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         var thousands = await ChatAsync(customer.Client, "Tankuję 40 l za 1 000 zł, który kupon?");
         Assert.Equal("compare_coupons:ok", ToolsOf(thousands).Single());
         Assert.Matches(@"za 1\s000,00 zł", thousands.Text);
+        // Choosing a reward is the catalogue, not a comparison (demo-1 regression).
+        var rewards = await ChatAsync(customer.Client, "Jakie nagrody mogę wybrać?");
+        Assert.Equal("list_available_rewards:ok", ToolsOf(rewards).Single());
+        var coupon = await ChatAsync(customer.Client, "Który kupon wybrać na 40 l?");
+        Assert.StartsWith("compare_coupons:", ToolsOf(coupon).Single());
+        // Only "wybrać" next to rewards is the catalogue; other comparison words still ask.
+        foreach (var question in new[] { "Która oferta się opłaca?", "Co mogę zaoszczędzić?" })
+            Assert.Contains("Ile litrów", (await ChatAsync(customer.Client, question)).Text);
         // Over the limit: the tool rejects it and the answer says what to give.
         var tooMuch = await ChatAsync(customer.Client, "Tankuję 40 l za 9000 zł, który kupon?");
         Assert.Equal("compare_coupons:rejected", ToolsOf(tooMuch).Single());
