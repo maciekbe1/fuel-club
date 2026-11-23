@@ -431,7 +431,7 @@ Audyt - API i skaner (2026-11-23):
 - review (`/code-review high`, 7 uwag): przyjęte - długi `Retry-After` czekał do `RequestTimeout` i kończył turę jako `timeout` (teraz > 5 s → od razu `provider_error`; mutacja: 20 s i test pada), atrapa Gemini powtarzała ostatnią odpowiedź (osłabiała inne testy - wycofane, porażki podane jawnie), opis `RequestTimeout`, ostrzeżenie w logu przy ponowieniu; częściowo - `TurnTimeout` przy wielu krokach (bez zmian w kodzie, poprawione zdanie w ADR 0011), testy pozostałych ścieżek (dodany `Retry-After`); odrzucone - rozpoznawanie limitu dziennego `429` (tylko z treści odpowiedzi, koszt ok. 1,5 s).
 - API 540/540 (1 pominięty: Gemini na żywo).
 
-P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`; szkic regulaminu `specs/regulamin-szkic.md` czeka na akceptację właściciela (punkty `[DECYZJA]`).
+P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`; szkic regulaminu `specs/regulamin-szkic.md`: właściciel rozstrzygnął §3.7, §4.4 (ograniczenia demo, nie zakazy) i §8.3; całość czeka na przeczytanie i akceptację (potem `regulamin-v1`). Wyszukiwanie `simple`+`unaccent`+`pg_trgm` - wariant do sprawdzenia testami odmiany i pytań bez źródła.
 
 ## Następny krok
 

@@ -1,8 +1,8 @@
 # Regulamin programu Fuel Club - SZKIC do akceptacji właściciela
 
-Wersja: `regulamin-v1` (szkic, 2026-11-23). Napisany na podstawie działania aplikacji. Czeka na akceptację - do tego czasu nie trafia do czatu.
+Status: **szkic** (2026-11-23). Po zatwierdzeniu przez właściciela dostanie wersję `regulamin-v1`. Napisany na podstawie działania aplikacji. Do akceptacji całości nie trafia do czatu.
 
-Punkty oznaczone `[DECYZJA]` nie wynikają z kodu. To propozycje zasad do zatwierdzenia lub zmiany.
+Rozstrzygnięte przez właściciela: §3.7, §4.4, §8.3. Pozostała treść czeka na przeczytanie i akceptację.
 
 ## §1. Postanowienia ogólne
 
@@ -25,7 +25,7 @@ Punkty oznaczone `[DECYZJA]` nie wynikają z kodu. To propozycje zasad do zatwie
 4. Punkty przyznaje kasa przy rejestracji zakupu z okazaną kartą. Jeden paragon można zarejestrować tylko raz.
 5. Jeden zakup może wynosić najwyżej 5000 zł.
 6. Odebranie nagrody produktowej (np. kawy) nie daje punktów.
-7. `[DECYZJA]` Zakup bez okazanej karty nie daje punktów. Nie można ich później dopisać na podstawie paragonu.
+7. Punkty przyznaje się tylko przy rejestracji zakupu z kartą. Demo nie obsługuje dopisywania punktów po zakupie.
 
 ## §4. Wymiana punktów na kupon
 
@@ -34,7 +34,7 @@ Punkty oznaczone `[DECYZJA]` nie wynikają z kodu. To propozycje zasad do zatwie
    - nagroda produktowa (np. kawa, hot dog, myjnia).
 2. Wymiana jest możliwa, gdy saldo wystarcza na koszt oferty. Punkty schodzą z konta w chwili wymiany.
 3. Kupon zachowuje warunki z chwili wymiany. Późniejsza zmiana lub wyłączenie oferty go nie dotyczy.
-4. `[DECYZJA]` Wymiana jest ostateczna: punkty za kupon nie wracają na konto, także gdy kupon nie zostanie wykorzystany.
+4. Demo nie obsługuje anulowania wymiany ani zwrotu punktów.
 
 ## §5. Aktywacja i odbiór kuponu
 
@@ -63,7 +63,7 @@ Punkty oznaczone `[DECYZJA]` nie wynikają z kodu. To propozycje zasad do zatwie
 
 1. Rozmowę z konsultantem rozpoczyna się z czatu, po zgodzie na zapisanie i przechowywanie rozmowy.
 2. Do zgłoszenia można dołączyć wcześniejszą rozmowę z asystentem. To wybór uczestnika.
-3. `[DECYZJA]` Konsultant nie zmienia salda ani kuponów. Wyjaśnia zasady i stan konta.
+3. Konsultant pomaga i wyjaśnia zasady oraz stan konta, ale nie zmienia salda ani kuponów.
 
 ## §9. Zmiany regulaminu
 
