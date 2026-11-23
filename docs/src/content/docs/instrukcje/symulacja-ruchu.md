@@ -123,8 +123,9 @@ dotnet run --project apps/tools/Simulator -- converse --run pilot-6 --conversati
 | --- | --- | --- | --- |
 | `saldo-i-kupony` | 18 | saldo, kupony | klient |
 | `regulamin` | 14 | wygasanie punktów, punkty po rabacie | klient |
-| `produkt-zakup` | 5 | punkty za hot doga → dopytanie → „zakup w sklepie” | klient |
-| `produkt-odbior` | 5 | punkty za hot doga → dopytanie → „odbiór nagrody” | klient |
+| `produkt` | 4 | „Czy dostanę punkty za hot doga?” - odpowiedź na oba znaczenia (§3.1 i §3.6), bez dopytania (od `demo-rules-v9`) | klient |
+| `produkt-zakup` | 3 | „…jeśli kupię hot doga?” - §3.1 z wnioskiem | klient |
+| `produkt-odbior` | 3 | „…za odebranie hot doga z kuponu?” - §3.6 | klient |
 | `oferty` | 8 | dostępne oferty | klient |
 | `porownanie` | 6 | który kupon przy 40 l | klient |
 | `aktywacja` | 7 | „Aktywuj kupon SIM {run} rabat”; sprawdzenie: propozycja (jeśli padła) dotyczy oferty „… rabat” - cel ze zdarzenia `confirmation`, nie tekst | przycisk potwierdzenia (70%), gdy padła propozycja; inaczej bez aktywacji |
@@ -257,6 +258,11 @@ Judge `demo-1` (P16d, `gemini-3.5-flash-lite`, rubryka v1; odpowiedzi adaptera d
 
 Judge `demo-1`, rubryka v2 (te same 50 tur, transkrypty v7 - bez zapisanego celu propozycji): losowa 40 - 35 pass, 1 fail, 4 nie można ocenić (`porownanie`, argumenty `compare_coupons`); regresje 10/10 fail; 0 awarii; 0,0416 USD. `c01339#0` (zły kupon): cel `cannot_assess` (brak dowodu w transkrypcie v7), fail za `answers_question: partly`; uzasadnienie nadal mówi o „ID”, choć klient podał nazwę. Pierwsza wersja instrukcji v2 nie mówiła, jak ocenić „brak propozycji” - judge odpowiadał `not_applicable` (awaria formatu); doprecyzowana, wszystkie tury ocenione od nowa. Ślepy arkusz `calibration-judge-rubric-v2-gemini-3.5-flash-lite.tsv`: 30 tur, 17 różnych odpowiedzi, czeka na ocenę człowieka.
 
+Ocena człowieka `demo-1` (rubryka v2, 30 tur, 19 różnych par pytanie-odpowiedź; oceniał właściciel na liście par, oceny wpisane do arkusza): 16 pass, 14 fail. Zgodność z judge'em 27/30, kappa 0,80 - mała próbka, ok. 19 różnych przypadków, więc przedział niepewności szeroki. Wszystkie 3 rozbieżności: człowiek fail, judge pass (judge pobłażliwy), z dwóch przypadków, oba z luk rubryki, nie modelu:
+- „Czy dostanę punkty za hot doga?” (2 tury) → dopytanie. Rubryka: „przy pytaniu, które można rozumieć na dwa sposoby, może dopytać - to poprawna odpowiedź”; judge to zastosował. Człowiek: oba znaczenia dają tę samą odpowiedź (brak punktów, §3.1 i §3.6), więc dopytanie jest zbędne. Do rubryki: dopytanie poprawne tylko, gdy znaczenia prowadzą do różnych odpowiedzi.
+- Skarga „To skandal, znowu nie dostałem punktów…” (1 tura) → wyjaśnienie zakupu. Judge: odpowiada, zgodne z §3. Człowiek: brak przyznania problemu i następnego kroku (odśwież aplikację, konsultant). Rubryka nie ocenia obsługi skargi.
+Judge nie dał fail tam, gdzie człowiek dał pass. Oba przypadki to założenia autora rubryki, które człowiek odrzucił - samo 27/30 tego nie pokazuje. Zmiany zachowania demo po tej ocenie: `demo-rules-v9` (hot dog bez dopytania, zbieranie i „za co” z §3, skarga z przeprosinami, krokiem i przyciskiem). Rubryka v3 (dopytanie tylko przy różnych odpowiedziach, obsługa skargi) - do zrobienia.
+
 Przejście `demo-1 / v8-same` (`demo-rules-v8`, test techniczny):
 - 1453/1460 rozmów (raport jawnie niepełny), 2104 tury z `done`, 0 błędów strumienia. 7 rozmów z przekazaniem stanęło na limicie zgłoszeń (5 na konto na godzinę, te same konta co w `demo-1`): symulator przeczekiwał `Retry-After` do godziny - poprawione (limit 60 s, wznowienie bez powtarzania tur); Ponowienie po oknie limitu: `400 support.validation_failed` (`conversationId` nieznana) - instancja nie miała stałego `Assistant:PseudonymKey`, restart zmienił pseudonimy i rozmowy sprzed niego przestały być „własne”. Tych 7 rozmów nie da się dokończyć jako tych samych; instancja ma teraz stały klucz.
 - Porównanie: 2043 → 2050 z 2113 tur zgodnych, 7 poprawionych w `aktywacja`. 6 z nich to efekt danych (kupon „hot dog” aktywowany w `demo-1`, więc klient nie ma kuponów), zachowanie v8 widać tylko w 1 (`c01315`). 0 aktywacji: kupony do aktywacji zostały tylko tam, gdzie `demo-1` nie potwierdził, a decyzje są te same. Dlatego to nie jest porównanie jakości.
@@ -286,8 +292,8 @@ Wybór kuponu v7/v8 - kontrolowane porównanie (porównanie jakości dla tej pop
 - Sprzątanie poprzednich przebiegów usunęło też ich rozmowy i tury.
 
 Znaleziska z transkryptów (przed `pilot-6`, przyczyny zdiagnozowane, scenariusze przeformułowane):
-- „Za co dostaję punkty?” - adapter demo odpowiada saldem: wzorzec salda łapie „punkt”, a pytania o zasady nie rozpoznaje. Ograniczenie reguł demo, nie przepływu.
-- „Jak działa zbieranie punktów?” - wyszukiwanie w regulaminie nie znajduje §3.1 i proponuje konsultanta. Luka wyszukiwania (brak dopasowania „zbieranie”); nie zmieniona bez osobnej diagnozy.
+- „Za co dostaję punkty?” - adapter demo odpowiada saldem: wzorzec salda łapie „punkt”, a pytania o zasady nie rozpoznaje. Ograniczenie reguł demo, nie przepływu. Poprawione w `demo-rules-v9` (ocena człowieka `demo-1`).
+- „Jak działa zbieranie punktów?” - wyszukiwanie w regulaminie nie znajduje §3.1 i proponuje konsultanta. Luka wyszukiwania (brak dopasowania „zbieranie”). Poprawione w `demo-rules-v9`: demo szuka tematem §3; samo wyszukiwanie bez zmian (Gemini przekazuje słowa klienta).
 - „Ile punktów dostanę za hot doga?” - demo rozpoznaje pytanie o produkt tylko w szyku „punkty za hot doga”; inaczej odpowiada saldem.
 - „Jakie nagrody mogę wybrać?” - demo pyta o litry: słowo „wybrać” łapie wzorzec porównania kuponów.
 - „Aktywuj kupon” przy kilku kuponach kończy się pytaniem „który?”; scenariusz nazywa ofertę przebiegu.

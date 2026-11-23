@@ -21,7 +21,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v8";
+    public string PromptVersion => "demo-rules-v9";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -51,30 +51,61 @@ public sealed partial class DemoChatModel : IChatModel
                 : Call(AssistantTools.ProposeHandoff);
 
         // A question about awarded points; a request in the same message was refused above.
+        // A complaint gets the same check, said with the problem acknowledged, the next step and
+        // a consultant proposal (the button) in case the purchase is not the one they mean.
         if (ExplainPoints().IsMatch(text))
-            return
-                context.ToolResults.LastOrDefault(r =>
-                    r.Name == AssistantTools.ExplainPurchasePoints
-                )
-                    is { } explained
-                ? Reply(intro + Describe(explained))
-                : Call(AssistantTools.ExplainPurchasePoints);
+        {
+            var explained = context.ToolResults.LastOrDefault(r =>
+                r.Name == AssistantTools.ExplainPurchasePoints
+            );
+            if (explained is null)
+                return Call(AssistantTools.ExplainPurchasePoints);
+            if (!Complaint().IsMatch(text))
+                return Reply(intro + Describe(explained));
+            if (context.ToolResults.All(r => r.Name != AssistantTools.ProposeHandoff))
+                return Call(AssistantTools.ProposeHandoff);
+            const string Consultant =
+                "użyj przycisku „Porozmawiaj z konsultantem” - przekażę sprawę konsultantowi.";
+            // Only a found purchase is "checked"; none or a failed lookup goes to the consultant.
+            return Reply(
+                intro
+                    + "Przykro mi, że punkty się nie zgadzają. "
+                    + (
+                        explained.Data is PurchasePointsData
+                            ? "Sprawdziłem: "
+                                + LowerFirst(Describe(explained))
+                                + " Jeśli to nie ten zakup albo nie widzisz tych punktów, "
+                                + "odśwież aplikację. Jeśli to nie pomoże, "
+                                + Consultant
+                        : explained.Status == ToolStatus.Ok
+                            ? "Nie widzę jeszcze żadnego Twojego zakupu. Jeśli tankowałeś "
+                                + "z kartą, odśwież aplikację, a jeśli to nie pomoże, "
+                                + Consultant
+                        : "Nie udało się teraz sprawdzić Twojego zakupu - " + LowerFirst(Consultant)
+                    )
+            );
+        }
+
+        // "Punkty za hot doga?" is a purchase (§3.1, points only for fuel) or a reward pickup
+        // (§3.6). Both mean no points, so it answers both instead of asking (human review of
+        // demo-1): one search per meaning, each cited with its source. Not a question about the
+        // cost or the validity of points ("ile punktów za kawę", "czy wygasają"): those go on.
+        if (
+            PointsForProduct().IsMatch(text)
+            && !PurchaseOrPickup().IsMatch(text)
+            && !NotEarning().IsMatch(text)
+        )
+            return Task.FromResult(NextProductStep(context, intro, text));
+
+        // How points are earned is §3 of the rules: searched by its subject, not by the wording
+        // ("zbieranie", "za co"), which the search does not match (demo-1 regressions).
+        if (EarningQuestion().IsMatch(text) && !Product().IsMatch(text))
+            return Task.FromResult(NextRulesStep(context, intro, EarningQuery));
 
         // A question about the program: answered from the approved rules (P14), not from these
         // patterns. Only rule wording counts ("wygasa", "zasady", "cofnąć"), so a question about the
         // user's own coupon or points still reaches its tool below. One intent per message: in
         // "Ile mam punktów? Czy punkty wygasają?" only the rules are answered.
-        // "Punkty za hot doga?" is a purchase (§3.1, points only for fuel) or a reward pickup
-        // (§3.6): different answers, so it asks first.
-        if (
-            context.ToolResults.Count == 0
-            && PointsForProduct().IsMatch(text)
-            && !PurchaseOrPickup().IsMatch(text)
-        )
-            return Task.FromResult<ModelStep>(new ModelStep.Reply(intro + ProductQuestion));
-        // The answer to that question: the original question with the chosen meaning.
-        if (AnswersProductQuestion(context.History, text) is { } meaning)
-            return Task.FromResult(NextRulesStep(context, intro, meaning));
 
         if (aboutPeople || RulesQuestion().IsMatch(text))
             return Task.FromResult(NextRulesStep(context, intro));
@@ -250,12 +281,55 @@ public sealed partial class DemoChatModel : IChatModel
     ];
 
     /// <summary>
-    /// Searches the rules with the question; cites the best point, or says the rules do not cover it
-    /// and proposes a person.
+    /// The subject of §3.1 (points for fuel): the search query for questions about earning points,
+    /// whose own wording ("zbieranie", "za co", "sklep") matches nothing in the rules.
     /// </summary>
-    private const string ProductQuestion =
-        "Pytasz o zakup tego produktu w sklepie stacji czy o odbiór nagrody z kuponu za punkty? "
-        + "Zasady są różne - napisz, o które chodzi.";
+    private const string EarningQuery = "Za każdy pełny 1 zł zapłacony za paliwo punkt";
+
+    private static ModelStep NextProductStep(ChatModelContext context, string intro, string text)
+    {
+        var product = Product().Match(text).Value;
+        var searches = context
+            .ToolResults.Where(r => r.Name == AssistantTools.SearchProgramRules)
+            .ToList();
+        string[] queries =
+        [
+            EarningQuery,
+            $"Czy dostanę punkty za odebranie nagrody {product} z kuponu?",
+        ];
+        if (searches.Count < queries.Length)
+            return new ModelStep.Tool(
+                new ToolCall(
+                    AssistantTools.SearchProgramRules,
+                    Arguments(new { query = queries[searches.Count] })
+                )
+            );
+        if (searches.Any(s => s.Status != ToolStatus.Ok))
+            return new ModelStep.Reply(
+                intro + "Nie udało się sprawdzić regulaminu - spróbuj ponownie za chwilę."
+            );
+        // No fragment for a meaning: the tool already proposed the consultant (handoff event).
+        if (
+            searches
+            is not [
+                { Data: ProgramRulesData { Fragments: [var purchase, ..] } rules },
+                { Data: ProgramRulesData { Fragments: [var pickup, ..] } },
+            ]
+        )
+            return new ModelStep.Reply(
+                intro
+                    + "Regulamin programu tego nie opisuje. Mogę przekazać pytanie konsultantowi - "
+                    + "użyj przycisku „Porozmawiaj z konsultantem”."
+            );
+        return new ModelStep.Reply(
+            $"{intro}Nie - ani za zakup w sklepie stacji, ani za odbiór nagrody z kuponu. "
+                + $"Zakup: {purchase.Text} ({purchase.Source}).{ShopPurchaseNote($"kupie {product}", purchase.Source)} "
+                + $"Odbiór nagrody: {pickup.Text} ({pickup.Source}). Wersja: {rules.Version}."
+        );
+    }
+
+    private static string LowerFirst(string text) =>
+        text.Length == 0 ? text : char.ToLowerInvariant(text[0]) + text[1..];
 
     /// <summary>
     /// §3.1 grants points for fuel and says nothing about shop products: for a product purchase the
@@ -273,26 +347,10 @@ public sealed partial class DemoChatModel : IChatModel
             : "";
     }
 
-    /// <summary>A rules query for the chosen meaning, or null when this is not that answer.</summary>
-    private static string? AnswersProductQuestion(
-        IReadOnlyList<Chat.ChatHistoryItem> history,
-        string text
-    )
-    {
-        if (
-            history.Count < 2
-            || history[^1] is not { Role: "assistant", Text: { } last }
-            || !last.Contains(ProductQuestion, StringComparison.Ordinal)
-            || history[^2] is not { Role: "user", Text: { } question }
-        )
-            return null;
-        var product = Product().Match(Normalize(question)).Value;
-        return Pickup().IsMatch(text)
-                ? $"Czy dostanę punkty za odebranie nagrody {product} z kuponu?"
-            : Purchase().IsMatch(text) ? $"Czy dostanę punkty, jeśli kupię {product}?"
-            : null;
-    }
-
+    /// <summary>
+    /// Searches the rules with the question; cites the best point, or says the rules do not cover it
+    /// and proposes a person.
+    /// </summary>
     private static ModelStep NextRulesStep(
         ChatModelContext context,
         string intro,
@@ -302,6 +360,17 @@ public sealed partial class DemoChatModel : IChatModel
         var found = context.ToolResults.LastOrDefault(r =>
             r.Name == AssistantTools.SearchProgramRules
         );
+        // Whether buying a product earns points is §3.1 (fuel only), searched by that subject;
+        // shop words ("sklep") match nothing in the rules. Only a question about getting points:
+        // "jak odebrać kawę, którą kupiłem" keeps its own words.
+        var message = Normalize(context.Message);
+        if (
+            query is null
+            && Product().IsMatch(message)
+            && Purchase().IsMatch(message)
+            && GetsPoints().IsMatch(message)
+        )
+            query = EarningQuery;
         if (found is null)
         {
             query ??= context.Message.Trim();
@@ -320,7 +389,7 @@ public sealed partial class DemoChatModel : IChatModel
         if (found.Data is ProgramRulesData { Fragments: [var best, ..] } rules)
             return new ModelStep.Reply(
                 $"{intro}Według regulaminu: {best.Text} Źródło: {best.Source} ({rules.Version})."
-                    + ShopPurchaseNote(query ?? context.Message, best.Source)
+                    + ShopPurchaseNote(context.Message, best.Source)
             );
         if (found.Status != ToolStatus.Ok)
             return new ModelStep.Reply(
@@ -538,9 +607,6 @@ public sealed partial class DemoChatModel : IChatModel
     [GeneratedRegex(@"hot\s*dog\w*|kaw\w*|myjni\w*")]
     private static partial Regex Product();
 
-    [GeneratedRegex(@"odbi|odbior|odebr|nagrod|kupon")]
-    private static partial Regex Pickup();
-
     [GeneratedRegex(@"zakup|kupi|kupuj|sklep|place|zaplac")]
     private static partial Regex Purchase();
 
@@ -559,6 +625,27 @@ public sealed partial class DemoChatModel : IChatModel
 
     [GeneratedRegex(@"sald|punkt|ile\s+mam")]
     private static partial Regex Balance();
+
+    // How points are earned, not how many there are: "jak działa zbieranie punktów", "za co
+    // dostaję punkty", "jak zdobyć punkty".
+    [GeneratedRegex(
+        @"zbiera\w*\s+punkt|zbieranie|za\s+co\s+(\w+\s+)?(dostaj|dostan|przyznaj|nalicz|sa)\w*\s+punkt|jak\s+(zdoby|dosta|zbiera|uzbiera)\w*\s+punkt"
+    )]
+    private static partial Regex EarningQuestion();
+
+    // A complaint about missing points (acknowledged and given a way out, not only explained).
+    [GeneratedRegex(@"skandal|oszuk|zlodziej|wkurz|reklamac|nie\s+dostal")]
+    private static partial Regex Complaint();
+
+    // Getting points ("czy dostanę punkty", "punkty za/jeśli"), not anything else about a product.
+    [GeneratedRegex(
+        @"(dostane|dostaje|dostac|zdobe|zdoby|zbiore|nalicz)\w*\s+(\w+\s+)?punkt|punkt\w*\s+(za|jesli|gdy|kiedy)"
+    )]
+    private static partial Regex GetsPoints();
+
+    // The cost or the validity of points, not whether a product earns them.
+    [GeneratedRegex(@"ile\s+punkt|kosztuj|potrzebuj|brakuj|wygasa|waznos|termin")]
+    private static partial Regex NotEarning();
 
     [GeneratedRegex(@"ofert|nagrod|katalog|co\s+moge")]
     private static partial Regex Offers();

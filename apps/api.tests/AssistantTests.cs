@@ -1152,6 +1152,31 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         Assert.DoesNotContain("Nie mogę", explain.Text);
     }
 
+    [Fact]
+    public async Task Demo_answers_a_complaint_with_the_purchase_an_apology_and_a_way_out()
+    {
+        var customer = await AccountAsync(balance: 10);
+        await PurchaseAsync(
+            customer.UserId,
+            new DateOnly(2026, 11, 20),
+            320m,
+            0m,
+            DateTimeOffset.UtcNow
+        );
+
+        var stream = await ChatAsync(
+            customer.Client,
+            "To skandal, znowu nie dostałem punktów za tankowanie!"
+        );
+
+        Assert.Equal(["explain_purchase_points:ok", "propose_handoff:ok"], ToolsOf(stream));
+        Assert.Single(stream.Of("handoff"));
+        Assert.Contains("Przykro mi", stream.Text);
+        Assert.Contains("zapłacono 320,00 zł → 320 pkt", stream.Text);
+        Assert.Contains("odśwież aplikację", stream.Text);
+        Assert.Contains("Porozmawiaj z konsultantem", stream.Text);
+    }
+
     // ---- program rules (P14) ----
 
     [Fact]
@@ -1256,25 +1281,36 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("zakup w sklepie", "Regulamin, §3.1")]
-    [InlineData("odbiór nagrody", "Regulamin, §3.6")]
-    public async Task Demo_answers_the_product_question_with_the_chosen_meaning(
-        string answer,
+    [InlineData("Czy dostanę punkty za hot doga?")]
+    [InlineData("Dostanę punkty za kawę?")]
+    public async Task Demo_answers_a_product_question_for_both_meanings_instead_of_asking(
+        string message
+    )
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(customer.Client, message);
+
+        // Both meanings mean no points (human review of demo-1): answered, each with its source.
+        Assert.Equal(["search_program_rules:ok", "search_program_rules:ok"], ToolsOf(stream));
+        Assert.Contains("Nie - ani za zakup w sklepie stacji, ani za odbiór nagrody", stream.Text);
+        Assert.Contains("Regulamin, §3.1", stream.Text);
+        Assert.Contains("Regulamin, §3.6", stream.Text);
+        Assert.Contains("nie przewiduje", stream.Text);
+        Assert.DoesNotContain("?", stream.Text.Split("(")[0]);
+    }
+
+    [Theory]
+    [InlineData("Czy dostanę punkty, jeśli kupię hot doga w sklepie?", "Regulamin, §3.1")]
+    [InlineData("Czy dostanę punkty za odebranie hot doga z kuponu?", "Regulamin, §3.6")]
+    public async Task Demo_answers_a_product_question_with_a_stated_meaning(
+        string message,
         string source
     )
     {
         var customer = await AccountAsync(balance: 10);
-        var first = await ChatAsync(customer.Client, "Czy dostanę punkty za hot doga?");
 
-        var stream = await ChatAsync(
-            customer.Client,
-            answer,
-            history: new[]
-            {
-                new { role = "user", text = "Czy dostanę punkty za hot doga?" },
-                new { role = "assistant", text = first.Text },
-            }
-        );
+        var stream = await ChatAsync(customer.Client, message);
 
         Assert.Equal(["search_program_rules:ok"], ToolsOf(stream));
         Assert.Contains(source, stream.Text);
@@ -1283,9 +1319,10 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("Czy dostanę punkty za hot doga?")]
-    [InlineData("Dostanę punkty za kawę?")]
-    public async Task Demo_asks_whether_a_product_question_means_a_purchase_or_a_pickup(
+    [InlineData("Ile punktów za kawę potrzebuję?")]
+    [InlineData("Czy punkty za hot doga wygasają?")]
+    [InlineData("Jak dostać punkty za kawę?")]
+    public async Task Demo_answers_both_product_meanings_only_when_the_question_is_about_earning(
         string message
     )
     {
@@ -1293,9 +1330,54 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
 
         var stream = await ChatAsync(customer.Client, message);
 
-        Assert.Empty(ToolsOf(stream));
-        Assert.Contains("zakup", stream.Text);
-        Assert.Contains("odbiór nagrody", stream.Text);
+        Assert.Equal(
+            message.StartsWith("Jak dostać"),
+            stream.Text.Contains("Nie - ani za zakup w sklepie stacji")
+        );
+    }
+
+    [Fact]
+    public async Task Demo_keeps_the_words_of_a_product_question_that_is_not_about_points()
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(customer.Client, "Jak odebrać kawę z kuponu, który kupiłem?");
+
+        Assert.DoesNotContain("nie przewiduje", stream.Text);
+        Assert.DoesNotContain("Regulamin, §3.1", stream.Text);
+    }
+
+    [Fact]
+    public async Task Demo_answers_a_complaint_without_a_purchase_with_the_way_out_only()
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(
+            customer.Client,
+            "To skandal, nie dostałem punktów za tankowanie!"
+        );
+
+        Assert.Equal(["explain_purchase_points:ok", "propose_handoff:ok"], ToolsOf(stream));
+        Assert.Contains("Przykro mi", stream.Text);
+        Assert.Contains("Nie widzę jeszcze żadnego Twojego zakupu", stream.Text);
+        Assert.DoesNotContain("Sprawdziłem", stream.Text);
+        Assert.DoesNotContain("ten zakup", stream.Text);
+    }
+
+    [Theory]
+    [InlineData("Jak działa zbieranie punktów?")]
+    [InlineData("Za co dostaję punkty?")]
+    [InlineData("Jak zdobyć punkty?")]
+    public async Task Demo_explains_how_points_are_earned_from_section_3(string message)
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(customer.Client, message);
+
+        Assert.Equal(["search_program_rules:ok"], ToolsOf(stream));
+        Assert.Contains("Regulamin, §3.1", stream.Text);
+        Assert.Contains("paliwo", stream.Text);
+        Assert.Empty(stream.Of("handoff"));
     }
 
     [Theory]

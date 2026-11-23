@@ -352,7 +352,13 @@
       "category": "regulamin-dopytanie",
       "message": "Czy dostanę punkty za hot doga?",
       "expect": {
-        "tools": [],
+        "tools": [
+          "search_program_rules:ok",
+          "search_program_rules:ok"
+        ],
+        "geminiOptionalTools": [
+          "search_program_rules:ok"
+        ],
         "end": "done",
         "answerContains": [
           "zakup",

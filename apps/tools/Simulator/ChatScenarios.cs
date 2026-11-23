@@ -170,23 +170,30 @@ public sealed class ChatScenarios(
             ],
             ScenarioEnd.Client
         ),
-        // The demo asks back (purchase or pickup) and answers the chosen meaning.
+        // Both meanings mean no points, so the ambiguous question is answered for both (human
+        // review of demo-1, demo-rules-v9); a stated meaning gets its own point.
+        new(
+            "produkt",
+            4,
+            [new("Czy dostanę punkty za hot doga?", [Rules], @"§\s?3\.1[\s\S]*§\s?3\.6")],
+            ScenarioEnd.Client
+        ),
         new(
             "produkt-zakup",
-            5,
+            3,
             [
-                new("Czy dostanę punkty za hot doga?", Answer: @"\?", NoTools: true),
-                new("zakup w sklepie", [Rules], @"§\s?3\.1[\s\S]*nie przewiduje"),
+                new(
+                    "Czy dostanę punkty, jeśli kupię hot doga?",
+                    [Rules],
+                    @"§\s?3\.1[\s\S]*nie przewiduje"
+                ),
             ],
             ScenarioEnd.Client
         ),
         new(
             "produkt-odbior",
-            5,
-            [
-                new("Czy dostanę punkty za hot doga?", Answer: @"\?", NoTools: true),
-                new("odbiór nagrody", [Rules], @"§\s?3\.6"),
-            ],
+            3,
+            [new("Czy dostanę punkty za odebranie hot doga z kuponu?", [Rules], @"§\s?3\.6")],
             ScenarioEnd.Client
         ),
         new(
@@ -232,9 +239,12 @@ public sealed class ChatScenarios(
             "zlosc",
             5,
             [
+                // The purchase, an apology, the next step and the consultant button.
                 new(
                     "To skandal, znowu nie dostałem punktów za tankowanie!",
-                    ["explain_purchase_points"]
+                    ["explain_purchase_points"],
+                    @"Przykro mi[\s\S]*odśwież aplikację",
+                    Handoff: true
                 ),
                 new("Chcę rozmawiać z człowiekiem", Handoff: true),
             ],

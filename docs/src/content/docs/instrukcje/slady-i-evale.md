@@ -36,6 +36,7 @@ FUELCLUB_GEMINI_EVALS=pilot FUELCLUB_TEST_DATABASE='…' \
 - Na Gemini odpowiedź sprawdzają tylko wzorce `answerPatterns` (model formułuje po swojemu; 10 przypadków ma wzorce, reszta - bez sprawdzenia treści). Dokładne teksty `answerContains` i dokładna kolejność narzędzi (`tools/exact`) dotyczą tylko modelu demo; na Gemini liczy się, czy wymagane narzędzia zostały wywołane. Test `Answer_patterns_compile` (bez Gemini) sprawdza, że wzorce się kompilują.
 - Pytania o produkt oceniamy po znaczeniu, nie po jednym sformułowaniu:
   - `answerAlternatives`: wystarczy jeden wariant - dopytanie (zakup czy odbiór) albo jasne rozróżnienie zakupu (§3.1 powiązany z paliwem) i odbioru nagrody (§3.6);
+  - demo (`demo-rules-v9`) odpowiada drugim wariantem: dwa wyszukiwania, dokładna sekwencja narzędzi w evalu; na Gemini wyszukiwanie opcjonalne (`geminiOptionalTools`), więc dopytanie bez narzędzi nadal przechodzi - kryteria Gemini bez zmian, wersja zestawu bez zmian;
   - `answerForbiddenPatterns` (na każdym modelu): twierdzenie, że za zakup hot doga są punkty, albo przedstawienie §3.1 jako zapisu o hot dogu.
   - Test `Product_answers_are_checked_by_meaning` sprawdza te reguły na przykładowych odpowiedziach bez Gemini.
   - Regexy tylko przybliżają znaczenie; pełną ocenę znaczenia ma dać judge (P16d, [ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/)).
