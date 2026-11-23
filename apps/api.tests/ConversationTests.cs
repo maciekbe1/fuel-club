@@ -210,7 +210,9 @@ public sealed class ConversationTests(ApiFactory factory) : IAsyncLifetime
     public async Task An_idle_conversation_ends_as_idle_not_as_the_clients_end()
     {
         var client = await AccountAsync();
-        var start = DateTimeOffset.UtcNow.AddMinutes(1);
+        // PostgreSQL keeps microseconds; Linux clocks have 100 ns ticks, so a raw time comes back
+        // shorter and an exact comparison fails in CI only.
+        var start = Microseconds(DateTimeOffset.UtcNow.AddMinutes(1));
         factory.Clock.Set(start);
         var id = await client.StartConversationAsync();
         var timedOut = await client.StartConversationAsync();
@@ -271,7 +273,9 @@ public sealed class ConversationTests(ApiFactory factory) : IAsyncLifetime
     public async Task A_case_from_an_idle_conversation_links_it_but_it_stays_ended_as_idle()
     {
         var client = await AccountAsync();
-        var start = DateTimeOffset.UtcNow.AddMinutes(1);
+        // PostgreSQL keeps microseconds; Linux clocks have 100 ns ticks, so a raw time comes back
+        // shorter and an exact comparison fails in CI only.
+        var start = Microseconds(DateTimeOffset.UtcNow.AddMinutes(1));
         factory.Clock.Set(start);
         var id = await client.StartConversationAsync();
 
@@ -369,4 +373,7 @@ public sealed class ConversationTests(ApiFactory factory) : IAsyncLifetime
         Assert.False(plainTurn.Synthetic);
         Assert.Null(plainTurn.RunId);
     }
+
+    private static DateTimeOffset Microseconds(DateTimeOffset time) =>
+        new(time.Ticks - time.Ticks % TimeSpan.TicksPerMicrosecond, time.Offset);
 }
