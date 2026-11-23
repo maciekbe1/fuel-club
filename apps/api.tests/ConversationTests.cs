@@ -264,6 +264,24 @@ public sealed class ConversationTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_case_from_an_idle_conversation_links_it_but_it_stays_ended_as_idle()
+    {
+        var client = await AccountAsync();
+        var start = DateTimeOffset.UtcNow.AddMinutes(1);
+        factory.Clock.Set(start);
+        var id = await client.StartConversationAsync();
+
+        factory.Clock.Set(start.AddMinutes(60));
+        var created = await CreateCaseAsync(client, id, Guid.NewGuid().ToString());
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var row = await RowAsync(id);
+        Assert.NotNull(row.SupportCaseId);
+        Assert.Equal(ConversationEndReason.Idle, row.EndReason);
+        Assert.Equal(start.AddMinutes(30), row.EndedAt);
+    }
+
+    [Fact]
     public async Task A_case_cannot_link_someone_elses_conversation()
     {
         var owner = await AccountAsync();

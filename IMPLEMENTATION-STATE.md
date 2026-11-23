@@ -509,6 +509,15 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Znaleziska z transkryptów: luki wzorców demo („Za co dostaję punkty?”, „wybrać”) i luka wyszukiwania („zbieranie punktów”). Scenariusze przeformułowane, reguł i wyszukiwania nie zmieniałem bez diagnozy.
 - Testy: API 653+ (w tym `ConversationTests`), E2E czat/konsultant/obserwowalność 42/42 (telefon i desktop), docs build OK.
 - Bez ręcznego przebiegu w przeglądarce: aplikacja dev właściciela (:3000 → :5271) działa na starym kodzie i bazie bez migracji. E2E pokrywa oba widoki.
+- Review (f153063..7b44538): 7 uwag, wszystkie przyjęte i poprawione:
+  - symulator zamyka otwarte zgłoszenie konta przed każdą rozmową. Wcześniej nieudane zamknięcie blokowało konto na stałe; sprawdzone w `pilot-9`: ponownie otwarte zgłoszenie zamknięte, 50/50;
+  - przekazanie z bezczynnej rozmowy zostaje `Idle` (test);
+  - start rozmowy po wyjściu z ekranu kończy ją;
+  - historia tylko z bieżącej rozmowy;
+  - `404` zadeklarowane przy czacie i `schema.d.ts` wygenerowany ponownie;
+  - `support.conversation_not_found` w kodach błędów;
+  - tempo czatu także na konto (18/min).
+- API 656/656, E2E 42/42.
 - Do zrobienia przez właściciela: `dotnet ef database update --project apps/api` na bazie dev (migracje `RuleFragments`, `Conversations`) i restart API.
 
 ## Następny krok

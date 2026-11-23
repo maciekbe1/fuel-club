@@ -99,6 +99,9 @@ public sealed class ChatScenarios(Manifest manifest, Settings settings, int chat
 
     private readonly Pacer _auth = new(settings.AuthPerMinute);
     private readonly Pacer _chat = new(chatPerMinute);
+
+    /// <summary>Per account, under the API's 20 turns/min per user whatever the global pace.</summary>
+    private const int AccountTurnsPerMinute = 18;
     private readonly string _transcripts = Path.Combine(
         Path.GetDirectoryName(manifest.Path)!,
         "transcripts"
@@ -149,12 +152,20 @@ public sealed class ChatScenarios(Manifest manifest, Settings settings, int chat
                     Console.WriteLine($"{account.Email}: {e.GetType().Name}: {e.Message}");
                     return;
                 }
+                var accountPace = new Pacer(Math.Min(AccountTurnsPerMinute, chatPerMinute));
                 foreach (var index in queue)
                 {
                     var scenario = Pick(index);
                     try
                     {
-                        await ConversationAsync(session, account, index, scenario, token);
+                        await ConversationAsync(
+                            session,
+                            account,
+                            index,
+                            scenario,
+                            accountPace,
+                            token
+                        );
                         lock (byScenario)
                             byScenario[scenario.Name] =
                                 byScenario.GetValueOrDefault(scenario.Name) + 1;
@@ -207,6 +218,7 @@ public sealed class ChatScenarios(Manifest manifest, Settings settings, int chat
         SimAccount account,
         int index,
         Scenario scenario,
+        Pacer accountPace,
         CancellationToken ct
     )
     {
@@ -216,6 +228,8 @@ public sealed class ChatScenarios(Manifest manifest, Settings settings, int chat
             return;
         op.Status = OperationStatus.Pending;
         manifest.Save();
+        // A case left open (a failed close, here or in an earlier run) would block every turn.
+        await CloseOpenCaseAsync(session, ct);
 
         // The same key on a rerun: the same conversation, never a second one.
         using var started = await session.PostAsync(
@@ -244,6 +258,7 @@ public sealed class ChatScenarios(Manifest manifest, Settings settings, int chat
         {
             foreach (var message in scenario.Messages)
             {
+                await accountPace.WaitAsync(ct);
                 await _chat.WaitAsync(ct);
                 // {run}: the run's own offer names (SIM <run> rabat).
                 var text = message.Replace("{run}", manifest.RunId, StringComparison.Ordinal);
@@ -323,13 +338,9 @@ public sealed class ChatScenarios(Manifest manifest, Settings settings, int chat
                     caseOp.Result = caseId.ToString();
                     caseOp.Status = OperationStatus.Done;
                     manifest.Save();
-                    // The customer leaves the case, so the account can chat again.
-                    using var closed = await session.PostAsync(
-                        $"/api/support/cases/{caseId}/close",
-                        null,
-                        ct
-                    );
-                    await ApiSession.EnsureAsync(closed, "close case", ct);
+                    // The customer leaves the case, so the account can chat again. If this fails,
+                    // the next conversation of the account closes it first.
+                    await CloseOpenCaseAsync(session, ct);
                 }
                 return "handoff";
             case ScenarioEnd.ConfirmIfProposed
@@ -365,6 +376,21 @@ public sealed class ChatScenarios(Manifest manifest, Settings settings, int chat
                     : transcript.Turns.Any(t => t.Confirmations > 0) ? "activation-declined"
                     : "ended";
         }
+    }
+
+    private static async Task CloseOpenCaseAsync(ApiSession session, CancellationToken ct)
+    {
+        using var current = await session.GetAsync("/api/support/cases/current", ct);
+        await ApiSession.EnsureAsync(current, "current case", ct);
+        if (current.StatusCode == HttpStatusCode.NoContent)
+            return;
+        var caseId = (
+            await current.Content.ReadFromJsonAsync<JsonElement>(ApiSession.JsonOptions, ct)
+        )
+            .GetProperty("id")
+            .GetGuid();
+        using var closed = await session.PostAsync($"/api/support/cases/{caseId}/close", null, ct);
+        await ApiSession.EnsureAsync(closed, "close case", ct);
     }
 
     private static async Task EndConversationAsync(

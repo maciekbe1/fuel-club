@@ -150,6 +150,7 @@ public static class AssistantModule
             .WithDescription(ChatEndpoints.ChatDescription)
             .Produces<ChatStreamContract>(StatusCodes.Status200OK, "text/event-stream")
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
         var conversations = chat.MapGroup("/conversations");

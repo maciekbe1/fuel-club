@@ -110,6 +110,8 @@ public sealed class Conversations(
     {
         var owner = pseudonyms.For(userId);
         var now = clock.GetUtcNow();
+        // One left idle ended as Idle when the limit ran out; the case links to it all the same.
+        await CloseIdleAsync(id, owner, now, ct);
         await db
             .AssistantConversations.Where(c =>
                 c.Id == id && c.UserPseudonym == owner && c.SupportCaseId == null

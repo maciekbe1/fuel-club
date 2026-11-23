@@ -148,11 +148,13 @@ function failureMessage(error: unknown) {
   return "Połączenie zostało przerwane - odpowiedź jest niepełna. Spróbuj ponownie.";
 }
 
-type ConversationSlot = { id: string | null; key: string };
+/** `since`: the first turn on screen that belongs to it - older ones are another conversation. */
+type ConversationSlot = { id: string | null; key: string; since: number };
 
-const newSlot = (): ConversationSlot => ({
+const newSlot = (since: number): ConversationSlot => ({
   id: null,
   key: crypto.randomUUID(),
+  since,
 });
 
 /**
@@ -165,24 +167,29 @@ export function useChat() {
   const [state, dispatch] = useReducer(reducer, { turns: [], demo: null });
   const active = useRef<AbortController | null>(null);
   const nextId = useRef(1);
-  const conversation = useRef<ConversationSlot>(newSlot());
+  const conversation = useRef<ConversationSlot>(newSlot(1));
+  const left = useRef(false);
   const streaming = state.turns.some((turn) => turn.status === "streaming");
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    left.current = false;
+    return () => {
+      left.current = true;
       active.current?.abort();
       // The latest conversation on purpose: the one this screen leaves.
       const id = conversation.current.id;
       if (id) void assistantService.endConversation(id).catch(() => {});
-    },
-    [],
-  );
+    };
+  }, []);
 
   const conversationId = useCallback(async () => {
     const slot = conversation.current;
     if (slot.id) return slot.id;
     const created = await assistantService.startConversation(slot.key);
     slot.id = created.id;
+    // Started after the screen was left: nobody will end it, so end it now.
+    if (left.current)
+      void assistantService.endConversation(created.id).catch(() => {});
     return created.id;
   }, []);
 
@@ -199,13 +206,16 @@ export function useChat() {
       };
       dispatch({ type: "start", id, question: message });
       let finished = false;
-      const history = historyOf(state.turns);
+      // Context of this conversation only: the model sees what the server counts as its turns.
+      const historyFor = (slot: ConversationSlot) =>
+        historyOf(state.turns.filter((turn) => turn.id >= slot.since));
       const attempt = async (retry: boolean): Promise<void> => {
         try {
+          const slot = conversation.current;
           await assistantService.chat(
             await conversationId(),
             message,
-            history,
+            historyFor(slot),
             controller.signal,
             (event) => {
               if (event.name === "done" || event.name === "error") {
@@ -224,7 +234,8 @@ export function useChat() {
             error.code &&
             CONVERSATION_GONE.has(error.code)
           ) {
-            conversation.current = newSlot();
+            // This question is the new conversation's first turn.
+            conversation.current = newSlot(id);
             return attempt(false);
           }
           throw error;

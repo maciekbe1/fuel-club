@@ -107,7 +107,7 @@ var settings = new Settings(
     PurchasesPerMinute: options.Int("purchases-per-minute", 50)
 );
 if (conversing)
-    // Below the API's chat limit (20/min per user) per account, see ChatScenarios.
+    // A global pace; each account also stays under the API's 20 turns/min (ChatScenarios).
     await new ChatScenarios(manifest, settings, options.Int("chat-per-minute", 60)).RunAsync(
         options.Int("conversations", 10),
         cancel.Token

@@ -97,6 +97,7 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `support.required_field` | `message`, `text` | pusta wiadomość (po przycięciu) |
 | `support.too_long` | `message`, `text`, `history` | wiadomość > 1000 znaków albo historia > `Assistant:MaxHistoryItems` wpisów |
 | `support.invalid_format` | `history`, `after` | kursor ujemny; wpis bez tekstu, z rolą inną niż `user`/`assistant` albo za długi |
+| `support.conversation_not_found` | `conversationId` | `400`: zgłoszenie wskazuje rozmowę czatu nieznaną albo cudzą - odmowa przed zapisem ([ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/)) |
 | `support.case_open` | - | `409`: klient ma już otwarte zgłoszenie; `caseId` wskazuje je (`SupportConflictProblem`) |
 | `support.case_not_found` | - | `404`: brak zgłoszenia |
 | `support.case_taken` | - | `409`: zgłoszenie przejął inny konsultant |
