@@ -535,6 +535,17 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - API 668/668, E2E obserwowalności 4/4, docs build OK.
 - Do zrobienia przez właściciela: migracja `MetricsAndCost` na bazie dev (razem z `RuleFragments`, `Conversations`); przegląd commitów P16b i P16c.
 
+## P16c - poprawki po przeglądzie właściciela (2026-11-23)
+
+- Przegląd właściciela do `10c05b6`, 4 uwagi, wszystkie poprawione:
+  - transkrypt zapisywany przed zakończeniem (`end-pending`), więc zgubiona odpowiedź na zakończenie nie zostawia pustego pliku;
+  - token aktywacji tylko z tury `done`;
+  - filtry modelu i promptu muszą pasować do tej samej tury rozmowy;
+  - krok ponowiony po utracie połączenia ma tokeny i koszt nieznane (`GeminiAttempts` wewnątrz potoku retry).
+- Cennik potwierdzony przez właściciela: `gemini-3.5-flash-lite-standard-2026-11-23`, 0,30 / 2,50 USD (wyjście z myśleniem), nadal szacunek.
+- Review poprawek (`/code-review high`, 7 uwag): przyjęte 6 - zapis transkryptu atomowy i odporny na ucięty plik, koszt nieznany tylko po próbie bez odpowiedzi (nie po `429`/`5xx`), propozycja konsultanta tylko z tury `done`, wyciek tokenu kończy rozmowę przed błędem, wynik ponowienia z manifestu (`activated`/`handoff`), `end-pending` osobno w raporcie. Odrzucona 1: zmiana nazwy wersji cennika - w bazach dev i demo nie ma tur z kosztem, więc nic nie zostało osierocone (notka w ADR 0018).
+- API 675/675, docs build OK.
+
 ## Następny krok
 
 Otwarte:

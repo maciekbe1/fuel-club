@@ -87,6 +87,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Settings.RequestTimeout);
+        var lost = GeminiAttempts.Begin();
         using var response = await http.SendAsync(request, timeout.Token);
         if (!response.IsSuccessStatusCode)
             // Status only: the body may echo the request.
@@ -96,7 +97,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
                 response.StatusCode
             );
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(timeout.Token);
-        return ParseResponse(body);
+        return ParseResponse(body) with { LostAttempts = lost.Value };
     }
 
     public static JsonObject BuildRequest(ChatModelContext context)

@@ -72,6 +72,12 @@ public sealed class Manifest
         return manifest;
     }
 
+    public bool IsDone(string key)
+    {
+        lock (_lock)
+            return Operations.Any(o => o.Key == key && o.Status == OperationStatus.Done);
+    }
+
     /// <summary>The operation for this key, created (with a fresh idempotency key) on first use.</summary>
     public Operation Operation(string key, string kind, string account)
     {

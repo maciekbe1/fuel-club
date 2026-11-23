@@ -28,6 +28,10 @@ public static class Reports
                 )
                 .ToList()
             : [];
+        // Saved before an end that never got confirmed (operation failed or pending): shown apart,
+        // not mixed into the numbers of finished conversations.
+        var unfinished = transcripts.Count(t => t.Outcome == ChatScenarios.EndPending);
+        transcripts = transcripts.Where(t => t.Outcome != ChatScenarios.EndPending).ToList();
         var turns = transcripts.SelectMany(t => t.Turns).ToList();
         var conversationOps = manifest.Operations.Where(o => o.Kind == "conversation").ToList();
         var technical = new StringBuilder();
@@ -44,6 +48,10 @@ public static class Reports
         technical.AppendLine(
             $"- Rozmowy: {conversationOps.Count(o => o.Status == OperationStatus.Done)} zakończonych operacji z {conversationOps.Count}; nieudane: {conversationOps.Count(o => o.Status == OperationStatus.Failed)}, w toku: {conversationOps.Count(o => o.Status == OperationStatus.Pending)}."
         );
+        if (unfinished > 0)
+            technical.AppendLine(
+                $"- Rozmowy bez potwierdzonego zakończenia (`end-pending`, poza liczbami niżej i w raporcie poprawności): {unfinished}."
+            );
         technical.AppendLine(
             $"- Wyniki rozmów: {Group(transcripts.Select(t => t.Outcome ?? "?"))}."
         );

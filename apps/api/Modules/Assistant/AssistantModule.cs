@@ -35,45 +35,47 @@ public static class AssistantModule
         // Chosen from the bound options when resolved, so every configuration source counts.
         // Transient answers (429, 5xx, 408, connection errors) are retried with backoff and a short
         // Retry-After; other 4xx are not. GeminiChatModel's RequestTimeout bounds all attempts of a step.
-        services
-            .AddHttpClient(GeminiChatModel.ClientName)
-            .AddResilienceHandler(
-                "gemini",
-                (pipeline, context) =>
-                {
-                    var logger = context
-                        .ServiceProvider.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger<GeminiChatModel>();
-                    pipeline.AddRetry(
-                        new HttpRetryStrategyOptions
+        var gemini = services.AddHttpClient(GeminiChatModel.ClientName);
+        gemini.AddResilienceHandler(
+            "gemini",
+            (pipeline, context) =>
+            {
+                var logger = context
+                    .ServiceProvider.GetRequiredService<ILoggerFactory>()
+                    .CreateLogger<GeminiChatModel>();
+                pipeline.AddRetry(
+                    new HttpRetryStrategyOptions
+                    {
+                        MaxRetryAttempts = 2,
+                        BackoffType = DelayBackoffType.Exponential,
+                        Delay = TimeSpan.FromMilliseconds(500),
+                        MaxDelay = GeminiRetryMaxDelay,
+                        UseJitter = true,
+                        ShouldHandle = args =>
+                            ValueTask.FromResult(
+                                HttpClientResiliencePredicates.IsTransient(args.Outcome)
+                                    && !LongRetryAfter(args.Outcome.Result)
+                            ),
+                        OnRetry = args =>
                         {
-                            MaxRetryAttempts = 2,
-                            BackoffType = DelayBackoffType.Exponential,
-                            Delay = TimeSpan.FromMilliseconds(500),
-                            MaxDelay = GeminiRetryMaxDelay,
-                            UseJitter = true,
-                            ShouldHandle = args =>
-                                ValueTask.FromResult(
-                                    HttpClientResiliencePredicates.IsTransient(args.Outcome)
-                                        && !LongRetryAfter(args.Outcome.Result)
-                                ),
-                            OnRetry = args =>
-                            {
-                                // Status or exception type only: bodies may echo the request.
-                                logger.LogWarning(
-                                    "Gemini attempt {Attempt} failed ({Status}); retrying in {Delay}.",
-                                    args.AttemptNumber + 1,
-                                    args.Outcome.Result is { } r
-                                        ? (int)r.StatusCode
-                                        : args.Outcome.Exception?.GetType().Name,
-                                    args.RetryDelay
-                                );
-                                return default;
-                            },
-                        }
-                    );
-                }
-            );
+                            // Status or exception type only: bodies may echo the request.
+                            logger.LogWarning(
+                                "Gemini attempt {Attempt} failed ({Status}); retrying in {Delay}.",
+                                args.AttemptNumber + 1,
+                                args.Outcome.Result is { } r
+                                    ? (int)r.StatusCode
+                                    : args.Outcome.Exception?.GetType().Name,
+                                args.RetryDelay
+                            );
+                            return default;
+                        },
+                    }
+                );
+            }
+        );
+        // Added after the retry pipeline, so it runs inside it: it sees every attempt of a step.
+        gemini.AddHttpMessageHandler<GeminiAttempts>();
+        services.AddTransient<GeminiAttempts>();
         services.AddSingleton<DemoChatModel>();
         services.AddTransient<IChatModel>(provider =>
         {

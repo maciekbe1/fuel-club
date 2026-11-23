@@ -19,7 +19,7 @@ Panel liczył tylko tury. Do pokazu i oceny agenta potrzebne są metryki z jawny
 
 - Okno: ostatnie `hours` (1-720). Tura należy do okna po `StartedAt`, rozmowa po `StartedAt`.
 - `traffic`: `real` (domyślnie, `Synthetic = false`), `synthetic`, `all`. Dalej `runId`, `model`, `promptVersion`.
-- Filtry dotyczą tur i rozmów. Rozmowa pasuje do filtra modelu lub wersji promptu, gdy pasuje któraś z jej tur.
+- Filtry dotyczą tur i rozmów. Rozmowa pasuje do filtrów modelu i wersji promptu, gdy któraś z jej tur spełnia oba naraz - nie jedna tura model, a inna prompt (wtedy panel pokazałby rozmowę bez pasujących tur).
 - Zdarzenia bezpieczeństwa i reguły anomalii nie są filtrowane (liczą wszystko, w swoich oknach).
 - Listy wartości filtrów pochodzą z okna i wybranego ruchu.
 
@@ -49,7 +49,8 @@ Panel liczył tylko tury. Do pokazu i oceny agenta potrzebne są metryki z jawny
 - **Zero**: tura nie-demo bez wywołania modelu (`ModelSteps = 0`: klient odszedł albo błąd przed modelem) - nic nie wydano.
 - Cennik: wersje unikalne, najwyżej jeden wpis na dostawcę, model i `EffectiveFrom` (inaczej wybór zależałby od kolejności).
   - Suma w panelu obejmuje tylko znane tury i jest pełna, gdy nieznanych jest 0.
-- Domyślny wpis cennika (`gemini-flash-lite-assumed-2026-11-23`: 0,30 / 2,50 USD za milion) to założenie z evali, do potwierdzenia u dostawcy przed pokazaniem kosztu jako faktu.
+- Domyślny wpis cennika (`gemini-3.5-flash-lite-standard-2026-11-23`): standardowa cena Gemini 3.5 Flash-Lite, 0,30 USD wejście / 2,50 USD wyjście za milion tokenów, wyjście z tokenami myślenia. Potwierdzona przez właściciela 2026-11-23 w [cenniku Google](https://ai.google.dev/gemini-api/docs/pricing). Panel nadal pokazuje szacunek, nie fakturę (inne progi, np. batch czy cache, nie są uwzględnione). Wpis zastąpił nazwę `gemini-flash-lite-assumed-2026-11-23` przed pierwszą zapisaną turą z kosztem (bazy dev i demo sprawdzone); od teraz zmiana ceny to nowy wpis.
+- **Ponowienie po utracie odpowiedzi**: próba bez odpowiedzi HTTP (zerwane połączenie) mogła zostać rozliczona, a tokeny znamy tylko z udanej - tura ma tokeny i koszt „nieznany”, nie sumę wyglądającą na pełną. Ponowienie po statusie błędu (`429`, `5xx`) nie zmienia kosztu: to odpowiedź, nie rozliczana. Próby bez odpowiedzi liczy handler `GeminiAttempts` wewnątrz potoku retry.
 - Koszt judge'a liczony osobno (P16d).
 
 ### Ruch demo

@@ -426,6 +426,7 @@ public sealed class ChatScenarios(
             StartedAt = DateTimeOffset.UtcNow,
         };
         var history = new List<object>();
+        var file = Path.Combine(_transcripts, $"{key}.json");
         string outcome;
         try
         {
@@ -448,6 +449,12 @@ public sealed class ChatScenarios(
                     history.Add(new { role = "assistant", text = turn.Assistant });
                 }
             }
+            // The talk is saved before the end: if the end goes through but its answer is lost,
+            // the rerun finds the conversation ended and keeps this file instead of an empty one.
+            // A token leaked into the text is not written now and fails the operation only after
+            // the end, so the conversation does not stay open.
+            transcript.Outcome = EndPending;
+            await SaveTranscriptAsync(file, transcript, ct, throwOnLeak: false);
             outcome = await EndAsync(
                 session,
                 account,
@@ -461,22 +468,100 @@ public sealed class ChatScenarios(
         catch (ApiException e) when (e.Code == "assistant.conversation_ended")
         {
             // A rerun of a conversation that ended meanwhile (idle, handoff): nothing more to say.
-            outcome = "ended-earlier";
+            // What went through before the lost answer is in the manifest.
+            outcome =
+                manifest.IsDone($"{key}:confirm") ? "activated"
+                : manifest.IsDone($"{key}:case") ? "handoff"
+                : "ended-earlier";
         }
         transcript.Outcome = outcome;
-        // A rerun that found it ended keeps the transcript of the run that did the talking.
-        var file = Path.Combine(_transcripts, $"{key}.json");
-        var json = JsonSerializer.Serialize(transcript, TranscriptJson);
-        // Last line: a token in the text (e.g. echoed by a model) never reaches the file.
-        if (transcript.Turns.SelectMany(t => t.Tokens).Any(token => json.Contains(token)))
-            throw new InvalidOperationException($"{key}: a confirmation token in the transcript");
-        if (outcome != "ended-earlier" || !File.Exists(file))
-            await File.WriteAllTextAsync(file, json, ct);
+        // A rerun that found it ended keeps the transcript of the run that did the talking; only
+        // an end left unconfirmed gets the outcome, a confirmed one stays as it was.
+        if (
+            transcript.Turns.Count > 0
+            || !File.Exists(file)
+            || !await CompleteEndPendingAsync(file, outcome, ct)
+        )
+            await SaveTranscriptAsync(file, transcript, ct);
         op.Result = $"{conversationId} {outcome}";
         op.Status = OperationStatus.Done;
         op.Error = null;
         manifest.Save();
         return true;
+    }
+
+    /// <summary>Written before the end call; replaced by the outcome once the end is confirmed.</summary>
+    public const string EndPending = "end-pending";
+
+    /// <summary>
+    /// The token to confirm, only from a turn that finished with done - as in the web client, an
+    /// answer cut off mid-stream is never confirmed.
+    /// </summary>
+    /// <summary>As in the web client: the handoff button shows only on a turn that ended with done.</summary>
+    public static bool HandoffShown(Transcript transcript) =>
+        transcript.Turns.Any(t => t.Done && t.Handoff);
+
+    public static string? ConfirmationToken(Transcript transcript) =>
+        transcript.Turns.Where(t => t.Done).SelectMany(t => t.Tokens).FirstOrDefault();
+
+    /// <summary>
+    /// Writes the file whole or not at all (temp file, then move). A token in the text (e.g.
+    /// echoed by a model) never reaches the file: it throws, or with throwOnLeak false skips the
+    /// write and returns false.
+    /// </summary>
+    public static async Task<bool> SaveTranscriptAsync(
+        string file,
+        Transcript transcript,
+        CancellationToken ct,
+        bool throwOnLeak = true
+    )
+    {
+        var json = JsonSerializer.Serialize(transcript, TranscriptJson);
+        if (transcript.Turns.SelectMany(t => t.Tokens).Any(token => json.Contains(token)))
+            return throwOnLeak
+                ? throw new InvalidOperationException(
+                    $"{Path.GetFileName(file)}: a confirmation token in the transcript"
+                )
+                : false;
+        await WriteWholeAsync(file, json, ct);
+        return true;
+    }
+
+    /// <summary>
+    /// Sets the outcome of a transcript saved before its end call. True when the file is a valid
+    /// transcript (left as it is if its end was already confirmed); false when it cannot be read,
+    /// so the caller writes a new one.
+    /// </summary>
+    public static async Task<bool> CompleteEndPendingAsync(
+        string file,
+        string outcome,
+        CancellationToken ct
+    )
+    {
+        System.Text.Json.Nodes.JsonNode? node;
+        try
+        {
+            node = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(file, ct));
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        if (node is null)
+            return false;
+        if ((string?)node["outcome"] == EndPending)
+        {
+            node["outcome"] = outcome;
+            await WriteWholeAsync(file, node.ToJsonString(TranscriptJson), ct);
+        }
+        return true;
+    }
+
+    private static async Task WriteWholeAsync(string file, string json, CancellationToken ct)
+    {
+        var temp = file + ".tmp";
+        await File.WriteAllTextAsync(temp, json, ct);
+        File.Move(temp, file, overwrite: true);
     }
 
     private async Task<string> EndAsync(
@@ -494,7 +579,7 @@ public sealed class ChatScenarios(
             case ScenarioEnd.Abandon:
                 return "abandoned";
             case ScenarioEnd.HandoffIfProposed
-                when transcript.Turns.Any(t => t.Handoff) && Seed($"{op.Key}:case") % 10 < 7:
+                when HandoffShown(transcript) && Seed($"{op.Key}:case") % 10 < 7:
                 var caseOp = manifest.Operation($"{op.Key}:case", "case", account.Email);
                 using (
                     var created = await session.PostAsync(
@@ -523,7 +608,7 @@ public sealed class ChatScenarios(
                 }
                 return "handoff";
             case ScenarioEnd.ConfirmIfProposed
-                when transcript.Turns.SelectMany(t => t.Tokens).FirstOrDefault() is { } token
+                when ConfirmationToken(transcript) is { } token
                     && Seed($"{op.Key}:confirm") % 10 < 7:
                 var confirmOp = manifest.Operation($"{op.Key}:confirm", "confirm", account.Email);
                 // The answer carries the coupon code: read the status only, keep nothing else.
@@ -551,8 +636,8 @@ public sealed class ChatScenarios(
                     )
                 )
                     await ApiSession.EnsureAsync(ended, "end conversation", ct);
-                return transcript.Turns.Any(t => t.Handoff) ? "proposal-declined"
-                    : transcript.Turns.Any(t => t.Confirmations > 0) ? "activation-declined"
+                return HandoffShown(transcript) ? "proposal-declined"
+                    : ConfirmationToken(transcript) is not null ? "activation-declined"
                     : "ended";
         }
     }

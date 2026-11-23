@@ -157,7 +157,9 @@ public sealed class ChatService(
                     recorder.Usage(null);
                     throw;
                 }
-                recorder.Usage(step.Usage);
+                // An attempt retried after its answer was lost may have been billed: the tokens of
+                // the successful attempt are not the whole cost, so the total is unknown.
+                recorder.Usage(step.LostAttempts > 0 ? null : step.Usage);
                 if (await HandedOver())
                     return;
                 if (step is ModelStep.Reply reply)

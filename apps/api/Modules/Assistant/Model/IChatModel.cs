@@ -27,6 +27,9 @@ public abstract record ModelStep
 {
     public TokenUsage? Usage { get; init; }
 
+    /// <summary>Attempts retried inside the step after getting no answer (may have been billed).</summary>
+    public int LostAttempts { get; init; }
+
     /// <summary>One or more calls the model asked for at once; they run in order.</summary>
     public sealed record Tool(IReadOnlyList<ToolCall> Calls) : ModelStep
     {

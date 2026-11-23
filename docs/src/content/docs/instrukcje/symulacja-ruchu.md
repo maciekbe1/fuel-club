@@ -115,13 +115,13 @@ Po `converse` w folderze przebiegu, z wszystkich transkryptów przebiegu:
 - `report-technical.md` - przebieg techniczny: operacje rozmów (zakończone, nieudane, w toku), wyniki rozmów, tury z `done` i z błędem strumienia, czas tury po stronie klienta (p50/p95), oczekiwania na `429`. Na demo z dopiskiem, że to nie pomiar Gemini.
 - `report-correctness.md` - poprawność odpowiedzi: tury zgodne ze sprawdzeniami w każdym scenariuszu, przykłady niezgodności, osobno scenariusze zwykłe i regresyjne.
 
-Tury z transkryptów sprzed P16c (bez sprawdzeń) są pokazane jako „bez sprawdzeń” i nie liczą się do zgodnych; tury bez czasu klienta nie wchodzą do p50/p95.
+Rozmowy `end-pending` (zakończenie niepotwierdzone, operacja nieudana lub w toku) raport techniczny liczy osobno i nie wlicza ich tur do statystyk ani do raportu poprawności. Tury z transkryptów sprzed P16c (bez sprawdzeń) są pokazane jako „bez sprawdzeń” i nie liczą się do zgodnych; tury bez czasu klienta nie wchodzą do p50/p95.
 
 Przebieg może być technicznie czysty przy złych odpowiedziach - dlatego raporty są osobne.
 
 - Zgłoszenie dostaje `conversationId` (przekazanie liczone raz) i jest od razu zamykane przez klienta, żeby konto mogło dalej pisać.
 - Tempo: jedno konto naraz prowadzi swoje rozmowy po kolei, globalnie `--chat-per-minute` (domyślnie 60) - poniżej limitu czatu 20/min na użytkownika przy rozłożeniu na konta; `429` czeka `Retry-After`.
-- Ponowienie: rozmowa `Done` jest pomijana; `Pending` startuje z tym samym kluczem, więc trafia w tę samą rozmowę. Jeśli ta jest już zakończona, wynik to `ended-earlier`, a transkrypt z przebiegu, który ją prowadził, zostaje. Tury czatu nie mają klucza idempotencji: przerwana w połowie rozmowa może po ponowieniu dostać powtórzoną turę.
+- Ponowienie: rozmowa `Done` jest pomijana; `Pending` startuje z tym samym kluczem, więc trafia w tę samą rozmowę. Jeśli ta jest już zakończona, wynik to `ended-earlier`, a transkrypt z przebiegu, który ją prowadził, zostaje: rozmowa jest zapisywana przed wywołaniem zakończenia (wynik `end-pending`), więc zgubiona odpowiedź na zakończenie nie zostawia pustego transkryptu. Ponowienie zmienia tylko `end-pending` - na `activated` albo `handoff`, gdy manifest ma udane potwierdzenie lub zgłoszenie, inaczej na `ended-earlier`; potwierdzony wynik zostaje. Plik zapisuje się w całości albo wcale (plik tymczasowy i przeniesienie); nieczytelny plik jest zapisywany od nowa. Token aktywacji i propozycję konsultanta symulator bierze tylko z tury zakończonej `done` - jak frontend. Token w treści nie trafia do pliku: przed zakończeniem zapis jest pomijany, a operacja pada dopiero po zakończeniu rozmowy. Tury czatu nie mają klucza idempotencji: przerwana w połowie rozmowa może po ponowieniu dostać powtórzoną turę.
 
 ### Transkrypty
 

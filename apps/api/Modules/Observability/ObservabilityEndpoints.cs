@@ -309,7 +309,7 @@ public static class ObservabilityEndpoints
                 .Order(StringComparer.Ordinal)
                 .ToList();
 
-        // A conversation matches the model or prompt filter when one of its turns does.
+        // A conversation matches the model and prompt filters when one of its turns matches both.
         var conversations = await db
             .Database.SqlQueryRaw<ConversationRow>(
                 """
@@ -328,10 +328,10 @@ public static class ObservabilityEndpoints
                 WHERE c."StartedAt" > @from AND c."StartedAt" <= @to
                   AND (@traffic = 'all' OR c."Synthetic" = (@traffic = 'synthetic'))
                   AND (@run IS NULL OR c."RunId" = @run)
-                  AND (@model IS NULL OR EXISTS (SELECT 1 FROM assistant_turns m
-                       WHERE m."ConversationId" = c."Id" AND m."Model" = @model))
-                  AND (@prompt IS NULL OR EXISTS (SELECT 1 FROM assistant_turns m
-                       WHERE m."ConversationId" = c."Id" AND m."PromptVersion" = @prompt))
+                  AND ((@model IS NULL AND @prompt IS NULL) OR EXISTS (SELECT 1 FROM assistant_turns m
+                       WHERE m."ConversationId" = c."Id"
+                         AND (@model IS NULL OR m."Model" = @model)
+                         AND (@prompt IS NULL OR m."PromptVersion" = @prompt)))
                 """,
                 Parameters()
             )

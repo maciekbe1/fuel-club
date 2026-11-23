@@ -745,6 +745,47 @@ public sealed class ObservabilityTests(ApiFactory factory) : IAsyncLifetime
         );
     }
 
+    [Fact]
+    public async Task Model_and_prompt_must_match_the_same_turn_of_a_conversation()
+    {
+        var run = $"g-{_tag}";
+        var mixed = Conversation(run, ConversationEndReason.Client);
+        await SeedAsync(
+            mixed,
+            MetricTurn(
+                run,
+                demo: false,
+                steps: 1,
+                model: "m-a",
+                prompt: "p-x",
+                conversation: mixed.Id
+            ),
+            MetricTurn(
+                run,
+                demo: false,
+                steps: 1,
+                model: "m-b",
+                prompt: "p-y",
+                conversation: mixed.Id
+            )
+        );
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        // No turn has both: no turn and no conversation, never a conversation without turns.
+        var crossed = await SummaryAsync(
+            admin,
+            $"traffic=synthetic&runId={run}&model=m-a&promptVersion=p-y"
+        );
+        var matching = await SummaryAsync(
+            admin,
+            $"traffic=synthetic&runId={run}&model=m-a&promptVersion=p-x"
+        );
+
+        Assert.Equal((0, 0), (crossed.Turns.Turns, crossed.Conversations.Started));
+        Assert.Equal((1, 1), (matching.Turns.Turns, matching.Conversations.Started));
+    }
+
     private AssistantConversation Conversation(
         string run,
         ConversationEndReason? end,

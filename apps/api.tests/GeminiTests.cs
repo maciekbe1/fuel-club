@@ -74,6 +74,9 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         {
             Sent.Add((request, await request.Content!.ReadAsStringAsync(cancellationToken)));
             var (status, body) = _answers.Dequeue();
+            // 0: the connection is lost, no answer (a transient failure that is retried).
+            if (status == 0)
+                throw new HttpRequestException("connection lost");
             var response = new HttpResponseMessage(status)
             {
                 Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
@@ -483,6 +486,58 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(3, gemini.Sent.Count);
         // Each attempt carries the whole request.
         Assert.All(gemini.Sent, s => Assert.Equal(gemini.Sent[0].Body, s.Body));
+        // Error statuses are answers and are not billed: the usage is the whole cost.
+        var turn = await TurnAsync(events);
+        Assert.NotNull(turn.InputTokens);
+        Assert.NotNull(turn.CostUsd);
+    }
+
+    [Fact]
+    public async Task A_step_retried_after_a_lost_connection_has_unknown_tokens_and_cost()
+    {
+        var gemini = new FakeGemini((0, ""), (HttpStatusCode.OK, TextBody("Masz 7 pkt.")));
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 7);
+
+        var events = await ChatAsync(client, "Cześć");
+
+        Assert.Equal("done", events[^1].Name);
+        Assert.Equal(2, gemini.Sent.Count);
+        // The lost attempt may have been billed: the successful one's usage is not the whole
+        // cost, so tokens and cost are unknown, not a sum that looks complete.
+        var turn = await TurnAsync(events);
+        Assert.Null(turn.InputTokens);
+        Assert.Null(turn.CostUsd);
+    }
+
+    private async Task<FuelClub.Api.Modules.Assistant.Tracing.AssistantTurn> TurnAsync(
+        List<(string Name, JsonElement Data)> events
+    )
+    {
+        var correlation = events[0].Data.GetProperty("correlationId").GetString();
+        await using var scope = factory.Services.CreateAsyncScope();
+        return await scope
+            .ServiceProvider.GetRequiredService<AppDbContext>()
+            .AssistantTurns.SingleAsync(t => t.CorrelationId == correlation);
+    }
+
+    [Fact]
+    public async Task A_step_answered_at_the_first_attempt_keeps_its_usage_and_cost()
+    {
+        var gemini = new FakeGemini((HttpStatusCode.OK, TextBody("Masz 7 pkt.")));
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 7);
+
+        var events = await ChatAsync(client, "Cześć");
+
+        Assert.Equal("done", events[^1].Name);
+        var correlation = events[0].Data.GetProperty("correlationId").GetString();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var turn = await scope
+            .ServiceProvider.GetRequiredService<AppDbContext>()
+            .AssistantTurns.SingleAsync(t => t.CorrelationId == correlation);
+        Assert.NotNull(turn.InputTokens);
+        Assert.NotNull(turn.CostUsd);
     }
 
     [Fact]

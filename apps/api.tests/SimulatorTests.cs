@@ -128,6 +128,108 @@ public sealed class SimulatorTests : IDisposable
     }
 
     [Fact]
+    public void Only_a_turn_that_finished_with_done_gives_a_token_to_confirm()
+    {
+        var cut = new TranscriptTurn { User = "Aktywuj kupon", Done = false };
+        cut.Tokens.Add("cut-token");
+        var transcript = new Transcript { RunId = "t-1", Scenario = "aktywacja" };
+        transcript.Turns.Add(cut);
+
+        Assert.Null(ChatScenarios.ConfirmationToken(transcript));
+
+        var done = new TranscriptTurn { User = "Aktywuj kupon", Done = true };
+        done.Tokens.Add("done-token");
+        transcript.Turns.Add(done);
+        Assert.Equal("done-token", ChatScenarios.ConfirmationToken(transcript));
+    }
+
+    [Fact]
+    public async Task A_rerun_after_a_lost_end_keeps_the_talk_saved_before_the_end()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(ManifestPath)!);
+        var file = Path.Combine(Path.GetDirectoryName(ManifestPath)!, "c00000.json");
+        var talked = new Transcript
+        {
+            RunId = "t-1",
+            Scenario = "regulamin",
+            Outcome = ChatScenarios.EndPending,
+        };
+        talked.Turns.Add(new TranscriptTurn { User = "Czy punkty wygasają?", Done = true });
+        await ChatScenarios.SaveTranscriptAsync(file, talked, default);
+
+        // The end went through, its answer was lost; the rerun finds the conversation ended.
+        Assert.True(await ChatScenarios.CompleteEndPendingAsync(file, "ended-earlier", default));
+
+        var saved = System
+            .Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(file))
+            .RootElement;
+        Assert.Equal("ended-earlier", saved.GetProperty("outcome").GetString());
+        Assert.Equal(1, saved.GetProperty("turns").GetArrayLength());
+
+        // An end that was confirmed keeps its own outcome.
+        talked.Outcome = "handoff";
+        await ChatScenarios.SaveTranscriptAsync(file, talked, default);
+        Assert.True(await ChatScenarios.CompleteEndPendingAsync(file, "ended-earlier", default));
+        saved = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(file)).RootElement;
+        Assert.Equal("handoff", saved.GetProperty("outcome").GetString());
+
+        // A file cut short (an interrupted write of an older version) is not trusted: rewrite it.
+        await File.WriteAllTextAsync(file, "{\"runId\": \"t-1\", \"tur");
+        Assert.False(await ChatScenarios.CompleteEndPendingAsync(file, "ended-earlier", default));
+    }
+
+    [Fact]
+    public async Task A_token_in_the_text_is_never_written_and_fails_only_when_asked()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(ManifestPath)!);
+        var file = Path.Combine(Path.GetDirectoryName(ManifestPath)!, "c00001.json");
+        var turn = new TranscriptTurn
+        {
+            User = "Aktywuj",
+            Assistant = "Token: secret-1",
+            Done = true,
+        };
+        turn.Tokens.Add("secret-1");
+        var leaked = new Transcript { RunId = "t-1", Scenario = "aktywacja" };
+        leaked.Turns.Add(turn);
+
+        // Before the end: skipped, so the end still runs; after it: the operation fails.
+        Assert.False(
+            await ChatScenarios.SaveTranscriptAsync(file, leaked, default, throwOnLeak: false)
+        );
+        Assert.False(File.Exists(file));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ChatScenarios.SaveTranscriptAsync(file, leaked, default)
+        );
+        Assert.False(File.Exists(file));
+    }
+
+    [Fact]
+    public void A_handoff_counts_only_from_a_turn_that_finished_with_done()
+    {
+        var transcript = new Transcript { RunId = "t-1", Scenario = "konsultant" };
+        transcript.Turns.Add(
+            new TranscriptTurn
+            {
+                User = "Konsultant",
+                Handoff = true,
+                Done = false,
+            }
+        );
+        Assert.False(ChatScenarios.HandoffShown(transcript));
+
+        transcript.Turns.Add(
+            new TranscriptTurn
+            {
+                User = "Konsultant",
+                Handoff = true,
+                Done = true,
+            }
+        );
+        Assert.True(ChatScenarios.HandoffShown(transcript));
+    }
+
+    [Fact]
     public void A_turn_passes_only_when_every_rule_check_does()
     {
         var step = new Step(
