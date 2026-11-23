@@ -207,8 +207,17 @@ test("lost response: the retry reuses the key, one coupon and one debit", async 
 test("loading error of the catalog can be retried", async ({
   page,
   customer,
+  staff,
 }) => {
   void customer;
+  // Its own offer: a fresh database (CI) has an empty catalog.
+  const name = offerName("Ponowienie");
+  await staff.createOffer({
+    name,
+    pointsCost: 100,
+    discountPerLiter: 0.1,
+    maxLiters: 20,
+  });
   let healthy = false;
   await page.route("**/api/rewards", (route) =>
     healthy ? route.continue() : route.abort("failed"),
@@ -221,7 +230,9 @@ test("loading error of the catalog can be retried", async ({
   });
   healthy = true;
   await alert.getByRole("button", { name: "Spróbuj ponownie" }).click();
-  await expect(page.getByTestId("offer").first()).toBeVisible();
+  await expect(
+    page.getByTestId("offer").filter({ hasText: name }),
+  ).toBeVisible();
 });
 
 test("leaving the screen with an unknown outcome keeps the lock and the key", async ({
