@@ -302,17 +302,21 @@ public sealed class ChatScenarios(
                 var accountPace = new Pacer(Math.Min(AccountTurnsPerMinute, chatPerMinute));
                 foreach (var index in queue)
                 {
-                    var scenario = Pick(index);
+                    var scenario = ScenarioFor(index, account.Email);
                     try
                     {
-                        await ConversationAsync(
-                            session,
-                            account,
-                            index,
-                            scenario,
-                            accountPace,
-                            token
-                        );
+                        // Only conversations that ran now; done ones of an earlier run are skipped.
+                        if (
+                            !await ConversationAsync(
+                                session,
+                                account,
+                                index,
+                                scenario,
+                                accountPace,
+                                token
+                            )
+                        )
+                            continue;
                         lock (byScenario)
                             byScenario[scenario.Name] =
                                 byScenario.GetValueOrDefault(scenario.Name) + 1;
@@ -340,7 +344,21 @@ public sealed class ChatScenarios(
             Environment.ExitCode = 1;
     }
 
-    /// <summary>Deterministic per run and index: a rerun replays the same scenario.</summary>
+    /// <summary>
+    /// The scenario stored with the conversation's operation when it first ran; a rerun reuses it
+    /// whatever the flags are now, so one conversation never gets another scenario's messages.
+    /// </summary>
+    public Scenario ScenarioFor(int index, string accountEmail)
+    {
+        var op = manifest.Operation($"c{index:00000}", "conversation", accountEmail);
+        if (op.Scenario is { } stored && All.FirstOrDefault(s => s.Name == stored) is { } known)
+            return known;
+        var picked = Pick(index);
+        op.Scenario = picked.Name;
+        manifest.Save();
+        return picked;
+    }
+
     /// <summary>
     /// The first conversations of a run go to the regression scenarios (each so many times), so a
     /// small run has them too; the rest by weight. Deterministic per run and index.
@@ -367,7 +385,7 @@ public sealed class ChatScenarios(
             ) & int.MaxValue
         );
 
-    private async Task ConversationAsync(
+    private async Task<bool> ConversationAsync(
         ApiSession session,
         SimAccount account,
         int index,
@@ -379,7 +397,7 @@ public sealed class ChatScenarios(
         var key = $"c{index:00000}";
         var op = manifest.Operation(key, "conversation", account.Email);
         if (op.Status == OperationStatus.Done)
-            return;
+            return false;
         op.Status = OperationStatus.Pending;
         manifest.Save();
         // A case left open (a failed close, here or in an earlier run) would block every turn.
@@ -458,6 +476,7 @@ public sealed class ChatScenarios(
         op.Status = OperationStatus.Done;
         op.Error = null;
         manifest.Save();
+        return true;
     }
 
     private async Task<string> EndAsync(

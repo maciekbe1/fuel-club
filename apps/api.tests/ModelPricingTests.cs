@@ -64,6 +64,16 @@ public sealed class ModelPricingTests
     }
 
     [Fact]
+    public void A_turn_without_a_model_call_cost_nothing_not_an_unknown()
+    {
+        var pricing = Pricing(Price("p", Now.AddDays(-1), 0.30m, 2.50m));
+        var turn = Turn(input: null, output: null);
+        turn.ModelSteps = 0;
+
+        Assert.Equal(new TurnCost(0m, "p"), pricing.For(turn));
+    }
+
+    [Fact]
     public void Prices_are_validated()
     {
         var validator = new ModelPricingValidator();
@@ -73,9 +83,14 @@ public sealed class ModelPricingTests
             Prices = [Price("a", Now, 1m, 1m), Price("a", Now, 2m, 2m)],
         };
         var negative = new ModelPricingOptions { Prices = [Price("b", Now, -1m, 1m)] };
+        var sameMoment = new ModelPricingOptions
+        {
+            Prices = [Price("c", Now, 1m, 1m), Price("d", Now, 2m, 2m)],
+        };
 
         Assert.True(validator.Validate(null, ok).Succeeded);
         Assert.False(validator.Validate(null, duplicate).Succeeded);
         Assert.False(validator.Validate(null, negative).Succeeded);
+        Assert.False(validator.Validate(null, sameMoment).Succeeded);
     }
 }

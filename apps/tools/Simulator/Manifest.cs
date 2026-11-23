@@ -141,6 +141,9 @@ public sealed class Operation
     public required string IdempotencyKey { get; init; }
     public OperationStatus Status { get; set; }
 
+    /// <summary>For a conversation: the scenario it was given the first time (reruns keep it).</summary>
+    public string? Scenario { get; set; }
+
     /// <summary>A non-secret result, e.g. the coupon or purchase id.</summary>
     public string? Result { get; set; }
     public string? Error { get; set; }

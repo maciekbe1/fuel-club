@@ -237,13 +237,13 @@ public static class ObservabilityEndpoints
                        sum(t."ModelSteps")::bigint AS "Steps",
                        count(t."ModelSteps")::int AS "StepTurns",
                        percentile_cont(0.95) WITHIN GROUP (ORDER BY t."ModelSteps") AS "P95Steps",
-                       sum(t."ToolCalls")::bigint AS "ToolCalls",
+                       sum(jsonb_array_length(t."Tools"))::bigint AS "ToolCalls",
                        count(*) FILTER (WHERE t."Demo")::int AS "Demo",
                        count(*) FILTER (WHERE NOT t."Demo" AND t."CostUsd" IS NOT NULL)::int AS "CostKnown",
                        count(*) FILTER (WHERE NOT t."Demo" AND t."CostUsd" IS NULL)::int AS "CostUnknown",
                        sum(t."CostUsd") FILTER (WHERE NOT t."Demo") AS "Cost",
                        count(*) FILTER (WHERE t."InputTokens" IS NOT NULL)::int AS "TokenTurns",
-                       count(*) FILTER (WHERE NOT t."Demo" AND t."InputTokens" IS NULL)::int AS "NonDemoWithoutTokens",
+                       count(*) FILTER (WHERE NOT t."Demo" AND t."InputTokens" IS NULL AND t."ModelSteps" IS DISTINCT FROM 0)::int AS "NonDemoWithoutTokens",
                        sum(t."InputTokens")::bigint AS "Input",
                        sum(t."OutputTokens")::bigint AS "Output"
                 FROM assistant_turns t WHERE {TurnFilter}

@@ -48,16 +48,30 @@ export function Summary({
         options={options}
         onChange={onFiltersChange}
       />
-      {demoOnly && (
-        <Alert className="rounded-2xl p-3 text-sm" data-testid="demo-only">
-          Wszystkie tury w tym widoku pochodzą z adaptera demo (reguły, bez AI).
-          Czasy i liczby pokazują działanie aplikacji i panelu - to nie jest
-          pomiar wydajności ani kosztu Gemini.
-        </Alert>
+      {summary.isPlaceholderData && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Ładowanie metryk dla nowych filtrów…
+        </p>
       )}
-      <TurnMetricsSection turns={turns} />
-      <CostTile cost={cost} />
-      <ConversationMetricsSection conversations={conversations} />
+      <div
+        aria-busy={summary.isPlaceholderData}
+        className={
+          summary.isPlaceholderData
+            ? "flex flex-col gap-8 opacity-50"
+            : "flex flex-col gap-8"
+        }
+      >
+        {demoOnly && (
+          <Alert className="rounded-2xl p-3 text-sm" data-testid="demo-only">
+            Wszystkie tury w tym widoku pochodzą z adaptera demo (reguły, bez
+            AI). Czasy i liczby pokazują działanie aplikacji i panelu - to nie
+            jest pomiar wydajności ani kosztu Gemini.
+          </Alert>
+        )}
+        <TurnMetricsSection turns={turns} />
+        <CostTile cost={cost} />
+        <ConversationMetricsSection conversations={conversations} />
+      </div>
 
       <section aria-labelledby="security" className="flex flex-col gap-3">
         <h2 id="security" className="text-lg font-semibold">

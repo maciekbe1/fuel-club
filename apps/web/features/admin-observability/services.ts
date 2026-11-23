@@ -1,5 +1,5 @@
 import { api, unwrap } from "@/lib/api/client";
-import type { components } from "@/lib/api/schema";
+import type { components, paths } from "@/lib/api/schema";
 
 export type ObservabilitySummary =
   components["schemas"]["ObservabilitySummary"];
@@ -10,13 +10,14 @@ export type CostMetrics = components["schemas"]["CostMetrics"];
 export type ConversationMetrics = components["schemas"]["ConversationMetrics"];
 export type FilterOptions = components["schemas"]["FilterOptions"];
 
+type SummaryQuery = NonNullable<
+  paths["/api/admin/observability"]["get"]["parameters"]["query"]
+>;
+/** The values the API accepts for `traffic` (ADR 0018). */
 export type Traffic = "real" | "synthetic" | "all";
-/** Unset fields are not sent: the API counts all values of that field. */
-export type SummaryFilters = {
+/** The generated query without the window; unset fields count every value of that field. */
+export type SummaryFilters = Omit<SummaryQuery, "hours" | "traffic"> & {
   traffic: Traffic;
-  runId?: string;
-  model?: string;
-  promptVersion?: string;
 };
 
 export const observabilityService = {

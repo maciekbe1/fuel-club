@@ -106,7 +106,7 @@ dotnet run --project apps/tools/Simulator -- converse --run pilot-6 --conversati
 | `regresja-wybor-nagrody` | 1 | „Jakie nagrody mogę wybrać?” | klient; regresja |
 | `regresja-zbieranie-punktow` | 1 | „Jak działa zbieranie punktów?” | klient; regresja |
 
-- Scenariusze regresyjne to pytania, na które agent odpowiadał źle (znaleziska P16b), w oryginalnym brzmieniu. Przeformułowane wersje w scenariuszach zwykłych tylko generują ruch - nie oznaczają poprawy agenta. Pierwsze rozmowy przebiegu idą na regresje (`--regressions-each`, domyślnie 3 na scenariusz), więc mały przebieg też je ma.
+- Scenariusze regresyjne to pytania, na które agent odpowiadał źle (znaleziska P16b), w oryginalnym brzmieniu. Przeformułowane wersje w scenariuszach zwykłych tylko generują ruch - nie oznaczają poprawy agenta. Pierwsze rozmowy przebiegu idą na regresje (`--regressions-each`, domyślnie 3 na scenariusz), więc mały przebieg też je ma. Scenariusz zapisuje się w operacji rozmowy w manifeście przy pierwszym uruchomieniu; ponowienie go używa niezależnie od flag.
 - Każda tura ma sprawdzenia regułowe (`Step`): wymagane narzędzia (`nazwa` albo `nazwa:stan`), wzorzec odpowiedzi, propozycja konsultanta (musi / nie może), brak narzędzi. To przybliżenie znaczenia, nie ocena człowieka ani judge'a.
 
 ### Raporty
@@ -114,6 +114,8 @@ dotnet run --project apps/tools/Simulator -- converse --run pilot-6 --conversati
 Po `converse` w folderze przebiegu, z wszystkich transkryptów przebiegu:
 - `report-technical.md` - przebieg techniczny: operacje rozmów (zakończone, nieudane, w toku), wyniki rozmów, tury z `done` i z błędem strumienia, czas tury po stronie klienta (p50/p95), oczekiwania na `429`. Na demo z dopiskiem, że to nie pomiar Gemini.
 - `report-correctness.md` - poprawność odpowiedzi: tury zgodne ze sprawdzeniami w każdym scenariuszu, przykłady niezgodności, osobno scenariusze zwykłe i regresyjne.
+
+Tury z transkryptów sprzed P16c (bez sprawdzeń) są pokazane jako „bez sprawdzeń” i nie liczą się do zgodnych; tury bez czasu klienta nie wchodzą do p50/p95.
 
 Przebieg może być technicznie czysty przy złych odpowiedziach - dlatego raporty są osobne.
 
@@ -143,6 +145,11 @@ dotnet run --project apps/tools/Simulator -- cleanup --run pilot-1
 `pilot-1`, 5 kont: 26/26 operacji. Ponowienie: bez zmian w bazie. Ponowienie z trzema operacjami oznaczonymi `Pending` (zakup, realizacja kuponu, wymiana): bez podwojeń. Sprzątanie na bazie testowej: odmowa; na demo: 5 kont, 7 zakupów, 5 kuponów, 2 oferty usunięte, konta demo zostały.
 
 `pilot-2` (po review): 26/26; ponowienie z dwiema rejestracjami `Pending` - bez błędów; sprzątanie z kontem bez id w manifeście - usunięte wszystkie 5 kont i 21 rekordów idempotencji.
+
+`demo-1` (P16c, 200 kont, adapter demo): 1460 rozmów, 2113 tur.
+- Technicznie: 1460/1460 rozmów, 2113/2113 tur z `done`, 0 błędów strumienia, 0 oczekiwań na `429`, 7,3 min; czas tury u klienta p50 21 ms, p95 36 ms. To czas aplikacji z adapterem reguł - nie pomiar wydajności ani kosztu Gemini.
+- Poprawność: scenariusze zwykłe 2050/2050 tur zgodnych; regresyjne 0/63 - trzy znane pomyłki bez zmian.
+- Panel (`synthetic`, `demo-1`): 2113 tur, 3984 kroki modelu, 1871 wywołań narzędzi (42 nie `ok`), 1460 rozmów (1201 zakończone przez klienta, 194 przekazane ze zgłoszeniem, 65 otwartych porzuconych, 0 `Idle` w chwili odczytu), 305 z propozycją konsultanta, koszt „nie dotyczy”.
 
 `control-1` (P16c, przebieg kontrolny przed dużym, adapter demo): 10 kont, 80 rozmów, 109 tur.
 - Technicznie: 80/80 rozmów, 109/109 tur z `done`, 0 błędów strumienia, 0 oczekiwań na `429`; czas tury u klienta p50 23 ms, p95 35 ms (demo - nie pomiar Gemini).

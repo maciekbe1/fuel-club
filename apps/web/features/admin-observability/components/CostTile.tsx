@@ -20,7 +20,9 @@ export function CostTile({ cost }: { cost: CostMetrics }) {
       : "";
   return (
     <div className="flex flex-col gap-1">
-      <Tile label="Szacowany koszt modelu" value={value} />
+      <dl data-testid="cost-metrics">
+        <Tile label="Szacowany koszt modelu" value={value} />
+      </dl>
       <p className="text-xs text-muted-foreground">
         Szacunek, nie faktura{versions}. Tury demo:{" "}
         {number.format(cost.notApplicableTurns)} (nie dotyczy).

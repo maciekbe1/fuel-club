@@ -80,7 +80,8 @@ public static class Reports
         )
         {
             var scenarioTurns = group.SelectMany(t => t.Turns).ToList();
-            var passed = scenarioTurns.Count(t => t.Checks.All(c => c.Ok));
+            var checkedTurns = scenarioTurns.Where(t => t.Checks.Count > 0).ToList();
+            var passed = checkedTurns.Count(t => t.Checks.All(c => c.Ok));
             var failed = scenarioTurns
                 .SelectMany(t =>
                     t.Checks.Where(c => !c.Ok).Select(c => $"{c.Name} (\"{Short(t.User)}\")")
@@ -88,20 +89,25 @@ public static class Reports
                 .Distinct()
                 .Take(2);
             correctness.AppendLine(
-                $"| `{group.Key}` | {(group.First().Regression ? "tak" : "")} | {scenarioTurns.Count} | {passed} | {string.Join("; ", failed)} |"
+                $"| `{group.Key}` | {(group.First().Regression ? "tak" : "")} | {checkedTurns.Count}{(checkedTurns.Count < scenarioTurns.Count ? $" (+{scenarioTurns.Count - checkedTurns.Count} bez sprawdzeń)" : "")} | {passed} | {string.Join("; ", failed)} |"
             );
         }
         var regressionTurns = transcripts
             .Where(t => t.Regression)
             .SelectMany(t => t.Turns)
+            .Where(t => t.Checks.Count > 0)
             .ToList();
-        var otherTurns = transcripts.Where(t => !t.Regression).SelectMany(t => t.Turns).ToList();
+        var otherTurns = transcripts
+            .Where(t => !t.Regression)
+            .SelectMany(t => t.Turns)
+            .Where(t => t.Checks.Count > 0)
+            .ToList();
         correctness.AppendLine();
         correctness.AppendLine(
-            $"- Scenariusze zwykłe: {otherTurns.Count(t => t.Checks.All(c => c.Ok))} z {otherTurns.Count} tur zgodnych."
+            $"- Scenariusze zwykłe: {otherTurns.Count(t => t.Checks.All(c => c.Ok))} z {otherTurns.Count} sprawdzonych tur zgodnych."
         );
         correctness.AppendLine(
-            $"- Scenariusze regresyjne (znane pomyłki): {regressionTurns.Count(t => t.Checks.All(c => c.Ok))} z {regressionTurns.Count} tur zgodnych. Przeformułowane scenariusze zwykłe generują ruch; nie oznaczają, że agent przestał się mylić."
+            $"- Scenariusze regresyjne (znane pomyłki): {regressionTurns.Count(t => t.Checks.All(c => c.Ok))} z {regressionTurns.Count} sprawdzonych tur zgodnych. Przeformułowane scenariusze zwykłe generują ruch; nie oznaczają, że agent przestał się mylić."
         );
 
         var root = Path.GetDirectoryName(manifest.Path)!;
@@ -124,7 +130,8 @@ public static class Reports
 
     private static string Percentile(List<TranscriptTurn> turns, double p)
     {
-        var values = turns.Select(t => t.ClientMs).Order().ToList();
+        // 0: a transcript from before the client time was recorded.
+        var values = turns.Where(t => t.ClientMs > 0).Select(t => t.ClientMs).Order().ToList();
         if (values.Count == 0)
             return "-";
         return values[(int)Math.Min(values.Count - 1, Math.Ceiling(p * values.Count) - 1)]

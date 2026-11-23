@@ -520,6 +520,21 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - API 656/656, E2E 42/42.
 - Do zrobienia przez właściciela: `dotnet ef database update --project apps/api` na bazie dev (migracje `RuleFragments`, `Conversations`) i restart API.
 
+## P16c - metryki, koszt, regresje i raporty (2026-11-23)
+
+- Doprecyzowania właściciela: trzy nietrafne pytania jako osobne scenariusze regresyjne (przeformułowanie generuje ruch, nie poprawia agenta); raporty osobno: techniczny i poprawności; rozmowy, tury i wywołania narzędzi jako osobne liczniki; handoff raz na rozmowę, `Idle` ≠ rozwiązanie; filtry `RunId`, model, wersja promptu; koszt demo „nie dotyczy”, brak danych Gemini „nieznany”; 2000 tur demo ≠ pomiar Gemini; judge szacuje i wymaga kalibracji; E2E nie zastępuje testu ręcznego.
+- API: `GET /api/admin/observability` z filtrami `traffic` (domyślnie `real`), `runId`, `model`, `promptVersion`; sekcje tur, kosztu i rozmów; kolumny `ModelSteps`, `CostUsd`, `PriceVersion` (migracja `MetricsAndCost`); `Assistant:Pricing` z wersjonowanym cennikiem; ADR 0018.
+- Web: filtry, osobne sekcje, komunikat „dane demo”, koszt „nie dotyczy / nieznany / niepełny”, odsetek z mianownikiem, przygaszenie przy ładowaniu nowych filtrów.
+- Symulator: kroki ze sprawdzeniami regułowymi, 3 scenariusze regresyjne (pierwsze rozmowy przebiegu, `--regressions-each`), scenariusz zapisany w manifeście, `report-technical.md` i `report-correctness.md`.
+- `control-1` (10 kont, 80 rozmów, 109 tur) i `demo-1` (200 kont, 1460 rozmów, 2113 tur), oba na adapterze demo:
+  - technicznie `demo-1`: 1460/1460 rozmów, 2113/2113 tur z `done`, 0 błędów, 0 × `429`, 7,3 min; czas u klienta p50 21 ms, p95 36 ms (demo, nie Gemini);
+  - poprawność `demo-1`: zwykłe 2050/2050 tur zgodnych, regresyjne 0/63 - trzy pomyłki nadal są;
+  - panel (`synthetic`, `demo-1`) zgodny z raportem: 2113 tur, 3984 kroki, 1871 wywołań narzędzi (42 nie `ok`), 1460 rozmów, 305 z propozycją, 194 przekazane, 65 otwartych (porzucone), koszt „nie dotyczy”.
+- Test ręczny: osobny web na :3200 → API demo :5301 (bez :3000). Widok rzeczywisty pusty, syntetyczny z filtrem przebiegu, komunikat demo, koszt „nie dotyczy”, rozmowy z mianownikami; telefon 390 px bez przewijania w bok.
+- Review (616053d..d866d66): 9 uwag, wszystkie przyjęte: koszt tury bez wywołania modelu = 0, unikalna cena na model i datę, wywołania narzędzi z jednego źródła, scenariusz rozmowy w manifeście, tury bez sprawdzeń poza wynikiem, typy filtrów ze schematu, `<dl>` kosztu, przygaszenie przy ładowaniu, zduplikowany komentarz.
+- API 668/668, E2E obserwowalności 4/4, docs build OK.
+- Do zrobienia przez właściciela: migracja `MetricsAndCost` na bazie dev (razem z `RuleFragments`, `Conversations`); przegląd commitów P16b i P16c.
+
 ## Następny krok
 
 Otwarte:

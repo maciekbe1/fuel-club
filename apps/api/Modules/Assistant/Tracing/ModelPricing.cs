@@ -45,6 +45,13 @@ public sealed class ModelPricingValidator : IValidateOptions<ModelPricingOptions
         }
         if (options.Prices.GroupBy(p => p.Version).Any(g => g.Count() > 1))
             errors.Add("Assistant:Pricing: versions must be unique.");
+        // Two prices of one model from the same moment: which one applies would depend on order.
+        if (
+            options
+                .Prices.GroupBy(p => (p.Provider, p.Model, p.EffectiveFrom))
+                .Any(g => g.Count() > 1)
+        )
+            errors.Add("Assistant:Pricing: one price per provider, model and EffectiveFrom.");
         return errors.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(errors);
@@ -70,6 +77,9 @@ public sealed class ModelPricing(IOptions<ModelPricingOptions> options)
                 && p.EffectiveFrom <= turn.StartedAt
             )
             .MaxBy(p => p.EffectiveFrom);
+        // No model call (client gone before it, failure before it): nothing was spent.
+        if (turn.ModelSteps == 0)
+            return new(0m, price?.Version);
         if (
             price is null
             || turn.InputTokens is not { } input

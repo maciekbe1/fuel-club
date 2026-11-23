@@ -103,6 +103,31 @@ public sealed class SimulatorTests : IDisposable
     }
 
     [Fact]
+    public void A_rerun_keeps_the_scenario_a_conversation_was_given()
+    {
+        var manifest = Manifest.Create(
+            ManifestPath,
+            "t-1",
+            "http://localhost:5301",
+            "Europe/Warsaw"
+        );
+        var settings = new Settings("s", "c", "c", "a", "a", 1, 10, 10);
+        var first = new ChatScenarios(manifest, settings, 60, regressionsEach: 3).ScenarioFor(
+            0,
+            "a0"
+        );
+        Assert.True(first.Regression);
+
+        // Another flag value on the rerun: the stored scenario wins, the new pick does not.
+        var reloaded = Manifest.Load(ManifestPath);
+        var again = new ChatScenarios(reloaded, settings, 60, regressionsEach: 0).ScenarioFor(
+            0,
+            "a0"
+        );
+        Assert.Equal(first.Name, again.Name);
+    }
+
+    [Fact]
     public void A_turn_passes_only_when_every_rule_check_does()
     {
         var step = new Step(

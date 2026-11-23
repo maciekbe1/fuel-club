@@ -27,7 +27,7 @@ Panel liczył tylko tury. Do pokazu i oceny agenta potrzebne są metryki z jawny
 
 - **Tury**: wynik (`Done`/`Error`/`Cancelled`), p50/p95 pierwszego zdarzenia i całej tury (`percentile_cont`).
 - **Kroki modelu**: wywołania modelu w turze, także nieudane (`ModelSteps`). Suma, p95 na turę i liczba tur z danymi (tury sprzed P16c nie mają tej wartości).
-- **Wywołania narzędzi**: suma `ToolCalls` i rozbicie nazwa/stan. „Nie `ok`” to stany `rejected`, `error`, `timeout`, `no_match` itp. Mianownik to wywołania, nie tury.
+- **Wywołania narzędzi**: liczba wpisów w `Tools` (to samo źródło co rozbicie nazwa/stan, więc udział „nie `ok`” nie przekroczy 100%). „Nie `ok`” to stany `rejected`, `error`, `timeout`, `no_match` itp. Mianownik to wywołania, nie tury.
 - **Rozmowy**: rozpoczęte w oknie. Otwarte to te bez zakończenia i nie dłużej bezczynne niż `Assistant:ConversationIdleTimeout`. Zakończone dzielą się na `Client`, `Idle` i `Handoff`. Rozmowa bezczynna ponad limit liczy się jako `Idle`, zanim serwer ją zamknie.
 
 ### Przekazanie
@@ -45,7 +45,9 @@ Panel liczył tylko tury. Do pokazu i oceny agenta potrzebne są metryki z jawny
   - Zapisany razem z wersją ceny (`CostUsd`, `PriceVersion`), więc edycja cennika nie zmienia historii.
 - Tokeny wyjścia zawierają już tokeny „myślenia” Gemini, więc nie liczymy ich drugi raz.
 - **Demo: „nie dotyczy”**: adapter nie ma ceny ani tokenów (`CostUsd = null`, bez wersji).
-- **Nieznany**: tura nie-demo bez danych o użyciu albo bez ceny modelu. Nigdy zero.
+- **Nieznany**: tura nie-demo z wywołaniem modelu, ale bez danych o użyciu albo bez ceny modelu. Nigdy zero.
+- **Zero**: tura nie-demo bez wywołania modelu (`ModelSteps = 0`: klient odszedł albo błąd przed modelem) - nic nie wydano.
+- Cennik: wersje unikalne, najwyżej jeden wpis na dostawcę, model i `EffectiveFrom` (inaczej wybór zależałby od kolejności).
   - Suma w panelu obejmuje tylko znane tury i jest pełna, gdy nieznanych jest 0.
 - Domyślny wpis cennika (`gemini-flash-lite-assumed-2026-11-23`: 0,30 / 2,50 USD za milion) to założenie z evali, do potwierdzenia u dostawcy przed pokazaniem kosztu jako faktu.
 - Koszt judge'a liczony osobno (P16d).
