@@ -20,6 +20,40 @@ async function couponStatus(page: Page, couponId: string) {
   return ((await response.json()) as { status: string }).status;
 }
 
+test("a rules question is answered from the rules with its source; an uncovered one offers an agent", async ({
+  page,
+  customer,
+}) => {
+  void customer;
+  await openChat(page);
+
+  const covered = await ask(page, "Czy punkty wygasają?");
+
+  await expect(covered).toHaveAttribute("data-status", "done");
+  await expect(covered.getByTestId("chat-answer")).toContainText(
+    "Punkty nie wygasają.",
+  );
+  await expect(covered.getByTestId("chat-answer")).toContainText(
+    "Regulamin, §6.1",
+  );
+  await expect(
+    covered.getByRole("list", { name: "Użyte narzędzia" }),
+  ).toHaveText("Regulamin: sprawdzono");
+
+  const uncovered = await ask(
+    page,
+    "Co regulamin mówi o płatności kartą kredytową?",
+  );
+
+  await expect(uncovered).toHaveAttribute("data-status", "done");
+  await expect(uncovered.getByTestId("chat-answer")).toContainText(
+    "Regulamin programu tego nie opisuje",
+  );
+  await expect(
+    uncovered.getByRole("button", { name: "Porozmawiaj z konsultantem" }),
+  ).toBeVisible();
+});
+
 test("balance question streams an answer with the tool used and the demo label", async ({
   page,
   customer,

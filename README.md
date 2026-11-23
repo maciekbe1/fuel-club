@@ -82,7 +82,7 @@ Bazy testowe (kontener `postgres-test`, :5434) są oddzielne od bazy dev.
 ```sh
 docker compose up -d postgres-test
 FUELCLUB_TEST_DATABASE='Host=localhost;Port=5434;Database=fuelclub_test;Username=fuelclub_test;Password=fuelclub_test' \
-  dotnet test apps/api.tests                   # API + evale asystenta (assistant-evals-v1)
+  dotnet test apps/api.tests                   # API + evale asystenta (assistant-evals-v2)
 dotnet csharpier check apps
 cd apps/web
 npm run typecheck && npm run lint && npm run format:check && npm run build

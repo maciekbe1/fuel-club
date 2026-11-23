@@ -26,14 +26,14 @@ Stan na 2026-11-22. Dowód to test, który przechodzi, albo opisany ręczny prze
 | Adapter demo jawnie oznaczony, bez sekretów | `AssistantTests`, `e2e/chat.spec.ts` (etykieta demo) |
 | SSE przez fetch, zdarzenia, typy z OpenAPI, ramka podzielona na fragmenty | `e2e/chat.spec.ts` (`sse-split`, `sse-cut`), `ChatStreamContract` w `schema.d.ts` |
 | Limity wejścia, czasu, narzędzi; anulowanie; heartbeat; brak buforowania; błąd bez sukcesu | `AssistantTests`, `e2e/chat.spec.ts`, [ADR 0007](/decyzje/0007-czat-i-potwierdzenia/) |
-| Zamknięta lista narzędzi, tożsamość z sesji, walidacja argumentów | `AssistantTests`, evale `assistant-evals-v1` |
+| Zamknięta lista narzędzi, tożsamość z sesji, walidacja argumentów | `AssistantTests`, evale `assistant-evals-v2` |
 | Propozycja bez mutacji, potwierdzenie przyciskiem, wspólna aktywacja z Idempotency-Key, brak naliczania/wymiany/odbioru | `AssistantTests`, `e2e/chat.spec.ts`, `e2e/demo.spec.ts` |
 
 ## 3. Evals i obserwowalność
 
 | Kryterium | Dowód |
 | --- | --- |
-| Wersjonowane przypadki wszystkich kategorii, asercje na narzędzia, właściciela i skutki w bazie | `AssistantEvals` (`assistant-evals-v1`, 13 przypadków) |
+| Wersjonowane przypadki wszystkich kategorii, asercje na narzędzia, właściciela i skutki w bazie | `AssistantEvals` (`assistant-evals-v2`, 21 przypadków) |
 | Ślady: correlationId, pseudonim, narzędzia, czasy, tryb dostawcy; bez treści i kodów | `AssistantTracingTests`, `TurnRecorderTests`, [ADR 0008](/decyzje/0008-slady-i-evale-czatu/) |
 | OpenTelemetry, opcjonalny Phoenix, niedostępny odbiorca nie blokuje | `AssistantTracingTests` (eksport OTLP, nieosiągalny kolektor); ręcznie: Phoenix w P7a |
 | Metryki całego ruchu (p95, błędy, narzędzia, odmowy, limity) | `ObservabilityTests`, `e2e/observability.spec.ts` |

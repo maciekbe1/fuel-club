@@ -15,8 +15,8 @@ Specyfikacja: specs/SPEC.md. Każdy krok osobno przechodzi pętlę z specs/LOOP.
 9. **P8 - CI i odbiór lokalnego MVP.** Pełne testy, docs, świeży start według README i scenariusz demonstracji. Wszystkie kryteria specyfikacji mają dowód lub jawny blocker.
 10. **P9 - hosting.** Obrazy, instrukcja i konfiguracja wdrożenia, następnie HTTPS i telefon, jeśli dostępne konto. Bez udawania ukończenia przy braku dostępu. Weryfikacja backup/restore i SSE.
 11. **P10 - opcjonalny Gemini.** Oddzielny zakres po MVP, bez zależności lokalnych testów od chmury. Pozostałe integracje: projekt, nie automatyczna rozbudowa.
-12. **P14 - regulamin i FAQ w czacie (RAG).** Po zamknięciu P11.
-    - **Dokument:** demonstracyjny regulamin zgodny z działaniem aplikacji (`specs/regulamin-v1.md`, zaakceptowany). Zasady zatwierdza właściciel; agent nie wymyśla ich jako obowiązujących. Wersja `regulamin-v1` dopiero po akceptacji całej treści; ograniczenia demo opisane jako ograniczenia demo, nie ogólne zakazy.
+12. **P14 - regulamin i FAQ w czacie (RAG).** Po zamknięciu P11. Zrealizowany 2026-11-23 ([ADR 0016](../docs/src/content/docs/decyzje/0016-regulamin-w-czacie.md)).
+    - **Dokument:** demonstracyjny regulamin zgodny z działaniem aplikacji (`apps/api/Modules/Knowledge/Documents/regulamin-v1.md`, zaakceptowany). Zasady zatwierdza właściciel; agent nie wymyśla ich jako obowiązujących. Wersja `regulamin-v1` dopiero po akceptacji całej treści; ograniczenia demo opisane jako ograniczenia demo, nie ogólne zakazy.
     - **Narzędzie:** `search_program_rules(query)` zwraca fragmenty z numerem punktu (§) i wersją dokumentu.
     - **Wyszukiwanie:** PostgreSQL, bez osobnej bazy wektorowej. `simple` + `unaccent` + `pg_trgm` to wariant do sprawdzenia, nie decyzja. Usunięcie akcentów nie rozwiązuje odmiany, więc najpierw testy na polskich pytaniach: odmiana („punktów/punkty”, „nagrody/nagrodę”) i pytania bez trafnego źródła (brak wyniku zamiast słabego trafienia).
     - **Odpowiedzi:**
@@ -31,11 +31,33 @@ Specyfikacja: specs/SPEC.md. Każdy krok osobno przechodzi pętlę z specs/LOOP.
       - pytanie bez odpowiedzi w dokumencie;
       - sprzeczna instrukcja zaszyta w dokumencie (fragment nie jest poleceniem).
 
+### Kolejność po P14 (uzgodniona 2026-11-23)
+
+1. Push i zielone CI.
+2. Evale Gemini: te same scenariusze, kilka powtórzeń; poprawność narzędzi i argumentów, izolacja, handoff, RAG; znane pudła wyszukiwania jako jawne braki. Zapisany raport jako punkt odniesienia; bez blokowania CI.
+3. P15a-d.
+4. Judge offline (rubryka, kalibracja na ręcznie ocenionej próbce), potem online (P15e).
+5. Publiczne wdrożenie. Hosting (np. Cloud Run) i dostęp do modelu (klucz API albo Vertex) to osobne decyzje.
+
+Po evalach: porównanie wyszukiwania leksykalnego z hybrydowym na tym samym zbiorze. Slack i voice na końcu.
+
+### P15 - panel LLMOps (planowane, po P14)
+
+Rozbudowa istniejącej obserwowalności, nie drugi system. Zakres: SPEC, sekcja „P15”. Kolejność:
+
+1. **P15a - kontrakt i trace tury.** ADR: identyfikacja rozmowy i zakończenia, korelacja tur, wywołań modelu (także ponowień), narzędzi i decyzji klienta. Lista dozwolonych danych, retencja i dostęp Admin. Widok osi czasu z czasami, wynikami, wersjami promptu/modelu i dostępnymi tokenami. Potwierdzenie wykonane osobnym HTTP jest powiązane z turą, nie sztucznie zagnieżdżone w zakończonym spanie.
+2. **P15b - metryki i koszty.** Mediana/p95, kroki na turę, błędy narzędzi, handoff i odmowy potwierdzenia z jawnymi mianownikami. Koszt szacowany z użycia i wersjonowanego cennika. Kryterium: testy obliczeń, niepełnych danych, ponowień oraz braku podwójnego naliczenia.
+3. **P15c - rozmowy i anomalie.** Lista rozmów z metadanymi, filtr „tylko podejrzane”, powody i przejście do trace. Wykorzystanie istniejącej kolejki przeglądu. Kryterium: izolacja ról, paginacja, poprawne powiązania i retencja, bez sekretów w API/eksporcie.
+4. **P15d - raporty offline.** Zakładka Evale: wersja zestawu, prompt/model, commit, wyniki checków i szczegóły awarii. Runner nadal korzysta z apps/api.tests/Evals; raporty jako artefakty, bez surowych rozmów w Git. Kryterium: raport sukcesu, porażki i przerwanego przebiegu; krytyczne naruszenia blokują niezależnie od pass rate.
+5. **P15e - online judge (realizacja otwartego P7c).** Ocena po zakończeniu rozmowy poza ścieżką odpowiedzi. Konfigurowalna próbka losowa i osobna próbka błędów, budżet, limity, kolejka, wersja rubryki i kalibracja ocenami człowieka. Domyślnie wyłączone bez dostawcy i zatwierdzonego zakresu danych. Kryterium: testy samplingu, budżetu, braku duplikatów ocen, błędów judge'a i braku skutków domenowych. Ocena każdej rozmowy nie jest domyślnym wymaganiem.
+
+Po każdym kroku: testy, niezależne review, dokumentacja i zapis stanu zgodnie z LOOP. Przed zapisywaniem/eksportem treści rozmów lub argumentów wymagana decyzja właściciela o polach, odbiorcy i retencji; samo dopisanie planu jej nie zastępuje. P15e opcjonalny dla lokalnego MVP; brak klucza nie blokuje P15a-d.
+
 ### Rozbicie P7
 
 - P7a: lokalne evals i metadane trace’ów, test redakcji, opcjonalny eksport OpenTelemetry do lokalnego Phoenix.
 - P7b: metryki i reguły anomalii, kolejka przeglądu, dostęp i retencja.
-- P7c: opcjonalny judge na próbce z budżetem, raportem awarii i kalibracją. Bez klucza etap raportuje tę część jako niewykonaną, nie blokuje lokalnego MVP.
+- P7c (realizacja w P15e, jedna pozycja zakresu): opcjonalny judge na próbce z budżetem, raportem awarii i kalibracją. Bez klucza etap raportuje tę część jako niewykonaną, nie blokuje lokalnego MVP.
 - Przed gromadzeniem treści rozmów lub wysyłaniem ich do zewnętrznego dostawcy uzgodnij zakres danych, odbiorcę i retencję. Domyślnie tylko metadane; pełne treści nie są automatycznie autoryzowane.
 
 ## Obowiązkowe dowody

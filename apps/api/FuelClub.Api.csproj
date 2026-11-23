@@ -27,4 +27,12 @@
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.21.0" />
     <PackageReference Include="Scalar.AspNetCore" Version="3.1.1" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Approved program rules (P14): read by the RuleFragments migrations and tests. -->
+    <EmbeddedResource
+      Include="Modules/Knowledge/Documents/*.md"
+      LogicalName="Knowledge.%(Filename).md"
+    />
+  </ItemGroup>
 </Project>

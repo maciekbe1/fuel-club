@@ -31,6 +31,8 @@ namespace FuelClub.Api.Infrastructure
             Set<Modules.Observability.SecurityEvent>();
         public DbSet<Idempotency.IdempotencyRecord> IdempotencyRecords =>
             Set<Idempotency.IdempotencyRecord>();
+        public DbSet<Modules.Knowledge.RuleFragment> RuleFragments =>
+            Set<Modules.Knowledge.RuleFragment>();
 
         /// <summary>
         /// Every tracked EF update of an offer raises its version and UpdatedAt, so a form loaded before
@@ -75,6 +77,8 @@ namespace FuelClub.Api.Infrastructure
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            // word_similarity for ranking program rule fragments (P14).
+            builder.HasPostgresExtension("pg_trgm");
             builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         }
     }

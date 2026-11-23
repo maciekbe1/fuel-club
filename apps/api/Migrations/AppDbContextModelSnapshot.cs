@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
 
@@ -20,6 +21,7 @@ namespace FuelClub.Api.Migrations
                 .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("FuelClub.Api.Infrastructure.Idempotency.IdempotencyRecord", b =>
@@ -213,6 +215,61 @@ namespace FuelClub.Api.Migrations
                             t.HasCheckConstraint("ck_assistant_turns_tool_calls", "\"ToolCalls\" >= 0");
 
                             t.HasCheckConstraint("ck_assistant_turns_total_ms", "\"TotalMs\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("FuelClub.Api.Modules.Knowledge.RuleFragment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Heading")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasMaxLength(2200)
+                        .HasColumnType("character varying(2200)");
+
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasAnnotation("Npgsql:TsVectorConfig", "simple")
+                        .HasAnnotation("Npgsql:TsVectorProperties", new[] { "SearchText" });
+
+                    b.Property<string>("Section")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SearchVector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "GIN");
+
+                    b.HasIndex("DocumentVersion", "Section")
+                        .IsUnique();
+
+                    b.ToTable("RuleFragments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RuleFragments_SearchText", "\"SearchText\" = lower(\"SearchText\")");
+
+                            t.HasCheckConstraint("CK_RuleFragments_Section", "\"Section\" ~ '^[1-9][0-9]?\\.[1-9][0-9]?$'");
                         });
                 });
 

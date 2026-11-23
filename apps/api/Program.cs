@@ -4,6 +4,7 @@ using FuelClub.Api.Infrastructure.DemoData;
 using FuelClub.Api.Infrastructure.Idempotency;
 using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Assistant;
+using FuelClub.Api.Modules.Knowledge;
 using FuelClub.Api.Modules.Loyalty;
 using FuelClub.Api.Modules.Observability;
 using FuelClub.Api.Modules.Rewards;
@@ -36,6 +37,7 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
 builder.Services.AddRewards(builder.Configuration);
+builder.Services.AddKnowledge();
 builder.Services.AddAssistant(builder.Configuration);
 builder.Services.AddSupport(builder.Configuration);
 builder.Services.AddTelemetry(builder.Configuration);

@@ -1,0 +1,2 @@
+# The approved program rules are hashed in tests: keep their bytes the same on every checkout.
+apps/api/Modules/Knowledge/Documents/*.md text eol=lf

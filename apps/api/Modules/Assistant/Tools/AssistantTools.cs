@@ -2,6 +2,7 @@ using System.Text.Json;
 using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Modules.Assistant.Chat;
 using FuelClub.Api.Modules.Assistant.Confirmation;
+using FuelClub.Api.Modules.Knowledge;
 using FuelClub.Api.Modules.Loyalty.Domain;
 using FuelClub.Api.Modules.Loyalty.Points;
 using FuelClub.Api.Modules.Loyalty.Wallet;
@@ -113,11 +114,25 @@ public sealed record CouponSummary(
 
 public sealed record ProposalData(Guid ProposalId, Guid CouponId, string OfferName);
 
+/// <summary>A point of the rules; Source is how the answer cites it ("Regulamin, §3.2").</summary>
+public sealed record RuleFragmentData(string Source, string Heading, string Text);
+
 /// <summary>
-/// The closed list of assistant tools. Every tool reads the session user's data only; none takes a
+/// Fragments of the approved rules for the question, best first; none (reason no_match) means the
+/// rules do not answer it. The text is reference data for the answer, never instructions.
+/// </summary>
+public sealed record ProgramRulesData(string Version, List<RuleFragmentData> Fragments);
+
+/// <summary>
+/// The closed list of assistant tools. Every tool reads the session user's data only, except
+/// search_program_rules, which reads the shared program rules (no account data); none takes a
 /// user argument, none mutates (the two propose_* tools only show a button). Unknown tools and bad arguments are rejected without running.
 /// </summary>
-public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
+public sealed class AssistantTools(
+    AppDbContext db,
+    ConfirmationTokens tokens,
+    ProgramRulesSearch rules
+)
 {
     public const string GetMyBalance = "get_my_balance";
     public const string ListAvailableRewards = "list_available_rewards";
@@ -126,6 +141,8 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
     public const string CompareCoupons = "compare_coupons";
     public const string ExplainPurchasePoints = "explain_purchase_points";
     public const string ProposeHandoff = "propose_handoff";
+    public const string SearchProgramRules = "search_program_rules";
+    public const int MaxRulesQueryLength = 300;
 
     public const string PointsRule =
         "Obecna zasada naliczania: 1 pkt za każdą pełną złotówkę zapłaconą po rabacie "
@@ -143,6 +160,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
         CompareCoupons,
         ExplainPurchasePoints,
         ProposeHandoff,
+        SearchProgramRules,
     ];
 
     public Task<ToolResult> ExecuteAsync(
@@ -158,6 +176,7 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             ExplainPurchasePoints => NoArguments(call) ?? ExplainAsync(context, cancellationToken),
             ListMyCoupons => CouponsAsync(call, context, cancellationToken),
             ProposeCouponActivation => ProposeAsync(call, context, cancellationToken),
+            SearchProgramRules => RulesAsync(call, cancellationToken),
             // Changes nothing (ADR 0012): the client gets a "talk to an agent" button; only its
             // press, with the consent shown, opens a case.
             ProposeHandoff => NoArguments(call)
@@ -202,7 +221,15 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
                 || property.Value.ValueKind != JsonValueKind.String
             )
                 return null;
-            values[property.Name] = property.Value.GetString()!;
+            // A lone surrogate escape ("\ud83d") cannot become a .NET string: reject the call.
+            try
+            {
+                values[property.Name] = property.Value.GetString()!;
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
         }
         return values;
     }
@@ -402,6 +429,31 @@ public sealed class AssistantTools(AppDbContext db, ConfirmationTokens tokens)
             ))
             .ToListAsync(ct);
         return new(ListMyCoupons, ToolStatus.Ok, coupons);
+    }
+
+    /// <summary>The same for every user: the rules hold no account data.</summary>
+    private async Task<ToolResult> RulesAsync(ToolCall call, CancellationToken ct)
+    {
+        var arguments = StringArguments(call.Arguments, "query");
+        if (
+            arguments is null
+            || !arguments.TryGetValue("query", out var query)
+            || query.Trim() is not { Length: > 0 and <= MaxRulesQueryLength } trimmed
+        )
+            return Reject(call.Name, "invalid_arguments");
+        var fragments = (await rules.SearchAsync(trimmed, ct))
+            .Select(m => new RuleFragmentData(
+                $"{ProgramRules.DocumentName}, §{m.Section}",
+                m.Heading,
+                m.Text
+            ))
+            .ToList();
+        return new(
+            SearchProgramRules,
+            ToolStatus.Ok,
+            new ProgramRulesData(ProgramRules.CurrentVersion, fragments),
+            Reason: fragments.Count == 0 ? "no_match" : null
+        );
     }
 
     /// <summary>Checks the coupon and issues a signed proposal. Changes nothing.</summary>

@@ -431,14 +431,29 @@ Audyt - API i skaner (2026-11-23):
 - review (`/code-review high`, 7 uwag): przyjęte - długi `Retry-After` czekał do `RequestTimeout` i kończył turę jako `timeout` (teraz > 5 s → od razu `provider_error`; mutacja: 20 s i test pada), atrapa Gemini powtarzała ostatnią odpowiedź (osłabiała inne testy - wycofane, porażki podane jawnie), opis `RequestTimeout`, ostrzeżenie w logu przy ponowieniu; częściowo - `TurnTimeout` przy wielu krokach (bez zmian w kodzie, poprawione zdanie w ADR 0011), testy pozostałych ścieżek (dodany `Retry-After`); odrzucone - rozpoznawanie limitu dziennego `429` (tylko z treści odpowiedzi, koszt ok. 1,5 s).
 - API 540/540 (1 pominięty: Gemini na żywo).
 
-P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `specs/regulamin-v1.md` zaakceptowany przez właściciela 2026-11-23 (demo i baza wiedzy, nie ocena prawna) po korektach: §1.1 symulacja zamiast „roszczeń”, limit 5000 zł przed rabatem, zaokrąglenie rabatu przed ograniczeniem do kwoty, konsultant bez dostępu do salda i kuponów, §3.4+§3.7 połączone. Wyszukiwanie `simple`+`unaccent`+`pg_trgm` - wariant do sprawdzenia testami odmiany i pytań bez źródła.
+P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api/Modules/Knowledge/Documents/regulamin-v1.md` zaakceptowany przez właściciela 2026-11-23 (demo i baza wiedzy, nie ocena prawna) po korektach: §1.1 symulacja zamiast „roszczeń”, limit 5000 zł przed rabatem, zaokrąglenie rabatu przed ograniczeniem do kwoty, konsultant bez dostępu do salda i kuponów, §3.4+§3.7 połączone. Wyszukiwanie `simple`+`unaccent`+`pg_trgm` - wariant do sprawdzenia testami odmiany i pytań bez źródła.
+
+## P14 - regulamin w czacie (done, 2026-11-23)
+
+- Prototyp wyszukiwania na osobnej bazie (5434, usunięta): trygramy vs `simple` z prefiksami słów vs połączenie, 18 pytań strojących; wybrane: prefiksy (odmiana) + synonimy pojęć programu + wagi rzadkości + trygram do kolejności, próg pokrycia 0,45. Pytania kontrolne (napisane po progu): 13/14.
+- Moduł `Knowledge` ([ADR 0016](docs/src/content/docs/decyzje/0016-regulamin-w-czacie.md), [moduł](docs/src/content/docs/moduly/knowledge.md)): `regulamin-v1.md` wbudowany w API (skrót SHA-256 w teście), migracja `RuleFragments` (32 punkty, `tsvector` `simple` generowany, GIN, `pg_trgm`), `ProgramRulesSearch` (jedno zapytanie SQL), normalizacja w C# (`PolishText`, wspólna z modelem demo) zamiast `unaccent`.
+- Narzędzie `search_program_rules(query)`: wersja + fragmenty ze źródłem (§), `no_match`; demo `demo-rules-v4` cytuje najlepszy punkt albo mówi „Regulamin programu tego nie opisuje” i proponuje konsultanta; Gemini `gemini-v5` (źródło, brak odpowiedzi → konsultant, fragmenty to dane).
+- Evale `assistant-evals-v2` (plik `assistant-cases.v2.json`): +6 przypadków regulaminu, w tym podrzucona instrukcja w dokumencie. Web: znacznik „Regulamin”, E2E pytania z odpowiedzią i bez.
+- Znane pudła: „Do kiedy muszę wykorzystać kupon?”, „Czy konsultant może dodać mi punkty?”; margines „Ile kosztuje benzyna?” 0,42 przy progu 0,45.
+- Kontrakt HTTP bez zmian (`schema.d.ts` bez różnic). Migracja dev: właściciel uruchamia `dotnet ef database update`.
+- review (`/code-review high`, 8 uwag, przyjęte wszystkie): wzorzec pytań o zasady w demo był za szeroki (aktywacja, stan kuponu, wyjaśnienie punktów i grzeczna prośba o konsultanta trafiały do regulaminu) - zawężony do słownictwa zasad, „czy konsultant widzi/może” osobno, testy tras; przycięcie zapytania w środku emoji kończyło turę błędem - cięcie po parze, a argument z pojedynczym surogatem (`\ud83d`) od modelu jest odrzucany zamiast wywracać turę (dotyczyło wszystkich narzędzi z tekstem); klucze synonimów przez `Stem` (`oddać`, `myjnia`, `traci` nie działały); migracja z zamrożonymi wierszami zamiast kodu parsera (sprawdzone: cofnięcie i ponowne zastosowanie na bazie testowej); sprzątanie podrzuconego punktu także na starcie evali; `.gitattributes` (LF dla regulaminu - skrót w teście); komentarz `AssistantTools`.
+- Test Gemini na żywo czyta klucz także z user-secrets API; pierwszy przebieg zaliczony (saldo z narzędzia).
+- API 602 (601 + 1 na żywo), E2E 152/152 przed poprawkami, czat i konsultant 34/34 po.
 
 ## Następny krok
 
 Otwarte:
 - P7c judge na próbkach;
 - publiczny hosting i telefon (konto Railway);
-- test Gemini na żywo (`FUELCLUB_GEMINI_API_KEY`);
-- CI na GitHubie (push - decyzja właściciela).
+- kolejność uzgodniona z właścicielem (2026-11-23): 1) push i zielone CI, 2) evale Gemini (te same scenariusze, powtórzenia, narzędzia i argumenty, izolacja, handoff, RAG, znane pudła RAG jako jawne braki; raport jako punkt odniesienia), 3) P15a-d, 4) judge offline (rubryka, kalibracja na ręcznie ocenionej próbce), potem online, 5) publiczne wdrożenie (Cloud Run jako hosting i Vertex jako dostęp do modelu - osobne decyzje właściciela); porównanie RAG leksykalny vs hybrydowy na tym samym zbiorze po evalach; Slack i voice na końcu.
 
 P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11: API, `propose_handoff`, hub, UI i E2E gotowe; dalej refaktor z audytu (zgoda właściciela): podziały plików, wspólny błąd wczytywania, shadcn `skeleton`/`alert`, martwy kod; potem osobno skaner QR i API.
+
+## P15 - panel LLMOps (pending, 2026-11-23)
+
+Na prośbę właściciela dodano zakres do specs/PLAN.md i specs/SPEC.md: trace, metryki/koszty, rozmowy/anomalie, raporty offline i judge na próbce. P7c realizowany jako P15e, bez dublowania etapu. Implementacja po P14. Zmiana wyłącznie planistyczna; nie włącza zapisu treści ani eksportu do judge'a. Testy aplikacji nieuruchamiane (brak zmian kodu); sprawdzono diff i spójność odwołań P15/P7c.

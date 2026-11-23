@@ -1083,6 +1083,120 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         Assert.DoesNotContain("Nie mogę", explain.Text);
     }
 
+    // ---- program rules (P14) ----
+
+    [Fact]
+    public async Task Demo_answers_a_rules_question_from_the_rules_and_cites_the_point()
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(customer.Client, "Czy punkty wygasają?");
+
+        Assert.Equal(["search_program_rules:ok"], ToolsOf(stream));
+        Assert.Contains("Punkty nie wygasają.", stream.Text);
+        Assert.Contains("Regulamin, §6.1", stream.Text);
+        Assert.Contains("regulamin-v1", stream.Text);
+        Assert.Empty(stream.Of("handoff"));
+    }
+
+    [Fact]
+    public async Task A_rules_question_without_an_answer_says_so_and_proposes_an_agent()
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(
+            customer.Client,
+            "Co regulamin mówi o płatności kartą kredytową?"
+        );
+
+        Assert.Equal(["search_program_rules:ok", "propose_handoff:ok"], ToolsOf(stream));
+        Assert.Contains("Regulamin programu tego nie opisuje", stream.Text);
+        Assert.Single(stream.Of("handoff"));
+    }
+
+    [Theory]
+    // Own data and requests keep their tools; only rule wording goes to the rules.
+    [InlineData("Czy mogę aktywować mój kupon?", "list_my_coupons:ok,propose_coupon_activation:ok")]
+    [InlineData("Czy mogę porozmawiać z konsultantem?", "propose_handoff:ok")]
+    [InlineData("Czy mam aktywne kupony?", "list_my_coupons:ok")]
+    [InlineData("Czy konsultant widzi moje saldo?", "search_program_rules:ok")]
+    [InlineData("Czy mogę cofnąć aktywację kuponu?", "search_program_rules:ok")]
+    public async Task Demo_sends_only_rule_questions_to_the_rules(string message, string tools)
+    {
+        var customer = await AccountAsync(balance: 1000);
+        await CouponAsync(customer, "Pytanie");
+
+        var stream = await ChatAsync(customer.Client, message);
+
+        Assert.Equal(tools.Split(','), ToolsOf(stream));
+    }
+
+    [Fact]
+    public async Task A_long_rules_question_is_cut_without_splitting_an_emoji()
+    {
+        var customer = await AccountAsync(balance: 10);
+        // The emoji's two UTF-16 units straddle the 300-unit cut.
+        var message = "Jakie są zasady " + new string('x', 283) + "😀 dalej";
+
+        var stream = await ChatAsync(customer.Client, message);
+
+        Assert.Equal("search_program_rules:ok", ToolsOf(stream).First());
+        Assert.Equal("done", stream.Names.Last());
+    }
+
+    [Fact]
+    public async Task The_model_gets_rule_fragments_as_data_and_bad_queries_are_rejected()
+    {
+        var calls = new Queue<ModelStep>([
+            Tool(AssistantTools.SearchProgramRules, new { }),
+            Tool(AssistantTools.SearchProgramRules, new { query = "   " }),
+            Tool(
+                AssistantTools.SearchProgramRules,
+                new { query = new string('a', AssistantTools.MaxRulesQueryLength + 1) }
+            ),
+            Tool(AssistantTools.SearchProgramRules, new { query = 5 }),
+            Tool(AssistantTools.SearchProgramRules, new { query = "punkty", userId = "x" }),
+            // A lone surrogate, as raw JSON (a serializer would replace it).
+            new ModelStep.Tool(
+                new ToolCall(
+                    AssistantTools.SearchProgramRules,
+                    JsonDocument.Parse("{\"query\":\"zasady \\ud83d\"}").RootElement.Clone()
+                )
+            ),
+            Tool(AssistantTools.SearchProgramRules, new { query = "Czy punkty wygasają?" }),
+        ]);
+        var seen = new List<ToolResult>();
+        await using var host = Host(
+            model: new ScriptedModel(
+                (context, _) =>
+                {
+                    seen.Clear();
+                    seen.AddRange(context.ToolResults);
+                    return Task.FromResult(
+                        calls.Count > 0 ? calls.Dequeue() : new ModelStep.Reply("koniec")
+                    );
+                }
+            )
+        );
+        var settings = new Dictionary<string, string?> { ["Assistant:MaxToolCalls"] = "7" };
+        await using var wider = host.WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(settings))
+        );
+        var customer = await AccountAsync(host: wider);
+
+        var stream = await ChatAsync(customer.Client, "test");
+
+        Assert.Equal(
+            [.. Enumerable.Repeat("search_program_rules:rejected", 6), "search_program_rules:ok"],
+            ToolsOf(stream)
+        );
+        var data = Assert.IsType<ProgramRulesData>(seen[^1].Data);
+        Assert.Equal("regulamin-v1", data.Version);
+        Assert.Equal("Regulamin, §6.1", data.Fragments[0].Source);
+        Assert.Equal("Ważność", data.Fragments[0].Heading);
+        Assert.Null(seen[^1].Reason);
+    }
+
     private static IEnumerable<string> ToolsOf(Stream stream) =>
         stream
             .Of("tool")

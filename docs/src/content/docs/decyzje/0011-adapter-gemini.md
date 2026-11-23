@@ -61,5 +61,5 @@ Testy sprawdzają brak id i e-maila w żądaniu oraz dokładny zestaw pól wyja�
 
 ## Konsekwencje
 
-- Odpowiedzi modelu nie są deterministyczne. Evale `assistant-evals-v1` dotyczą adaptera demo. Dla Gemini jest test na żywo `Live_gemini_answers_the_balance_from_the_tool` (zmienna `FUELCLUB_GEMINI_API_KEY`, opcjonalnie `FUELCLUB_GEMINI_MODEL`).
+- Odpowiedzi modelu nie są deterministyczne. Evale `assistant-evals-v2` dotyczą adaptera demo. Dla Gemini jest test na żywo `Live_gemini_answers_the_balance_from_the_tool` (klucz z `FUELCLUB_GEMINI_API_KEY` albo z user-secrets API `Assistant:Gemini:ApiKey`, opcjonalnie `FUELCLUB_GEMINI_MODEL`). Lokalnie z kluczem w user-secrets uruchamia się przy każdym `dotnet test` (jedna tura); w CI bez klucza jest pomijany. Pierwszy przebieg: 2026-11-23, zaliczony.
 - Bezpieczeństwo nie zależy od modelu: narzędzia czytają tylko dane sesji, a aktywacja wymaga przycisku. Prompt injection może co najwyżej zmienić tekst odpowiedzi albo wywołać odrzucone narzędzie.

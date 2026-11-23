@@ -7,6 +7,7 @@ using FuelClub.Api.Modules.Accounts;
 using FuelClub.Api.Modules.Assistant.Model;
 using FuelClub.Api.Modules.Assistant.Tools;
 using FuelClub.Api.Modules.Assistant.Tracing;
+using FuelClub.Api.Modules.Knowledge;
 using FuelClub.Api.Modules.Loyalty.Domain;
 using FuelClub.Api.Modules.Rewards.Domain;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -18,7 +19,7 @@ using Xunit.Abstractions;
 namespace FuelClub.Api.Tests.Evals;
 
 /// <summary>
-/// Runs the versioned cases from assistant-cases.v1.json against the real API and database. Every
+/// Runs the versioned cases from assistant-cases.v2.json against the real API and database. Every
 /// case also checks what must hold for any turn: nothing changed without confirmation (balance and
 /// coupons), the stream ends with exactly one done or error, and the trace row matches the stream.
 /// </summary>
@@ -26,7 +27,7 @@ namespace FuelClub.Api.Tests.Evals;
 public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output) : IAsyncLifetime
 {
     private const string Password = "Valid-Test-Password1!";
-    private const string CasesFile = "Evals/assistant-cases.v1.json";
+    private const string CasesFile = "Evals/assistant-cases.v2.json";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly Lazy<EvalSuite> Suite = new(() =>
@@ -50,7 +51,17 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         "brak-zgody",
         "awaria-dostawcy",
         "przekroczenie-limitu",
+        // P14: answers from the program rules.
+        "regulamin-punkty-po-rabacie",
+        "regulamin-aktywacja-odbior",
+        "regulamin-nagrody",
+        "regulamin-waznosc",
+        "regulamin-brak-odpowiedzi",
+        "regulamin-wstrzykniecie",
     ];
+
+    /// <summary>Not in any approved document (they stop at §9).</summary>
+    private const string PlantedSection = "99.9";
 
     private readonly List<string> _emails = [];
     private readonly string _tag = Guid.NewGuid().ToString("N")[..8];
@@ -71,7 +82,8 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         int? Balance,
         List<string>? OwnCoupons,
         bool OtherCoupon,
-        bool Offer = false
+        bool Offer = false,
+        string? RuleFragment = null
     );
 
     public sealed record EvalExpect(
@@ -86,12 +98,19 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
     public static IEnumerable<object[]> Cases() =>
         Suite.Value.Cases.Select(c => new object[] { c.Id });
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    // A point planted by a run that was killed before DisposeAsync would skew every search.
+    public Task InitializeAsync() =>
+        DbAsync(db =>
+            db.RuleFragments.Where(f => f.Section == PlantedSection).ExecuteDeleteAsync()
+        );
 
     public async Task DisposeAsync()
     {
         foreach (var email in _emails)
             await factory.DeleteTestUserAsync(email);
+        await DbAsync(db =>
+            db.RuleFragments.Where(f => f.Section == PlantedSection).ExecuteDeleteAsync()
+        );
         await DbAsync(db =>
             db.RewardOffers.Where(offer => offer.Name.Contains(_tag)).ExecuteDeleteAsync()
         );
@@ -101,7 +120,7 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
     public void Suite_is_versioned_unique_and_covers_every_required_category()
     {
         var suite = Suite.Value;
-        Assert.Equal("assistant-evals-v1", suite.Version);
+        Assert.Equal("assistant-evals-v2", suite.Version);
         Assert.Equal(suite.Cases.Count, suite.Cases.Select(c => c.Id).Distinct().Count());
         Assert.Empty(RequiredCategories.Except(suite.Cases.Select(c => c.Category)));
     }
@@ -133,6 +152,24 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                         DiscountPerLiter = 0.10m,
                         MaxLiters = 20m,
                         IsActive = true,
+                    }
+                );
+                return await db.SaveChangesAsync();
+            });
+        // A planted rules point (e.g. an instruction hidden in the document); removed after the case.
+        if (setup.RuleFragment is { } planted)
+            await DbAsync(async db =>
+            {
+                var fragment = new RuleFragmentSource(PlantedSection, "Bonus", planted);
+                db.RuleFragments.Add(
+                    new RuleFragment
+                    {
+                        Id = Guid.CreateVersion7(),
+                        DocumentVersion = ProgramRules.CurrentVersion,
+                        Section = fragment.Section,
+                        Heading = fragment.Heading,
+                        Text = fragment.Text,
+                        SearchText = ProgramRules.SearchText(fragment),
                     }
                 );
                 return await db.SaveChangesAsync();

@@ -19,15 +19,29 @@ using Microsoft.Extensions.Options;
 
 namespace FuelClub.Api.Tests;
 
-/// <summary>Runs only with a real key in FUELCLUB_GEMINI_API_KEY (calls Google, costs tokens).</summary>
+/// <summary>
+/// Runs only with a real key (calls Google, costs tokens): FUELCLUB_GEMINI_API_KEY, or the API's
+/// own user-secrets (Assistant:Gemini:ApiKey), so a key set up for the backend is not copied.
+/// </summary>
 public sealed class GeminiFactAttribute : FactAttribute
 {
     public const string KeyVariable = "FUELCLUB_GEMINI_API_KEY";
 
+    /// <summary>The UserSecretsId of FuelClub.Api.csproj.</summary>
+    private const string ApiUserSecretsId = "0f35ea41-6338-4a42-8230-460fc2432078";
+
+    public static string? Key { get; } =
+        Environment.GetEnvironmentVariable(KeyVariable) is { Length: > 0 } fromEnvironment
+            ? fromEnvironment
+            : new ConfigurationBuilder().AddUserSecrets(ApiUserSecretsId).Build()[
+                "Assistant:Gemini:ApiKey"
+            ];
+
     public GeminiFactAttribute()
     {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(KeyVariable)))
-            Skip = $"Set {KeyVariable} to run the live Gemini check.";
+        if (string.IsNullOrWhiteSpace(Key))
+            Skip =
+                $"Set {KeyVariable} or the API's user-secret Assistant:Gemini:ApiKey to run the live Gemini check.";
     }
 }
 
@@ -424,6 +438,33 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Rule_fragments_go_back_to_gemini_with_their_source_and_version()
+    {
+        var gemini = new FakeGemini(
+            (
+                HttpStatusCode.OK,
+                CallBody("search_program_rules", new { query = "Czy punkty wygasają?" }, "sig-R")
+            ),
+            (HttpStatusCode.OK, TextBody("Nie wygasają (Regulamin, §6.1)."))
+        );
+        await using var host = Host(gemini);
+        var (client, _, _) = await CustomerAsync(host, 7);
+
+        var events = await ChatAsync(client, "Czy moje punkty przepadną?");
+
+        Assert.Equal("done", events[^1].Name);
+        var response = JsonNode.Parse(gemini.Sent[1].Body)!["contents"]![2]!["parts"]![0]![
+            "functionResponse"
+        ]!;
+        Assert.Equal("search_program_rules", response["name"]!.GetValue<string>());
+        var data = response["response"]!["data"]!;
+        Assert.Equal("regulamin-v1", data["version"]!.GetValue<string>());
+        Assert.Equal("Regulamin, §6.1", data["fragments"]![0]!["source"]!.GetValue<string>());
+        // The prompt that asks for sources and for saying when the rules are silent.
+        Assert.Contains("search_program_rules", gemini.Sent[0].Body);
+    }
+
+    [Fact]
     public async Task A_transient_gemini_failure_is_retried_and_the_turn_succeeds()
     {
         var gemini = new FakeGemini(
@@ -549,7 +590,7 @@ public sealed class GeminiTests(ApiFactory factory) : IAsyncLifetime
     [GeminiFact]
     public async Task Live_gemini_answers_the_balance_from_the_tool()
     {
-        var key = Environment.GetEnvironmentVariable(GeminiFactAttribute.KeyVariable)!;
+        var key = GeminiFactAttribute.Key!;
         await using var host = factory.WithWebHostBuilder(builder =>
         {
             var model = Environment.GetEnvironmentVariable("FUELCLUB_GEMINI_MODEL");

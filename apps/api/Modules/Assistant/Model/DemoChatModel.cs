@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using FuelClub.Api.Infrastructure;
 using FuelClub.Api.Modules.Assistant.Tools;
 
 namespace FuelClub.Api.Modules.Assistant.Model;
@@ -20,7 +21,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     public string Provider => "demo";
     public string Model => "demo-rules";
-    public string PromptVersion => "demo-rules-v3";
+    public string PromptVersion => "demo-rules-v4";
     public bool Demo => true;
 
     public Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken cancellationToken)
@@ -35,8 +36,12 @@ public sealed partial class DemoChatModel : IChatModel
                     + "Punkty nalicza kasa przy tankowaniu, a wymianę zrobisz w zakładce „Oferty”."
             );
 
+        // "Czy konsultant widzi saldo?" asks how the program works; other mentions of a person
+        // ask for one.
+        var aboutPeople = PeopleQuestion().IsMatch(text);
+
         // Asking for a person: only a proposal, the button opens the case.
-        if (Handoff().IsMatch(text))
+        if (Handoff().IsMatch(text) && !aboutPeople)
             return context.ToolResults.Any(r => r.Name == AssistantTools.ProposeHandoff)
                 ? Reply(
                     intro
@@ -54,6 +59,13 @@ public sealed partial class DemoChatModel : IChatModel
                     is { } explained
                 ? Reply(intro + Describe(explained))
                 : Call(AssistantTools.ExplainPurchasePoints);
+
+        // A question about the program: answered from the approved rules (P14), not from these
+        // patterns. Only rule wording counts ("wygasa", "zasady", "cofnąć"), so a question about the
+        // user's own coupon or points still reaches its tool below. One intent per message: in
+        // "Ile mam punktów? Czy punkty wygasają?" only the rules are answered.
+        if (aboutPeople || RulesQuestion().IsMatch(text))
+            return Task.FromResult(NextRulesStep(context, intro));
 
         var done = context.ToolResults;
         // An answer to "which coupon?" continues the activation even without the keyword.
@@ -128,6 +140,49 @@ public sealed partial class DemoChatModel : IChatModel
                 + Listed
                 + string.Join("; ", list.Select(c => c.OfferName))
                 + ListEnd
+        );
+    }
+
+    /// <summary>
+    /// Searches the rules with the question; cites the best point, or says the rules do not cover it
+    /// and proposes a person.
+    /// </summary>
+    private static ModelStep NextRulesStep(ChatModelContext context, string intro)
+    {
+        var found = context.ToolResults.LastOrDefault(r =>
+            r.Name == AssistantTools.SearchProgramRules
+        );
+        if (found is null)
+        {
+            var query = context.Message.Trim();
+            if (query.Length > AssistantTools.MaxRulesQueryLength)
+            {
+                var cut = AssistantTools.MaxRulesQueryLength;
+                // Never half of a surrogate pair (an emoji on the boundary).
+                if (char.IsHighSurrogate(query[cut - 1]))
+                    cut--;
+                query = query[..cut];
+            }
+            return new ModelStep.Tool(
+                new ToolCall(AssistantTools.SearchProgramRules, Arguments(new { query }))
+            );
+        }
+        if (found.Data is ProgramRulesData { Fragments: [var best, ..] } rules)
+            return new ModelStep.Reply(
+                $"{intro}Według regulaminu: {best.Text} Źródło: {best.Source} ({rules.Version})."
+            );
+        if (found.Status != ToolStatus.Ok)
+            return new ModelStep.Reply(
+                intro + "Nie udało się sprawdzić regulaminu - spróbuj ponownie za chwilę."
+            );
+        if (context.ToolResults.All(r => r.Name != AssistantTools.ProposeHandoff))
+            return new ModelStep.Tool(
+                new ToolCall(AssistantTools.ProposeHandoff, Arguments(new { }))
+            );
+        return new ModelStep.Reply(
+            intro
+                + "Regulamin programu tego nie opisuje. Mogę przekazać pytanie konsultantowi - "
+                + "użyj przycisku „Porozmawiaj z konsultantem”."
         );
     }
 
@@ -315,23 +370,21 @@ public sealed partial class DemoChatModel : IChatModel
 
     private static JsonElement Arguments(object value) => JsonSerializer.SerializeToElement(value);
 
-    /// <summary>Lower case without Polish diacritics, so "Saldo", "salda" and "SALDO" match alike.</summary>
-    private static string Normalize(string text)
-    {
-        var decomposed = text.ToLowerInvariant()
-            .Replace('ł', 'l')
-            .Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(decomposed.Length);
-        foreach (var c in decomposed)
-            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
-                builder.Append(c);
-        return builder.ToString();
-    }
+    private static string Normalize(string text) => PolishText.Normalize(text);
 
     [GeneratedRegex(
         @"nalicz(\s|$|cie)|dopisz|dodaj\s+(mi\s+)?\d*\s*punkt|daj\s+(mi\s+)?\d*\s*punkt|odbierz|zrealizuj|wymien|kup\s+kupon|admin|zmien\s+ofert|usun"
     )]
     private static partial Regex Forbidden();
+
+    // Wording of questions about how the program works, not about the user's own data.
+    [GeneratedRegex(
+        @"regulamin|zasad|wygasa|termin|waznos|zwrot|anulow|cofn|limit|maksymal|najwiecej|jednorazow|dwoch\s+kupon|licza?\s+sie|liczon|czy\s+(dostane|dostaje)\s+punkt|jak\s+(dziala|odebrac)"
+    )]
+    private static partial Regex RulesQuestion();
+
+    [GeneratedRegex(@"czy\s+(konsultant|asystent)\w*\s+(moze|widzi|ma|zmien)")]
+    private static partial Regex PeopleQuestion();
 
     [GeneratedRegex(@"konsultant|czlowiek|pracownik|z\s+osoba|obsluga\s+klienta")]
     private static partial Regex Handoff();

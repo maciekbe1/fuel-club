@@ -16,8 +16,8 @@ FUELCLUB_TEST_DATABASE='Host=localhost;Port=5434;Database=fuelclub_test;Username
   dotnet test apps/api.tests --filter "FullyQualifiedName~AssistantEvals" --logger "console;verbosity=normal"
 ```
 
-- Każdy przypadek wypisuje wiersz `assistant-evals-v1 <id> [<kategoria>] ok: <wynik>, tools=<n>, <ms> ms`.
-- Przypadki są w `apps/api.tests/Evals/assistant-cases.v1.json`. Nowy przypadek to nowy wpis z unikalnym `id` i jedną z kategorii. Zmiana znaczenia istniejących przypadków to nowa wersja pliku.
+- Każdy przypadek wypisuje wiersz `assistant-evals-v2 <id> [<kategoria>] ok: <wynik>, tools=<n>, <ms> ms`.
+- Przypadki są w `apps/api.tests/Evals/assistant-cases.v2.json`. Nowy przypadek to nowy wpis z unikalnym `id` i jedną z kategorii. Zmiana znaczenia istniejących przypadków to nowa wersja pliku.
 - Modele skryptowe (`"model": "bad-arguments" | "provider-failure" | "tool-loop"`) są w `AssistantEvals.Scripted`.
 
 ## Ślady w Phoenix (opcjonalnie)

@@ -11,6 +11,7 @@ const TOOL_LABELS: Record<string, string> = {
   propose_handoff: "Propozycja konsultanta",
   compare_coupons: "Porównanie kuponów",
   explain_purchase_points: "Rachunek punktów",
+  search_program_rules: "Regulamin",
 };
 
 const TOOL_STATUS: Record<string, string> = {

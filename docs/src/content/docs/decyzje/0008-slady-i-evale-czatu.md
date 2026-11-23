@@ -48,7 +48,7 @@ Trzeba wiedzieć, co asystent zrobił w każdej turze: które narzędzia, z jaki
 
 ### Evale
 
-- `apps/api.tests/Evals/assistant-cases.v1.json` (wersja `assistant-evals-v1`): przypadki z kategorią, wiadomością, opcjonalnym modelem skryptowym i oczekiwaniami.
+- `apps/api.tests/Evals/assistant-cases.v1.json` (wersja `assistant-evals-v1`; od P14 `assistant-cases.v2.json`, `assistant-evals-v2` - przypadki regulaminu, [ADR 0016](/decyzje/0016-regulamin-w-czacie/)): przypadki z kategorią, wiadomością, opcjonalnym modelem skryptowym i oczekiwaniami.
 - Runner `AssistantEvals` uruchamia każdy przypadek na prawdziwym API i bazie. Sprawdza:
   - narzędzia (nazwa i stan);
   - koniec tury: dokładnie jedno `done` albo `error`;
