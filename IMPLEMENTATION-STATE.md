@@ -566,7 +566,12 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Review (`/code-review high`, 10 uwag): przyjęte 8 - wznowienie bierze wynik z manifestu i tylko dla tej samej rozmowy; dopasowanie nazwy po całych słowach z odmianą (nie „kawa” w „kawałek”), samodzielny myślnik i powitania to nie nazwa; sprawdzenie celu propozycji ze zdarzenia `confirmation` zamiast wzorca tekstu; `compare` bez przejścia odmawia; nieaktualny akapit docs; klucz w logu. Częściowo: luźniejsze dopasowanie („jedno słowo”) odrzucone - przywraca błąd v7 („SIM demo-1” pasuje do „hot dog”); zbyt ostra odmowa kończy się listą do wyboru. Pominięta: `screenshots.spec.ts` uruchamia się w `npm run e2e` - plik nie mój, nieśledzony.
 - Testy: API 689/689, E2E chat/demo/observability 40/40.
 - Porównanie kontrolowane wyboru kuponu (osobne świeże bazy, te same dane, 11 przypadków, cel z `confirmation`): v7 8/11, v8 11/11. Odtwarzalne z repo: `coupon-cases` / `coupon-cases-report` (`CouponCases.cs`), przypadki w `symulacja-ruchu.md`; miarodajne dla tych 11 przypadków, nie dla agenta.
-- Następne: ocena człowieka w arkuszu kalibracji (`human_verdict`); rubryka v2 z oceną celu działania (cel propozycji jest już w transkrypcie; argumenty innych narzędzi nie - zdarzenie `tool` ma tylko nazwę i status), „nie można ocenić” przy braku dowodu.
+- Rotacja ujawnionych sekretów demo (nowe `SIM_SECRET`, `SIM_DEMO_PASSWORD`): `reset-demo-passwords`, nowa komenda `reset-simulation-passwords`, usunięte klucze DataProtection instancji demo (sesje), restart; stare hasła 401, nowe 204. Instancja demo ma stały `Assistant:PseudonymKey` (bez niego restart psuł wznawianie - 7 rozmów `v8-same` nie do dokończenia).
+- `screenshots.spec.ts` tylko na żądanie (`npm run e2e:screenshots`).
+- Rubryka `judge-rubric-v2`: pole `target` (cel propozycji kuponu z `confirmation`; `compare_coupons` i propozycja bez zapisu - `cannot_assess`, nigdy pass). `demo-1`: losowa 35/1/4, regresje 10/10 fail. Ślepy arkusz v2 do oceny człowieka.
+- Review (`/code-review high`, 6 uwag, przyjęte wszystkie): `compare_coupons` daje `cannot_assess` także przy zapisanej propozycji (wcześniej możliwy automatyczny pass); arkusz kalibracji z kolumną `proposal_target`, `agreement` po nagłówku; procedura rotacji nie generuje nowego klucza pseudonimów; `rubricHash` przy ocenie - zmiana tekstu instrukcji ocenia od nowa; raport `coupon-cases` z sumą przypadków obu stron; walidacja `--base`. Oceny v2 i arkusz wygenerowane ponownie (te same liczby).
+- Testy: API 704/704.
+- Następne: ocena człowieka w `calibration-judge-rubric-v2-gemini-3.5-flash-lite.tsv`, potem `agreement` i analiza rozbieżności.
 
 ## Następny krok
 

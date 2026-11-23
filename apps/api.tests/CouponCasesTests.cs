@@ -58,4 +58,30 @@ public sealed class CouponCasesTests
         Assert.Contains("CMP hot dog ✗ | brak propozycji ✓ |", report);
         Assert.Contains("cmp-v7: 0/1; cmp-v8: 1/1.", report);
     }
+
+    [Fact]
+    public void A_case_missing_on_one_side_is_shown_not_dropped_or_fatal()
+    {
+        static CouponCases.Result Case(string id) => new(id, "r", "m", [], [], true, "");
+        var older = new CouponCases.ResultFile(
+            "a",
+            "demo",
+            "x",
+            DateTimeOffset.UnixEpoch,
+            [Case("1")]
+        );
+        var newer = new CouponCases.ResultFile(
+            "b",
+            "demo",
+            "x",
+            DateTimeOffset.UnixEpoch,
+            [Case("1"), Case("2")]
+        );
+
+        Assert.Contains(
+            "| 2 | r | „m” | brak propozycji | brak w przebiegu |",
+            CouponCases.Report(older, newer)
+        );
+        Assert.Contains("| brak w przebiegu |", CouponCases.Report(newer, older));
+    }
 }

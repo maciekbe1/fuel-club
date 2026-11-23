@@ -138,6 +138,7 @@ public sealed class JudgeTests : IDisposable
                         answers_question = "no",
                         grounded = "not_applicable",
                         action = "inappropriate",
+                        target = "not_applicable",
                         reason = "Podaje saldo zamiast zasad.",
                     }
                 )
@@ -171,6 +172,7 @@ public sealed class JudgeTests : IDisposable
                         answers_question = "maybe",
                         grounded = "yes",
                         action = "appropriate",
+                        target = "not_applicable",
                         reason = "x",
                     }
                 )
@@ -192,6 +194,111 @@ public sealed class JudgeTests : IDisposable
         Assert.Equal(("judge_error", "invalid_format"), (empty.Status, empty.ErrorKind));
     }
 
+    private static JudgeItem Activation(TranscriptTurn turn) =>
+        JudgeSampling.Select(
+            "r",
+            [
+                (
+                    "/x/transcripts/c00009.json",
+                    new TranscriptFile
+                    {
+                        RunId = "r",
+                        Scenario = "aktywacja",
+                        Outcome = "ended",
+                        Turns = [turn],
+                    }
+                ),
+            ],
+            random: 1,
+            errors: 1,
+            regressions: 0
+        )[0];
+
+    private static TranscriptTurn Proposed(int confirmations, params string[] proposals) =>
+        new()
+        {
+            User = "Aktywuj kupon SIM r rabat",
+            Assistant = "Proponuję aktywację kuponu.",
+            Done = true,
+            Tools = ["list_my_coupons:ok", "propose_coupon_activation:ok"],
+            Confirmations = confirmations,
+            Proposals = [.. proposals],
+            Checks = [new TurnCheck("done", true)],
+        };
+
+    private static string Grade(string target) =>
+        Answer(
+            new
+            {
+                answers_question = "yes",
+                grounded = "not_applicable",
+                action = "appropriate",
+                target,
+                reason = "Ocena.",
+            }
+        );
+
+    [Fact]
+    public async Task The_target_is_graded_from_the_recorded_offer_and_a_wrong_one_fails()
+    {
+        var item = Activation(Proposed(1, "SIM r hot dog"));
+        var judge = Judge(new FakeGemini((HttpStatusCode.OK, Grade("wrong"))));
+
+        Assert.Contains("<cel_propozycji>SIM r hot dog</cel_propozycji>", judge.Prompt(item));
+        var result = await judge.GradeAsync(
+            item,
+            new JudgeBudget(1m, Price, GeminiJudge.MaxOutputTokens),
+            default
+        );
+        Assert.Equal(("wrong", "fail"), (result.Target, result.Verdict));
+    }
+
+    [Fact]
+    public async Task Without_evidence_of_the_target_the_turn_cannot_be_assessed_never_passes()
+    {
+        // An older transcript: a proposal was made, its offer was not recorded.
+        var item = Activation(Proposed(1));
+        Assert.IsType<TargetEvidence.Missing>(item.Target);
+        var judge = Judge(new FakeGemini((HttpStatusCode.OK, Grade("correct"))));
+        Assert.DoesNotContain("<cel_propozycji>", judge.Prompt(item));
+
+        var result = await judge.GradeAsync(
+            item,
+            new JudgeBudget(1m, Price, GeminiJudge.MaxOutputTokens),
+            default
+        );
+
+        Assert.Equal(
+            (JudgeRubric.CannotAssess, JudgeRubric.CannotAssess),
+            (result.Target, result.Verdict)
+        );
+        // Another failing grade still fails; compare_coupons arguments are never recorded.
+        Assert.Equal(
+            "fail",
+            JudgeRubric.Verdict("no", "yes", "appropriate", JudgeRubric.CannotAssess)
+        );
+        Assert.IsType<TargetEvidence.Missing>(
+            JudgeRubric.Evidence(
+                new TranscriptTurn { User = "40 l", Tools = ["compare_coupons:ok"] }
+            )
+        );
+        Assert.IsType<TargetEvidence.None>(
+            JudgeRubric.Evidence(
+                new TranscriptTurn { User = "§", Tools = ["search_program_rules:ok"] }
+            )
+        );
+    }
+
+    [Fact]
+    public async Task A_recorded_target_the_judge_calls_not_applicable_is_a_judge_error()
+    {
+        var item = Activation(Proposed(0));
+        Assert.Equal([], Assert.IsType<TargetEvidence.Recorded>(item.Target).Offers);
+        var result = await Judge(new FakeGemini((HttpStatusCode.OK, Grade("not_applicable"))))
+            .GradeAsync(item, new JudgeBudget(1m, Price, GeminiJudge.MaxOutputTokens), default);
+        Assert.Equal(("judge_error", "invalid_format"), (result.Status, result.ErrorKind));
+    }
+
     [Fact]
     public async Task The_cost_limit_stops_calls_and_a_rerun_spends_nothing_twice()
     {
@@ -201,6 +308,7 @@ public sealed class JudgeTests : IDisposable
                 answers_question = "yes",
                 grounded = "yes",
                 action = "appropriate",
+                target = "not_applicable",
                 reason = "Dobrze.",
             }
         );
@@ -259,6 +367,7 @@ public sealed class JudgeTests : IDisposable
                     answers_question = "yes",
                     grounded = "yes",
                     action = "appropriate",
+                    target = "not_applicable",
                     reason = "Dobrze.",
                 }
             )
@@ -364,6 +473,105 @@ public sealed class JudgeTests : IDisposable
         Assert.Equal(1, a.Matrix[1, 0]);
         // observed 0.75, chance (1*2 + 3*2) / 16 = 0.5 -> kappa 0.5
         Assert.Equal(0.5, a.Kappa!.Value, 6);
+    }
+
+    [Fact]
+    public void A_v2_sheet_shows_the_target_and_cannot_assess_grades_are_left_out()
+    {
+        static JudgeResult R(string id, string verdict) =>
+            new()
+            {
+                Id = id,
+                Sample = "random",
+                Scenario = "s",
+                Rubric = JudgeRubric.Version,
+                Model = "m",
+                Status = "judged",
+                Verdict = verdict,
+            };
+        var sheet = string.Join(
+            '\n',
+            "id\tscenario\tquestion\tanswer\ttools\tproposal_target\thuman_verdict\thuman_note",
+            "a\ts\tq\tx\t\tSIM r hot dog\tfail\t",
+            "b\ts\tq\tx\t\tnie można ocenić\tpass\t"
+        );
+
+        var agreement = Calibration.Compare(
+            sheet,
+            [R("a", "fail"), R("b", JudgeRubric.CannotAssess)],
+            "m"
+        );
+
+        Assert.Equal((1, 1), (agreement.Graded, agreement.Agree));
+        Assert.Equal(
+            "SIM r hot dog",
+            JudgeRubric.Describe(new TargetEvidence.Recorded(["SIM r hot dog"]))
+        );
+    }
+
+    [Fact]
+    public void A_comparison_in_the_turn_makes_even_a_recorded_proposal_unassessable()
+    {
+        var turn = Proposed(1, "SIM r rabat");
+        turn.Tools.Add("compare_coupons:ok");
+
+        Assert.Equal(
+            "compare_coupons",
+            Assert.IsType<TargetEvidence.Missing>(JudgeRubric.Evidence(turn)).Tool
+        );
+    }
+
+    [Fact]
+    public async Task A_grade_under_another_instruction_text_is_graded_again()
+    {
+        var items = Items();
+        Directory.CreateDirectory(JudgeRun.Folder(_directory));
+        Directory.CreateDirectory(Path.Combine(_directory, "transcripts"));
+        foreach (var item in items)
+            await File.WriteAllTextAsync(
+                Path.Combine(_directory, "transcripts", item.Id.Split('#')[0] + ".json"),
+                "{}"
+            );
+        var stale = items
+            .Select(i => new JudgeResult
+            {
+                Id = i.Id,
+                Sample = i.Sample,
+                Scenario = i.Scenario,
+                Rubric = JudgeRubric.Version,
+                RubricHash = "older-text",
+                Model = "judge-model",
+                Status = "judged",
+                Verdict = "pass",
+            })
+            .ToList();
+        await File.WriteAllTextAsync(
+            JudgeRun.ResultsPath(_directory),
+            JsonSerializer.Serialize(stale, JudgeRun.ReportJson)
+        );
+        var good = Answer(
+            new
+            {
+                answers_question = "no",
+                grounded = "not_applicable",
+                action = "inappropriate",
+                target = "not_applicable",
+                reason = "Źle.",
+            }
+        );
+        var fake = new FakeGemini([.. items.Select(_ => (HttpStatusCode.OK, good))]);
+
+        var (results, _) = await JudgeRun.RunAsync(
+            _directory,
+            items,
+            Judge(fake),
+            new JudgeBudget(1m, Price, GeminiJudge.MaxOutputTokens),
+            default
+        );
+
+        Assert.Equal(items.Count, fake.Sent.Count);
+        Assert.Equal(items.Count, results.Count);
+        Assert.All(results, r => Assert.Equal(JudgeRubric.InstructionsHash, r.RubricHash));
     }
 
     public void Dispose()

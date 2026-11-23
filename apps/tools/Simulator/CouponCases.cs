@@ -224,11 +224,19 @@ public static class CouponCases
             $"| # | Przypadek | Wiadomość | Oczekiwane | {before.RunId} | {after.RunId} |"
         );
         text.AppendLine("| --- | --- | --- | --- | --- | --- |");
-        foreach (var b in before.Results)
+        // Every case of either side; one missing on a side says so instead of failing.
+        var ids = before
+            .Results.Select(r => r.Case)
+            .Union(after.Results.Select(r => r.Case))
+            .OrderBy(id => int.TryParse(id, out var n) ? n : int.MaxValue)
+            .ThenBy(id => id, StringComparer.Ordinal);
+        foreach (var id in ids)
         {
-            var a = after.Results.Single(r => r.Case == b.Case);
+            var b = before.Results.SingleOrDefault(r => r.Case == id);
+            var a = after.Results.SingleOrDefault(r => r.Case == id);
+            var known = b ?? a!;
             text.AppendLine(
-                $"| {b.Case} | {b.Rule} | „{b.Message}” | {Names(b.Expected)} | {Names(b.Proposals)} {(b.Ok ? "✓" : "✗")} | {Names(a.Proposals)} {(a.Ok ? "✓" : "✗")} |"
+                $"| {id} | {known.Rule} | „{known.Message}” | {Names(known.Expected)} | {Cell(b)} | {Cell(a)} |"
             );
         }
         text.AppendLine();
@@ -237,6 +245,11 @@ public static class CouponCases
         );
         return text.ToString();
     }
+
+    private static string Cell(Result? result) =>
+        result is null
+            ? "brak w przebiegu"
+            : $"{Names(result.Proposals)} {(result.Ok ? "✓" : "✗")}";
 
     private static string Names(IReadOnlyCollection<string> names) =>
         names.Count == 0 ? "brak propozycji" : string.Join(", ", names);

@@ -28,6 +28,7 @@ export SIM_DEMO_PASSWORD='$(openssl rand -base64 18 | tr -d '/+=')Aa1!'
 export SIM_CASHIER_EMAIL='kasjer@demo.fuelclub.test'
 export SIM_ADMIN_EMAIL='admin@demo.fuelclub.test'
 export SIM_DEMO_DATABASE='Host=localhost;Port=5435;Database=fuelclub_demo;Username=fuelclub_demo;Password=fuelclub_demo'
+export SIM_PSEUDONYM_KEY='$(openssl rand -base64 32)'
 EOF2
 ```
 
@@ -36,7 +37,7 @@ EOF2
 
 ### Rotacja po ujawnieniu sekretu
 
-Zmiana `demo.env` nie zmienia haseł istniejących kont. Po wygenerowaniu nowych wartości (jak wyżej, bez wypisywania):
+Zmiana `demo.env` nie zmienia haseł istniejących kont. Zmień w pliku tylko linie `SIM_SECRET` i `SIM_DEMO_PASSWORD` (wartości jak wyżej, bez wypisywania) - nie generuj pliku od nowa: nowy `SIM_PSEUDONYM_KEY` odciąłby rozmowy sprzed restartu (`conversation_not_found`). Potem:
 
 ```sh
 source .simulation/demo.env    # nowe SIM_SECRET i SIM_DEMO_PASSWORD
@@ -62,11 +63,13 @@ ConnectionStrings__DefaultConnection="$SIM_DEMO_DATABASE" \
 Simulation__Enabled=true Simulation__RunId=pilot-1 \
 Assistant__Provider=demo \
 DemoAccounts__Enabled=true DemoAccounts__Password="$SIM_DEMO_PASSWORD" \
+Assistant__PseudonymKey="$SIM_PSEUDONYM_KEY" \
 RateLimits__AuthPermitLimit=200 \
 dotnet run --project apps/api --no-launch-profile --urls http://localhost:5301
 ```
 
 - `Assistant__Provider=demo` jawnie: user-secrets Development mogą ustawiać Gemini.
+- `Assistant__PseudonymKey` stały: bez niego klucz pseudonimów jest losowany przy każdym starcie, a po restarcie rozmowy sprzed niego przestają być „własne” konta (`conversation_not_found` przy czacie i zgłoszeniu) - wznowienie rozmów przebiegu się nie uda.
 - `RateLimits__AuthPermitLimit=200` - wyższy limit logowań tej instancji (konfiguracja serwera). Domyślnie 10/min na IP: 200 kont to ok. 40 minut samych logowań.
 
 ## Populacja kont
@@ -171,15 +174,18 @@ dotnet run --project apps/tools/Simulator -- agreement --run demo-1 [--model gem
 ```
 
 - Klucz: `GEMINI_API_KEY` albo user-secret API `Assistant:Gemini:ApiKey`; w nagłówku, nigdy w URL ani w logu.
-- Rubryka `judge-rubric-v1` (kod: `apps/tools/Simulator/Judge.cs`). Judge dostaje regulamin, wcześniejsze tury rozmowy (do 6), pytanie, nazwy i stany narzędzi, propozycję konsultanta i odpowiedź. Ocenia trzy rzeczy w ustrukturyzowanym JSON: `answers_question` (yes/partly/no), `grounded` (yes/no/not_applicable - zgodność z regulaminem i przywołanym paragrafem), `action` (appropriate/inappropriate) oraz `reason`. Werdykt liczy symulator stałą regułą: `pass`, gdy odpowiada na pytanie, nie przeczy regulaminowi i działanie pasuje.
+- Rubryka `judge-rubric-v2` (kod: `apps/tools/Simulator/Judge.cs`; v1 bez pola `target`, wyniki v1 zostają w swoim pliku). Judge dostaje regulamin, wcześniejsze tury rozmowy (do 6), pytanie, nazwy i stany narzędzi, propozycję konsultanta, cel propozycji aktywacji (gdy jest zapisany) i odpowiedź. Ocenia w ustrukturyzowanym JSON: `answers_question` (yes/partly/no), `grounded` (yes/no/not_applicable - zgodność z regulaminem i przywołanym paragrafem), `action` (appropriate/inappropriate - rodzaj działania), `target` (correct/wrong/not_applicable - cel działania) oraz `reason`.
+- Dowód celu ustala symulator, nie judge: propozycja aktywacji - nazwy ofert ze zdarzenia `confirmation` zapisane w transkrypcie (judge ocenia correct/wrong, także brak propozycji); propozycja bez zapisanego celu (transkrypt sprzed zapisu) i `compare_coupons` (litry i kwota nie są w żadnym zdarzeniu) - `cannot_assess` bez względu na odpowiedź judge'a; pozostałe tury - `not_applicable`. `compare_coupons` w turze daje `cannot_assess` także przy zapisanej propozycji. Zapytanie `search_program_rules` nie jest celem: jego skutek ocenia `grounded`. Publiczne SSE nie dostaje argumentów narzędzi na potrzeby judge'a.
+- Werdykt liczy symulator stałą regułą: `fail`, gdy odpowiedź nie odpowiada w pełni, przeczy regulaminowi, działanie nie pasuje albo cel jest zły; inaczej `cannot_assess`, gdy celu nie da się ocenić (nigdy automatyczny pass); inaczej `pass`.
 - Wyników narzędzi konta (saldo, kupony) judge nie widzi - nie ocenia liczb z konta.
 - Próbki osobno: **regresje** (scenariusze znanych pomyłek), **losowa** (pozostałe tury, szacuje udział poprawnych) i **błędów** (tury niezgodne ze sprawdzeniami regułowymi, niewylosowane). Wybór deterministyczny w przebiegu; tylko tury zakończone `done`, bez rozmów `end-pending`.
 - **Awaria judge'a ≠ ocena negatywna**: błąd HTTP, timeout (30 s), błąd transportu albo odpowiedź poza schematem to `judge_error` z rodzajem, liczony osobno i oceniany ponownie przy następnym uruchomieniu.
 - **Twardy limit kosztu** (`--max-usd`, domyślnie 0,20 USD): wywołanie idzie tylko, gdy jego najgorszy przypadek (instrukcje i prompt: znaki/2 tokenów wejścia, 2048 wyjścia) mieści się w limicie; użycie, którego nie da się odczytać jako liczby, też liczone jak najgorszy przypadek; wywołanie bez danych o użyciu liczone jak najgorszy przypadek. Koszt z cennika `gemini-3.5-flash-lite-standard-2026-11-23` (szacunek), osobno od kosztu tur w panelu.
-- Ponowne uruchomienie nie ocenia drugi raz tur już ocenionych tą rubryką i modelem.
-- Pliki w `.simulation/<run>/judge/` (poza Gitem, usuwane przez `prune` po 14 dniach): `results-judge-rubric-v1.json` (oceny wszystkich modeli), `report-judge.md`, `calibration-judge-rubric-v1-<model>.tsv` i `report-calibration-<model>.md`. Oceny tur, których transkrypt usunięto, wypadają przy następnym wczytaniu - przepisanie pliku nie przedłuża ich retencji.
+- Ponowne uruchomienie nie ocenia drugi raz tur już ocenionych tą rubryką, tym samym tekstem instrukcji (`rubricHash` przy ocenie) i modelem; ocena pod innym tekstem jest powtarzana.
+- Arkusz kalibracji v2 ma kolumnę `proposal_target` (zapisany cel propozycji albo „nie można ocenić”) - człowiek widzi ten sam dowód co judge; `agreement` szuka `human_verdict` po nagłówku.
+- Pliki w `.simulation/<run>/judge/` (poza Gitem, usuwane przez `prune` po 14 dniach): `results-<rubryka>.json` (oceny wszystkich modeli), `report-judge.md`, `calibration-<rubryka>-<model>.tsv` i `report-calibration-<model>.md`. Oceny tur, których transkrypt usunięto, wypadają przy następnym wczytaniu - przepisanie pliku nie przedłuża ich retencji.
 - Raport liczy każdą ocenioną turę w jej bieżącej próbce (zmiana `--random`/`--errors` przenosi turę, nie dubluje jej). Konsola podaje oceny, awarie judge'a i pominięcia przez limit osobno.
-- Raport: liczebności i pass/fail każdej próbki, awarie judge'a, koszt, zestawienie z wynikiem sprawdzeń regułowych i do 10 rozbieżności z uzasadnieniem judge'a.
+- Raport: liczebności i pass/fail/nie można ocenić każdej próbki (zgodność z regułami i arkusz kalibracji tylko z pass/fail), awarie judge'a, koszt, zestawienie z wynikiem sprawdzeń regułowych i do 10 rozbieżności z uzasadnieniem judge'a.
 
 ### Kalibracja
 
@@ -249,8 +255,10 @@ Judge `demo-1` (P16d, `gemini-3.5-flash-lite`, rubryka v1; odpowiedzi adaptera d
 - Arkusz kalibracji `calibration-judge-rubric-v1-gemini-3.5-flash-lite.tsv`: 30 tur (11 fail, 19 pass), bez ocen człowieka. Ponowne uruchomienie judge'a: 0 nowych wywołań, 0 USD.
 - Przegląd pomocniczy drugim modelem (nie kalibracja): ten arkusz wypełnił agent, który projektował rubrykę i znał część wyników judge'a. Werdykty 30/30 (kappa 1,00) nie potwierdzają zgodności z człowiekiem; próbka ma ok. 16 różnych przypadków i była dobrana według werdyktów judge'a. Różnice w ocenach cząstkowych: przy złym kuponie judge uznał działanie za właściwe („właściwe narzędzie”), a fail dał tylko za częściową odpowiedź - rubryka v1 nie ocenia celu działania; przy skardze `grounded yes` bez paragrafu; jedno uzasadnienie przekręca odpowiedź. Plik `report-secondary-review.md` w folderze judge'a.
 
+Judge `demo-1`, rubryka v2 (te same 50 tur, transkrypty v7 - bez zapisanego celu propozycji): losowa 40 - 35 pass, 1 fail, 4 nie można ocenić (`porownanie`, argumenty `compare_coupons`); regresje 10/10 fail; 0 awarii; 0,0416 USD. `c01339#0` (zły kupon): cel `cannot_assess` (brak dowodu w transkrypcie v7), fail za `answers_question: partly`; uzasadnienie nadal mówi o „ID”, choć klient podał nazwę. Pierwsza wersja instrukcji v2 nie mówiła, jak ocenić „brak propozycji” - judge odpowiadał `not_applicable` (awaria formatu); doprecyzowana, wszystkie tury ocenione od nowa. Ślepy arkusz `calibration-judge-rubric-v2-gemini-3.5-flash-lite.tsv`: 30 tur, 17 różnych odpowiedzi, czeka na ocenę człowieka.
+
 Przejście `demo-1 / v8-same` (`demo-rules-v8`, test techniczny):
-- 1453/1460 rozmów, 2104 tury z `done`, 0 błędów strumienia. 7 rozmów z przekazaniem stanęło na limicie zgłoszeń (5 na konto na godzinę, te same konta co w `demo-1`): symulator przeczekiwał `Retry-After` do godziny - poprawione (limit 60 s, wznowienie bez powtarzania tur); 7 pozostaje do ponowienia po oknie limitu.
+- 1453/1460 rozmów (raport jawnie niepełny), 2104 tury z `done`, 0 błędów strumienia. 7 rozmów z przekazaniem stanęło na limicie zgłoszeń (5 na konto na godzinę, te same konta co w `demo-1`): symulator przeczekiwał `Retry-After` do godziny - poprawione (limit 60 s, wznowienie bez powtarzania tur); Ponowienie po oknie limitu: `400 support.validation_failed` (`conversationId` nieznana) - instancja nie miała stałego `Assistant:PseudonymKey`, restart zmienił pseudonimy i rozmowy sprzed niego przestały być „własne”. Tych 7 rozmów nie da się dokończyć jako tych samych; instancja ma teraz stały klucz.
 - Porównanie: 2043 → 2050 z 2113 tur zgodnych, 7 poprawionych w `aktywacja`. 6 z nich to efekt danych (kupon „hot dog” aktywowany w `demo-1`, więc klient nie ma kuponów), zachowanie v8 widać tylko w 1 (`c01315`). 0 aktywacji: kupony do aktywacji zostały tylko tam, gdzie `demo-1` nie potwierdził, a decyzje są te same. Dlatego to nie jest porównanie jakości.
 
 Wybór kuponu v7/v8 - kontrolowane porównanie (porównanie jakości dla tej poprawki): dwie instancje na osobnych świeżych bazach, te same dane z jednego skryptu (4 oferty, 3 konta: jeden kupon, cztery, żaden), 11 przypadków, wynik z celu propozycji w zdarzeniu `confirmation`. v7 8/11, v8 11/11. Błędy v7: jedyny kupon podstawiony za nazwany, którego klient nie ma (2 przypadki, błąd z `demo-1`), i dopytanie zamiast propozycji przy „kawa duża”, gdy klient ma też „kawa”. Zestaw ułożył autor poprawki pod regułę właściciela; adapter demo, nie Gemini. Odtworzenie: [Wybór kuponu - kontrolowane porównanie](#wybór-kuponu---kontrolowane-porównanie).

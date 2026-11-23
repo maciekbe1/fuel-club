@@ -95,6 +95,8 @@ if (args[0] == "compare")
 if (args[0] == "coupon-cases-report")
 {
     var baseRun = options.Get("base") ?? throw new ArgumentException("--base <run> is required");
+    if (!Regex.IsMatch(baseRun, "^[a-z0-9][a-z0-9-]{0,39}$"))
+        throw new ArgumentException("--base: 1-40 characters a-z, 0-9, '-'");
     var load = (string id) =>
         System.Text.Json.JsonSerializer.Deserialize<CouponCases.ResultFile>(
             File.ReadAllText(Path.Combine(".simulation", id, "coupon-cases.json")),

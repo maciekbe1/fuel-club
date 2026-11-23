@@ -15,7 +15,7 @@ namespace FuelClub.Simulator;
 /// </summary>
 public static class JudgeRubric
 {
-    public const string Version = "judge-rubric-v1";
+    public const string Version = "judge-rubric-v2";
 
     public const string Instructions = """
         Oceniasz odpowiedzi asystenta programu lojalnościowego stacji paliw Fuel Club.
@@ -41,17 +41,89 @@ public static class JudgeRubric
           innym albo asystent dopowiada zasady spoza regulaminu; "not_applicable", gdy odpowiedź
           nie podaje zasad programu;
         - action: "appropriate", gdy wybór działania (narzędzie, dopytanie, propozycja konsultanta,
-          odmowa) pasuje do pytania, inaczej "inappropriate".
+          odmowa) pasuje do pytania, inaczej "inappropriate";
+        - target: cel działania. Gdy jest <cel_propozycji> (oferty, których aktywację asystent
+          zaproponował, zapisane z systemu, nie z tekstu): "correct", gdy każda propozycja dotyczy
+          tego, co klient wskazał (nazwa, ID), albo klient prosił ogólnie o aktywację; "wrong", gdy
+          asystent zaproponował inny kupon niż wskazany - także gdy klient wskazanego nie ma. Gdy
+          <cel_propozycji> to „brak propozycji aktywacji”: "correct", gdy nie należało proponować
+          (klient nie ma wskazanego kuponu, wskazanie niejasne, cudze ID), "wrong", gdy należało
+          zaproponować wskazany kupon. Bez <cel_propozycji>: "not_applicable".
         reason: jedno-dwa zdania po polsku - konkretnie, co jest nie tak albo dlaczego dobrze.
         """;
 
-    /// <summary>The verdict comes from the three grades by a fixed rule, not from the judge.</summary>
-    public static string Verdict(string answersQuestion, string grounded, string action) =>
-        answersQuestion == "yes" && grounded != "no" && action == "appropriate" ? "pass" : "fail";
+    /// <summary>
+    /// The verdict comes from the grades by a fixed rule, not from the judge. A target that cannot
+    /// be assessed (no evidence) never passes: any other failing grade still fails the turn.
+    /// </summary>
+    public static string Verdict(
+        string answersQuestion,
+        string grounded,
+        string action,
+        string target
+    ) =>
+        answersQuestion != "yes" || grounded == "no" || action != "appropriate" || target == "wrong"
+            ? "fail"
+        : target == CannotAssess ? CannotAssess
+        : "pass";
+
+    public const string CannotAssess = "cannot_assess";
+
+    /// <summary>
+    /// The instructions' fingerprint, stored with each grade: a grade made under another text is
+    /// graded again, so one version never mixes two texts.
+    /// </summary>
+    public static readonly string InstructionsHash = Convert.ToHexStringLower(
+        SHA256.HashData(Encoding.UTF8.GetBytes(Instructions))
+    )[..12];
+
+    /// <summary>What the target evidence is, in words (prompt and calibration sheet).</summary>
+    public static string Describe(TargetEvidence? evidence) =>
+        evidence switch
+        {
+            TargetEvidence.Recorded { Offers.Count: 0 } => "brak propozycji aktywacji",
+            TargetEvidence.Recorded r => string.Join("; ", r.Offers),
+            TargetEvidence.Missing m => $"nie można ocenić ({m.Tool} bez zapisu celu)",
+            _ => "",
+        };
 
     public static readonly string[] AnswersQuestion = ["yes", "partly", "no"];
     public static readonly string[] Grounded = ["yes", "no", "not_applicable"];
     public static readonly string[] Action = ["appropriate", "inappropriate"];
+    public static readonly string[] Target = ["correct", "wrong", "not_applicable"];
+
+    /// <summary>
+    /// What the target can be graded from, decided by the simulator, not the judge. A coupon
+    /// proposal has its offer recorded (confirmation event). compare_coupons depends on liters and
+    /// amount, which no event carries: cannot be assessed. A rules search is not a target - what it
+    /// found is graded as grounded.
+    /// </summary>
+    public static TargetEvidence Evidence(TranscriptTurn turn)
+    {
+        // Any unrecorded part makes the whole target unassessable, a recorded proposal included.
+        if (turn.Tools.Any(t => Named(t, "compare_coupons")))
+            return new TargetEvidence.Missing("compare_coupons");
+        if (turn.Tools.Any(t => Named(t, "propose_coupon_activation")))
+            return turn.Proposals.Count == turn.Confirmations
+                ? new TargetEvidence.Recorded([.. turn.Proposals])
+                : new TargetEvidence.Missing("propose_coupon_activation");
+        return new TargetEvidence.None();
+    }
+
+    private static bool Named(string tool, string name) =>
+        tool == name || tool.StartsWith(name + ":", StringComparison.Ordinal);
+}
+
+public abstract record TargetEvidence
+{
+    /// <summary>No action with a target in this turn.</summary>
+    public sealed record None : TargetEvidence;
+
+    /// <summary>Offers proposed for activation (empty: the tool ran, nothing was proposed).</summary>
+    public sealed record Recorded(IReadOnlyList<string> Offers) : TargetEvidence;
+
+    /// <summary>An action whose target is not recorded.</summary>
+    public sealed record Missing(string Tool) : TargetEvidence;
 }
 
 /// <summary>One assistant turn to grade, with the conversation before it.</summary>
@@ -65,7 +137,8 @@ public sealed record JudgeItem(
     string User,
     string Assistant,
     IReadOnlyList<string> Tools,
-    bool Handoff
+    bool Handoff,
+    TargetEvidence? Target = null
 );
 
 public sealed class JudgeResult
@@ -76,6 +149,7 @@ public sealed class JudgeResult
     public bool Regression { get; init; }
     public bool RuleChecksOk { get; init; }
     public required string Rubric { get; init; }
+    public string? RubricHash { get; init; }
     public required string Model { get; init; }
 
     /// <summary>judged, or judge_error (the judge failed; says nothing about the agent).</summary>
@@ -84,6 +158,7 @@ public sealed class JudgeResult
     public string? AnswersQuestion { get; init; }
     public string? Grounded { get; init; }
     public string? Action { get; init; }
+    public string? Target { get; init; }
     public string? Verdict { get; init; }
     public string? Reason { get; init; }
     public int? InputTokens { get; init; }
@@ -165,7 +240,8 @@ public static class JudgeSampling
                         turn.User,
                         turn.Assistant,
                         turn.Tools,
-                        turn.Handoff
+                        turn.Handoff,
+                        JudgeRubric.Evidence(turn)
                     )
                 );
             }
@@ -213,6 +289,8 @@ public sealed class GeminiJudge(HttpClient http, string apiKey, string model, st
         text.AppendLine(
             $"<propozycja_konsultanta>{(item.Handoff ? "tak" : "nie")}</propozycja_konsultanta>"
         );
+        if (item.Target is TargetEvidence.Recorded recorded)
+            text.AppendLine($"<cel_propozycji>{JudgeRubric.Describe(recorded)}</cel_propozycji>");
         text.AppendLine($"<odpowiedz>{item.Assistant}</odpowiedz>");
         return text.ToString();
     }
@@ -310,16 +388,35 @@ public sealed class GeminiJudge(HttpClient http, string apiKey, string model, st
             var grounded = grade.GetProperty("grounded").GetString();
             var action = grade.GetProperty("action").GetString();
             var reason = grade.GetProperty("reason").GetString();
+            var graded = grade.GetProperty("target").GetString();
             if (
                 answers is null
                 || grounded is null
                 || action is null
+                || graded is null
                 || !JudgeRubric.AnswersQuestion.Contains(answers)
                 || !JudgeRubric.Grounded.Contains(grounded)
                 || !JudgeRubric.Action.Contains(action)
+                || !JudgeRubric.Target.Contains(graded)
                 || string.IsNullOrWhiteSpace(reason)
             )
                 return Failed(item, "invalid_format", input, output, cost);
+            // The evidence decides whether the judge's target counts at all.
+            string target;
+            switch (item.Target)
+            {
+                case TargetEvidence.Recorded when graded == "not_applicable":
+                    return Failed(item, "invalid_format", input, output, cost);
+                case TargetEvidence.Recorded:
+                    target = graded;
+                    break;
+                case TargetEvidence.Missing:
+                    target = JudgeRubric.CannotAssess;
+                    break;
+                default:
+                    target = "not_applicable";
+                    break;
+            }
             return new JudgeResult
             {
                 Id = item.Id,
@@ -328,12 +425,14 @@ public sealed class GeminiJudge(HttpClient http, string apiKey, string model, st
                 Regression = item.Regression,
                 RuleChecksOk = item.RuleChecksOk,
                 Rubric = JudgeRubric.Version,
+                RubricHash = JudgeRubric.InstructionsHash,
                 Model = model,
                 Status = "judged",
                 AnswersQuestion = answers,
                 Grounded = grounded,
                 Action = action,
-                Verdict = JudgeRubric.Verdict(answers, grounded, action),
+                Target = target,
+                Verdict = JudgeRubric.Verdict(answers, grounded, action, target),
                 Reason = reason.Length <= 400 ? reason : reason[..400],
                 InputTokens = input,
                 OutputTokens = output,
@@ -367,6 +466,7 @@ public sealed class GeminiJudge(HttpClient http, string apiKey, string model, st
             Regression = item.Regression,
             RuleChecksOk = item.RuleChecksOk,
             Rubric = JudgeRubric.Version,
+            RubricHash = JudgeRubric.InstructionsHash,
             Model = model,
             Status = "judge_error",
             ErrorKind = kind,
@@ -411,13 +511,21 @@ public sealed class GeminiJudge(HttpClient http, string apiKey, string model, st
                 ["answers_question"] = Choice(JudgeRubric.AnswersQuestion),
                 ["grounded"] = Choice(JudgeRubric.Grounded),
                 ["action"] = Choice(JudgeRubric.Action),
+                ["target"] = Choice(JudgeRubric.Target),
                 ["reason"] = new JsonObject { ["type"] = "STRING" },
             },
-            ["required"] = new JsonArray("answers_question", "grounded", "action", "reason"),
+            ["required"] = new JsonArray(
+                "answers_question",
+                "grounded",
+                "action",
+                "target",
+                "reason"
+            ),
             ["propertyOrdering"] = new JsonArray(
                 "answers_question",
                 "grounded",
                 "action",
+                "target",
                 "reason"
             ),
         };
@@ -491,8 +599,14 @@ public static class JudgeRun
         CancellationToken ct
     )
     {
+        // Errors and grades under another instruction text are graded again.
         var results = LoadResults(runFolder)
-            .Where(r => !(r.Status == "judge_error" && r.Model == judge.Model))
+            .Where(r =>
+                !(
+                    r.Model == judge.Model
+                    && (r.Status == "judge_error" || r.RubricHash != JudgeRubric.InstructionsHash)
+                )
+            )
             .ToList();
         var done = results.Where(r => r.Model == judge.Model).Select(r => r.Id).ToHashSet();
         var skipped = 0;
@@ -540,17 +654,18 @@ public static class JudgeRun
         );
         text.AppendLine();
         text.AppendLine(
-            "| Próbka | Tury | Ocenione | Pass | Fail | Awaria judge'a | Zgodność z regułami (ocenione) |"
+            "| Próbka | Tury | Ocenione | Pass | Fail | Nie można ocenić | Awaria judge'a | Zgodność z regułami (pass/fail) |"
         );
-        text.AppendLine("| --- | --- | --- | --- | --- | --- | --- |");
+        text.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
         foreach (var sample in new[] { "random", "errors", "regression" })
         {
             var inSample = items.Count(i => i.Sample == sample);
             var rows = mine.Where(r => sampleOf[r.Id] == sample).ToList();
             var judged = rows.Where(r => r.Status == "judged").ToList();
-            var agree = judged.Count(r => (r.Verdict == "pass") == r.RuleChecksOk);
+            var decided = judged.Where(r => r.Verdict is "pass" or "fail").ToList();
+            var agree = decided.Count(r => (r.Verdict == "pass") == r.RuleChecksOk);
             text.AppendLine(
-                $"| {sample} | {inSample} | {judged.Count} | {judged.Count(r => r.Verdict == "pass")} | {judged.Count(r => r.Verdict == "fail")} | {rows.Count(r => r.Status == "judge_error")} | {(judged.Count == 0 ? "-" : $"{agree} z {judged.Count}")} |"
+                $"| {sample} | {inSample} | {judged.Count} | {judged.Count(r => r.Verdict == "pass")} | {judged.Count(r => r.Verdict == "fail")} | {judged.Count(r => r.Verdict == JudgeRubric.CannotAssess)} | {rows.Count(r => r.Status == "judge_error")} | {(decided.Count == 0 ? "-" : $"{agree} z {decided.Count}")} |"
             );
         }
         text.AppendLine();
@@ -562,10 +677,12 @@ public static class JudgeRun
             $"- Pominięte przez limit kosztu: {skipped}. Koszt tego uruchomienia: {budget.SpentUsd.ToString("0.0000", CultureInfo.InvariantCulture)} USD z limitu {budget.LimitUsd.ToString("0.00", CultureInfo.InvariantCulture)} USD (cennik `{price.Version}`, szacunek; wywołania bez danych o użyciu liczone jak najgorszy przypadek)."
         );
         text.AppendLine(
-            "- Losowa próbka szacuje udział poprawnych odpowiedzi; próbka błędów i regresje pokazują, czy judge widzi znane pomyłki. „Zgodność z regułami” to tylko zestawienie dwóch przybliżeń, nie dowód poprawności żadnego z nich."
+            "- „Nie można ocenić”: cel działania bez dowodu (np. argumenty `compare_coupons`, propozycja bez zapisanego celu) - nie pass i nie liczone do zgodności; fail za inne pola zostaje fail.\n- Losowa próbka szacuje udział poprawnych odpowiedzi; próbka błędów i regresje pokazują, czy judge widzi znane pomyłki. „Zgodność z regułami” to tylko zestawienie dwóch przybliżeń, nie dowód poprawności żadnego z nich."
         );
         var disagreements = mine.Where(r =>
-                r.Status == "judged" && (r.Verdict == "pass") != r.RuleChecksOk
+                r.Status == "judged"
+                && r.Verdict is "pass" or "fail"
+                && (r.Verdict == "pass") != r.RuleChecksOk
             )
             .Take(10)
             .ToList();
@@ -594,7 +711,7 @@ public static class Calibration
         Path.Combine(JudgeRun.Folder(runFolder), $"calibration-{JudgeRubric.Version}-{model}.tsv");
 
     private const string Header =
-        "id\tscenario\tquestion\tanswer\ttools\thuman_verdict\thuman_note";
+        "id\tscenario\tquestion\tanswer\ttools\tproposal_target\thuman_verdict\thuman_note";
 
     /// <summary>
     /// From every turn this model graded (not a new sample): half judged pass, half fail where
@@ -645,6 +762,7 @@ public static class Calibration
                         Cell(i.User),
                         Cell(i.Assistant),
                         string.Join(", ", i.Tools),
+                        JudgeRubric.Describe(i.Target),
                         "",
                         ""
                     )
@@ -665,16 +783,21 @@ public static class Calibration
     {
         var judge = JudgeRun
             .Of(results, model)
-            .Where(r => r.Status == "judged")
+            .Where(r => r.Status == "judged" && r.Verdict is "pass" or "fail")
             .ToDictionary(r => r.Id, r => r.Verdict == "pass");
         // [human, judge], index 0 = pass, 1 = fail.
         var matrix = new int[2, 2];
-        foreach (var line in sheet.Split('\n').Skip(1))
+        var lines = sheet.Split('\n');
+        // By header: v1 sheets have no proposal_target column.
+        var column = Array.IndexOf(lines[0].TrimEnd('\r').Split('\t'), "human_verdict");
+        if (column < 0)
+            throw new InvalidDataException("The sheet has no human_verdict column.");
+        foreach (var line in lines.Skip(1))
         {
             var cells = line.Split('\t');
-            if (cells.Length < 6 || !judge.TryGetValue(cells[0], out var judgePass))
+            if (cells.Length <= column || !judge.TryGetValue(cells[0], out var judgePass))
                 continue;
-            var human = cells[5].Trim().ToLowerInvariant();
+            var human = cells[column].Trim().ToLowerInvariant();
             if (human is not ("pass" or "fail"))
                 continue;
             matrix[human == "pass" ? 0 : 1, judgePass ? 0 : 1]++;

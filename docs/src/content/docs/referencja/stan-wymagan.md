@@ -22,7 +22,7 @@ Stan na 2026-11-23. Poziomy:
 | Agent głosowy | nie | nie | nie | Mikrofon z zamianą mowy na tekst to jeszcze nie agent głosowy. |
 | Obserwowalność (ślady, metryki, anomalie) | tak | tak | nie | Panel LLMOps rozbudowuje P15. [Observability](/moduly/observability/) |
 | Alerty anomalii na Slacka | reguły tak, wysyłka nie | reguły tak | nie | |
-| LLM-as-judge | offline na syntetycznych transkryptach (P16d) | nie | nie | Rubryka z wersją, limit kosztu, arkusz kalibracji; kalibracja ocenami człowieka jeszcze niewykonana. Online (próbka ruchu, P15e) - nie. [Symulacja](/instrukcje/symulacja-ruchu/#judge) |
+| LLM-as-judge | offline na syntetycznych transkryptach (P16d) | nie | nie | Rubryka z wersją (v2: cel propozycji kuponu, „nie można ocenić” bez dowodu), limit kosztu, arkusz kalibracji; kalibracja ocenami człowieka jeszcze niewykonana. Online (próbka ruchu, P15e) - nie. [Symulacja](/instrukcje/symulacja-ruchu/#judge) |
 | Konsultant (przekazanie rozmowy) | tak | tak | nie | Własny panel, nie integracja z LiveChat. [Support](/moduly/support/) |
 | Twilio / WhatsApp / CRM / LiveChat | nie | nie | nie | |
 
