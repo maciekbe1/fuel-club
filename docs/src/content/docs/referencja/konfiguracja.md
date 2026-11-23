@@ -54,6 +54,7 @@ sidebar:
 | `Support:HubAllowedOrigins` | dla huba | originy, z których przeglądarka może połączyć się z hubem SignalR (np. `https://app.example`); lokalnie w `appsettings.Development.json` (`:3000`, `:3100`); każdy wpis `scheme://host[:port]` bez ścieżki i ukośnika (inaczej API nie startuje); pusto = hub niedostępny |
 | `Support:WorkerEnabled` / `WorkerInterval` | nie | `true` / `00:01:00` (1 s - 1 h); testy wyłączają worker i wywołują porządki same |
 | `Telemetry:OtlpEndpoint` | nie | adres OTLP/HTTP (np. `http://localhost:6006/v1/traces` dla Phoenix); pusty = bez eksportu OpenTelemetry. Nagłówki eksportera tylko z `OTEL_EXPORTER_OTLP_HEADERS` |
+| `Simulation:Enabled` / `RunId` | nie | instancja ruchu syntetycznego ([ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/)): tylko `Development` (inaczej API nie startuje), `RunId` 1-40 znaków `a-z0-9-` wymagany; włącza `GET /api/simulation`. Ustawiane w środowisku instancji demo, nie przez żądanie - [Symulacja ruchu](/instrukcje/symulacja-ruchu/) |
 | `ASPNETCORE_ENVIRONMENT` | nie | `Development` włącza OpenAPI i `/health/db` |
 
 ## Frontend
@@ -78,5 +79,7 @@ sidebar:
 | API | 5271 (http), 7029 (https) |
 | PostgreSQL dev | 5433 |
 | PostgreSQL test | 5434 |
+| PostgreSQL demo (symulacja) | 5435 |
+| API instancji demo | 5301 |
 
 Sekrety nigdy nie trafiają do repozytorium ani do logów.

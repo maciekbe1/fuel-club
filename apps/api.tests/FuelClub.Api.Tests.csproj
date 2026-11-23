@@ -25,5 +25,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\api\FuelClub.Api.csproj" />
+    <ProjectReference Include="..\tools\Simulator\FuelClub.Simulator.csproj" />
   </ItemGroup>
 </Project>

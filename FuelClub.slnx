@@ -6,4 +6,7 @@
   <Folder Name="/apps/api/">
     <Project Path="apps/api/FuelClub.Api.csproj" />
   </Folder>
+  <Folder Name="/apps/tools/Simulator/">
+    <Project Path="apps/tools/Simulator/FuelClub.Simulator.csproj" />
+  </Folder>
 </Solution>

@@ -467,6 +467,16 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Demo `demo-rules-v6`: pytanie o punkty za produkt bez „zakup/odbiór/kupon” → dopytanie bez narzędzi; po `no_match` bez `propose_handoff` (propozycja z narzędzia).
 - Kanały (aplikacja + WhatsApp, wspólna rozmowa): osobny ADR po domknięciu evali (wskazanie właściciela 2026-11-23).
 
+## P16a - manifest i populacja (2026-11-23)
+
+- Decyzje właściciela: ADR 0017 (oznaczenie z konfiguracji instancji, serwerowy `conversationId` z jawnym zakończeniem, „bez przekazania” zamiast containment, dane judge'a tylko syntetyczne poza Git). P16 odsyła do metryk P15b.
+- API: `Simulation:Enabled`/`RunId` (tylko Development, walidacja przy starcie), `GET /api/simulation` tylko na instancji symulacji (runId, dostawca, model). Testy `SimulationTests`.
+- `apps/tools/Simulator` (.NET, tylko HTTP): `populate` (konta `sim-<run>-<nr>@sim.fuelclub.test`, profile Zero/Low/Medium/High, karta, zakupy kasjera, oferty symulacji, wymiana, aktywacja, realizacja rabatu przy zakupie), manifest z kluczami idempotencji (bez haseł i kodów), tempo poniżej limitów + `Retry-After`; `cleanup` jednego przebiegu tylko na `fuelclub_demo`, jedna transakcja. Testy `SimulatorTests`.
+- `compose.yml`: `postgres-demo` (5435). Sekrety w `.simulation/demo.env` (gitignore).
+- Przebieg `pilot-1`, 5 kont: 26/26; ponowienie bez zmian; ponowienie z 3 operacjami `Pending` bez podwojeń; sprzątanie: odmowa na `fuelclub_test`, na demo usunięte tylko konta i oferty przebiegu.
+- API 638/638, docs build OK.
+- Następnie P16b: rozmowy (serwerowy `conversationId`, `Synthetic`/`RunId` przy turze i rozmowie) i scenariusze czatu.
+
 ## Następny krok
 
 Otwarte:

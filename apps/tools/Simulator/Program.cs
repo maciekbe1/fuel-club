@@ -1,0 +1,139 @@
+using System.Net.Http.Json;
+using System.Text.RegularExpressions;
+using FuelClub.Simulator;
+
+// Synthetic traffic for the demo instance (ADR 0017). Public HTTP API only.
+//
+//   populate --run <id> [--accounts 5] [--api http://localhost:5301] [--manifest path]
+//   cleanup  --run <id> [--manifest path]     (SIM_DEMO_DATABASE: connection string)
+//
+// Secrets come from the environment, never from arguments or the manifest:
+//   SIM_SECRET (derives the accounts' passwords), SIM_CASHIER_EMAIL/PASSWORD, SIM_ADMIN_EMAIL/PASSWORD.
+
+using var cancel = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cancel.Cancel();
+};
+
+if (args.Length == 0 || args[0] is not ("populate" or "cleanup"))
+{
+    Console.WriteLine(
+        "usage: populate|cleanup --run <id> [--accounts N] [--api URL] [--manifest PATH]"
+    );
+    return 64;
+}
+
+var options = Options.Parse(args[1..]);
+var run = options.Get("run") ?? throw new ArgumentException("--run is required");
+if (!Regex.IsMatch(run, "^[a-z0-9][a-z0-9-]{0,39}$"))
+    throw new ArgumentException("--run: 1-40 characters a-z, 0-9, '-'");
+var manifestPath = options.Get("manifest") ?? Path.Combine(".simulation", run, "manifest.json");
+
+if (args[0] == "cleanup")
+{
+    var connection =
+        Environment.GetEnvironmentVariable("SIM_DEMO_DATABASE")
+        ?? throw new ArgumentException("SIM_DEMO_DATABASE is required for cleanup");
+    var existing = Manifest.Load(manifestPath);
+    if (existing.RunId != run)
+        throw new ArgumentException($"The manifest belongs to run '{existing.RunId}'.");
+    return await Cleanup.RunAsync(existing, connection, cancel.Token);
+}
+
+var api = options.Get("api") ?? "http://localhost:5301";
+var manifest = File.Exists(manifestPath)
+    ? Manifest.Load(manifestPath)
+    : Manifest.Create(manifestPath, run, api);
+if (manifest.RunId != run || manifest.ApiUrl != api)
+    throw new ArgumentException(
+        $"The manifest is for run '{manifest.RunId}' at {manifest.ApiUrl}, not '{run}' at {api}."
+    );
+if (manifest.CleanedAt is not null)
+    throw new InvalidOperationException("This run was cleaned up; start a new run id.");
+
+// The server decides the run and the model; the simulator only checks it reached the right one.
+using (var probe = new HttpClient { BaseAddress = new Uri(api) })
+{
+    var response = await probe.GetAsync("/api/simulation", cancel.Token);
+    if (!response.IsSuccessStatusCode)
+    {
+        Console.WriteLine(
+            $"Refused: {api} is not a simulation instance (/api/simulation: {(int)response.StatusCode})."
+        );
+        return 2;
+    }
+    var simulation = await response.Content.ReadFromJsonAsync<SimulationInfo>(cancel.Token);
+    if (simulation?.RunId != run)
+    {
+        Console.WriteLine($"Refused: the instance runs '{simulation?.RunId}', not '{run}'.");
+        return 2;
+    }
+    var expected = options.Get("expect-provider") ?? "demo";
+    if (simulation.Provider != expected)
+    {
+        Console.WriteLine(
+            $"Refused: the instance uses '{simulation.Provider}', expected '{expected}'."
+        );
+        return 2;
+    }
+    Console.WriteLine($"run {run} at {api}: {simulation.Provider}/{simulation.Model}");
+}
+
+var settings = new Settings(
+    Secret: Required("SIM_SECRET"),
+    CashierEmail: Required("SIM_CASHIER_EMAIL"),
+    CashierPassword: Required("SIM_CASHIER_PASSWORD"),
+    AdminEmail: Required("SIM_ADMIN_EMAIL"),
+    AdminPassword: Required("SIM_ADMIN_PASSWORD"),
+    Parallel: options.Int("parallel", 4),
+    AuthPerMinute: options.Int("auth-per-minute", 8),
+    PurchasesPerMinute: options.Int("purchases-per-minute", 50)
+);
+await new Population(manifest, settings).RunAsync(options.Int("accounts", 5), cancel.Token);
+return Environment.ExitCode;
+
+static string Required(string name) =>
+    Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
+        ? value
+        : throw new ArgumentException($"{name} is required (environment variable)");
+
+namespace FuelClub.Simulator
+{
+    /// <summary>
+    /// Paces default below the API's defaults (auth 10/min per IP, purchases 60/min per cashier);
+    /// a demo instance with higher server limits can take higher values.
+    /// </summary>
+    public sealed record Settings(
+        string Secret,
+        string CashierEmail,
+        string CashierPassword,
+        string AdminEmail,
+        string AdminPassword,
+        int Parallel,
+        int AuthPerMinute,
+        int PurchasesPerMinute
+    );
+
+    internal sealed record SimulationInfo(string RunId, string Provider, string Model, bool Demo);
+
+    internal sealed class Options(Dictionary<string, string> values)
+    {
+        public static Options Parse(string[] args)
+        {
+            var values = new Dictionary<string, string>();
+            for (var i = 0; i < args.Length; i++)
+                if (args[i].StartsWith("--", StringComparison.Ordinal) && i + 1 < args.Length)
+                    values[args[i][2..]] = args[++i];
+                else
+                    throw new ArgumentException($"Unexpected argument '{args[i]}'");
+            return new Options(values);
+        }
+
+        public string? Get(string name) => values.GetValueOrDefault(name);
+
+        public int Int(string name, int fallback) =>
+            values.TryGetValue(name, out var value) ? int.Parse(value) : fallback;
+    }
+}

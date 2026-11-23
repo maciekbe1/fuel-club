@@ -42,6 +42,7 @@ builder.Services.AddAssistant(builder.Configuration);
 builder.Services.AddSupport(builder.Configuration);
 builder.Services.AddTelemetry(builder.Configuration);
 builder.Services.AddObservability(builder.Configuration);
+builder.Services.AddSimulation(builder.Configuration);
 builder.Services.AddHostedService<DemoAccountsSeeder>();
 
 var app = builder.Build();
@@ -84,6 +85,7 @@ app.MapRewardsEndpoints();
 app.MapAssistantEndpoints();
 app.MapSupportEndpoints();
 app.MapObservabilityEndpoints();
+app.MapSimulationEndpoint();
 
 foreach (var additional in app.Services.GetServices<IAdditionalEndpoints>())
     additional.Map(app);

@@ -14,3 +14,6 @@ TestResults/
 .env
 .env.*
 !.env.example
+
+# Simulator runs (manifests, transcripts): local only, never in Git
+.simulation/

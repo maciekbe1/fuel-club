@@ -10,6 +10,7 @@ Pełny, aktualny kontrakt: `GET /openapi/v1.json` (Development). Ta tabela opisu
 | Metoda i trasa | Autoryzacja | CSRF | Sukces | Błędy |
 | --- | --- | --- | --- | --- |
 | `GET /api/auth/csrf` | brak | - | `200 { token }` | - |
+| `GET /api/simulation` | brak | - | `200 { runId, provider, model, demo }`; trasa istnieje tylko przy `Simulation:Enabled` (instancja demo, Development) | `404` poza symulacją |
 | `POST /api/auth/register` | brak | tak | `201` | `400`, `403 csrf.invalid`, `429 rate_limit.exceeded` (limit na adres IP) |
 | `POST /api/auth/login` | brak | tak | `204` + cookie sesji | `400`, `401`, `403 csrf.invalid`, `429 rate_limit.exceeded` (limit na adres IP) |
 | `POST /api/auth/logout` | zalogowany | tak | `204` | `401`, `403 csrf.invalid` |

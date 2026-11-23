@@ -29,6 +29,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  # Synthetic traffic (ADR 0017): its own database, never the dev one. Started on demand:
+  # docker compose up -d postgres-demo
+  postgres-demo:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: fuelclub_demo
+      POSTGRES_USER: fuelclub_demo
+      POSTGRES_PASSWORD: fuelclub_demo
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - postgres_demo_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fuelclub_demo -d fuelclub_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   # Optional local trace viewer (OTLP/HTTP on :6006/v1/traces, UI on :6006; PHOENIX_PORT changes it).
   # Not started by default:
   # docker compose --profile observability up -d phoenix. No volume: traces live as long as the container.
@@ -44,3 +61,4 @@ services:
 volumes:
   postgres_data:
   postgres_test_data:
+  postgres_demo_data:
