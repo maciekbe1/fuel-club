@@ -180,6 +180,16 @@ public static class GeminiReport
         }
         foreach (var id in skipped)
             md.AppendLine($"| {id} | pominięty (limit) | | | | |");
+        // The reply of each run that failed a check (test data, redacted, cut).
+        var unanswered = runs.Where(r => r.Answer is not null && r.Checks.Any(c => !c.Ok)).ToList();
+        if (unanswered.Count > 0)
+        {
+            md.AppendLine();
+            md.AppendLine("## Odpowiedzi przebiegów z niezaliczonym sprawdzeniem");
+            md.AppendLine();
+            foreach (var r in unanswered)
+                md.AppendLine($"- `{r.Id}`: {r.Answer!.Replace("\n", " ")}");
+        }
         // Diagnosis of the run (test data, redacted): what the model called and what it got.
         md.AppendLine();
         md.AppendLine("## Wywołania narzędzi");

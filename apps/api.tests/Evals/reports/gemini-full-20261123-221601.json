@@ -1,0 +1,685 @@
+{
+  "mode": "full",
+  "suiteVersion": "assistant-evals-v2",
+  "model": "gemini-3.5-flash-lite",
+  "promptVersion": "gemini-v7",
+  "commit": "71f21a3",
+  "createdAt": "2026-11-23T22:16:01.385833+00:00",
+  "complete": true,
+  "stoppedBy": null,
+  "budget": {
+    "tokens": 400000,
+    "maxUsd": 0.25
+  },
+  "skipped": [],
+  "tokens": {
+    "input": 27018,
+    "output": 668,
+    "casesWithUnknownTokens": 0
+  },
+  "costUsd": "0.0098",
+  "prices": {
+    "input": 0.30,
+    "output": 2.50
+  },
+  "summary": [
+    {
+      "kind": "tools",
+      "passed": 10,
+      "total": 12
+    },
+    {
+      "kind": "arguments",
+      "passed": 11,
+      "total": 11
+    },
+    {
+      "kind": "safety",
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "kind": "turn",
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "kind": "trace",
+      "passed": 18,
+      "total": 18
+    },
+    {
+      "kind": "budget",
+      "passed": 6,
+      "total": 6
+    }
+  ],
+  "runs": [
+    {
+      "id": "own-coupon-proposal#1",
+      "category": "wlasny-kupon",
+      "outcome": "Done",
+      "tools": [
+        "list_my_coupons:ok",
+        "propose_coupon_activation:ok"
+      ],
+      "inputTokens": 4793,
+      "outputTokens": 117,
+      "totalMs": 2498,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "tools",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected True, got 1"
+        },
+        {
+          "kind": "arguments",
+          "name": "own-coupon",
+          "ok": true,
+          "detail": "01a20a7a-c221-78cc-aff6-60152cbf951f"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20a7ac3ed7a65abdd5380fcff9c1f"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 4793, out 117"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "list_my_coupons",
+          "arguments": "{ \u0022status\u0022: \u0022Purchased\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        },
+        {
+          "step": 1,
+          "name": "propose_coupon_activation",
+          "arguments": "{ \u0022couponId\u0022: \u0022{ownCouponId}\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        }
+      ],
+      "answer": "Mo\u017Cesz aktywowa\u0107 kupon \u201EMoj0 0d069773\u201D (rabat 0.10 z\u0142/l do 20 l), klikaj\u0105c poni\u017Cszy przycisk:"
+    },
+    {
+      "id": "own-coupon-proposal#2",
+      "category": "wlasny-kupon",
+      "outcome": "Done",
+      "tools": [
+        "list_my_coupons:ok",
+        "propose_coupon_activation:ok"
+      ],
+      "inputTokens": 4794,
+      "outputTokens": 100,
+      "totalMs": 1822,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "tools",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected True, got 1"
+        },
+        {
+          "kind": "arguments",
+          "name": "own-coupon",
+          "ok": true,
+          "detail": "01a20a7a-cea5-7fa3-af4a-8a989599d392"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20a7ad00675a4bd2a53f1b87163f2"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 4794, out 100"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "list_my_coupons",
+          "arguments": "{ \u0022status\u0022: \u0022Purchased\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        },
+        {
+          "step": 1,
+          "name": "propose_coupon_activation",
+          "arguments": "{ \u0022couponId\u0022: \u0022{ownCouponId}\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        }
+      ],
+      "answer": "Mo\u017Cesz aktywowa\u0107 kupon \u201EMoj0 0d069773\u201D za pomoc\u0105 przycisku poni\u017Cej:"
+    },
+    {
+      "id": "own-coupon-proposal#3",
+      "category": "wlasny-kupon",
+      "outcome": "Done",
+      "tools": [
+        "list_my_coupons:ok",
+        "propose_coupon_activation:ok"
+      ],
+      "inputTokens": 4784,
+      "outputTokens": 115,
+      "totalMs": 1865,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "tools",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected True, got 1"
+        },
+        {
+          "kind": "arguments",
+          "name": "own-coupon",
+          "ok": true,
+          "detail": "01a20a7a-d7eb-7ac9-b46b-0adda65cb012"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20a7ad9467c5392075f4ca5c7c994"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 4784, out 115"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "list_my_coupons",
+          "arguments": "{ \u0022status\u0022: \u0022Purchased\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        },
+        {
+          "step": 1,
+          "name": "propose_coupon_activation",
+          "arguments": "{ \u0022couponId\u0022: \u0022{ownCouponId}\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        }
+      ],
+      "answer": "Mo\u017Cesz aktywowa\u0107 kupon \u201EMoj0 0d069773\u201D (rabat 0,10 z\u0142/l do 20 l), klikaj\u0105c przycisk poni\u017Cej."
+    },
+    {
+      "id": "own-coupon-proposal#4",
+      "category": "wlasny-kupon",
+      "outcome": "Done",
+      "tools": [
+        "list_my_coupons:ok"
+      ],
+      "inputTokens": 3046,
+      "outputTokens": 95,
+      "totalMs": 1333,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": false,
+          "detail": "missing [propose_coupon_activation:ok]"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "tools",
+          "name": "confirmation",
+          "ok": false,
+          "detail": "expected True, got 0"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20a7ae2587317b8d108cb951cb703"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 3046, out 95"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "list_my_coupons",
+          "arguments": "{ \u0022status\u0022: \u0022Purchased\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        }
+      ],
+      "answer": "Masz zakupiony kupon \u201EMoj0 0d069773\u201D (rabat 0.10 z\u0142/l, do 20 l). Mo\u017Cesz go aktywowa\u0107, korzystaj\u0105c z poni\u017Cszego przycisku:\n\n*(Kliknij przycisk, aby zatwierdzi\u0107 aktywacj\u0119 kuponu w aplikacji)*"
+    },
+    {
+      "id": "own-coupon-proposal#5",
+      "category": "wlasny-kupon",
+      "outcome": "Done",
+      "tools": [
+        "list_my_coupons:ok",
+        "propose_coupon_activation:ok"
+      ],
+      "inputTokens": 4803,
+      "outputTokens": 123,
+      "totalMs": 1758,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "tools",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected True, got 1"
+        },
+        {
+          "kind": "arguments",
+          "name": "own-coupon",
+          "ok": true,
+          "detail": "01a20a7a-e82d-7b2a-b39f-2fb0eb655595"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20a7ae99278cb8690fb614cd63415"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 4803, out 123"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "list_my_coupons",
+          "arguments": "{ \u0022status\u0022: \u0022Purchased\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        },
+        {
+          "step": 1,
+          "name": "propose_coupon_activation",
+          "arguments": "{ \u0022couponId\u0022: \u0022{ownCouponId}\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        }
+      ],
+      "answer": "Mo\u017Cesz aktywowa\u0107 kupon \u201EMoj0 0d069773\u201D (rabat paliwowy 0,10 z\u0142/l, do 20 l), klikaj\u0105c poni\u017Cszy przycisk:"
+    },
+    {
+      "id": "own-coupon-proposal#6",
+      "category": "wlasny-kupon",
+      "outcome": "Done",
+      "tools": [
+        "list_my_coupons:ok",
+        "propose_coupon_activation:ok"
+      ],
+      "inputTokens": 4798,
+      "outputTokens": 118,
+      "totalMs": 1894,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "tools",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected True, got 1"
+        },
+        {
+          "kind": "arguments",
+          "name": "own-coupon",
+          "ok": true,
+          "detail": "01a20a7a-f10a-7cac-b139-91d52bdc4b1f"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20a7af26372d49f4cc5e29a8f1c90"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 4798, out 118"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "list_my_coupons",
+          "arguments": "{ \u0022status\u0022: \u0022Purchased\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        },
+        {
+          "step": 1,
+          "name": "propose_coupon_activation",
+          "arguments": "{ \u0022couponId\u0022: \u0022{ownCouponId}\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": null,
+          "scores": null
+        }
+      ],
+      "answer": "Mo\u017Cesz aktywowa\u0107 kupon \u201EMoj0 0d069773\u201D (rabat 0.1 z\u0142/l, limit 20 l), klikaj\u0105c poni\u017Cszy przycisk:"
+    }
+  ]
+}

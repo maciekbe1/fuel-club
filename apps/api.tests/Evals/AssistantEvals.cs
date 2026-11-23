@@ -422,6 +422,12 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
     {
         /// <summary>Gemini runs only: each tool call, redacted (test data only).</summary>
         public List<ToolDiagnostic>? Calls { get; init; }
+
+        /// <summary>
+        /// Gemini runs only: the reply, redacted like the calls and cut to 400 characters - what the
+        /// model said when a tool it should have called is missing.
+        /// </summary>
+        public string? Answer { get; init; }
     }
 
     /// <summary>
@@ -726,8 +732,11 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         )
         {
             Calls = calls,
+            Answer = calls is null ? null : Cut(Redact(stream.Text)),
         };
     }
+
+    private static string Cut(string text) => text.Length <= 400 ? text : text[..400] + "…";
 
     private sealed class Recorder
     {
