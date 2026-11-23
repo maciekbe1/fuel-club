@@ -417,6 +417,8 @@ Refaktor 1 - podział plików (audyt): 8 plików z kilkoma komponentami rozbite 
 
 Refaktor 2 - wspólne elementy: `components/query/QueryError.tsx` (shadcn `alert`) zamiast 7 kopii bloku błędu wczytywania (przy okazji: 401 wszędzie daje „Zaloguj się ponownie”); shadcn `skeleton` w 10 miejscach (karta salda zostaje - ciemne tło marki); ramki komunikatów jako `Alert` (wariant projektu `warning` dla niepewnego wyniku, `destructive`); E2E 148/148.
 
+Refaktor 3 - czat na AI Elements ([ADR 0015](docs)): `conversation`, `message` (odpowiedź jako markdown przez `streamdown`), `suggestion` w `/czat` i w rozmowie z konsultantem zamiast ręcznych dymków, przewijania i podpowiedzi; `prompt-input` odrzucony (1414 linii za ~70); okno czatu o stałej wysokości (telefon 45dvh); zrzuty telefon/desktop sprawdzone; E2E 148/148.
+
 ## Następny krok
 
 Otwarte:

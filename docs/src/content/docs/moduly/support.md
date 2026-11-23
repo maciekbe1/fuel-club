@@ -72,7 +72,7 @@ Klient z okna czatu prosi o rozmowę z człowiekiem. Powstaje zgłoszenie w kole
 - Treść zawsze z kursora (`useConversation` dociąga tylko nowsze niż ostatnia trzymana); zdarzenia huba unieważniają zapytania; po połączeniu i każdym ponownym - odczyt wszystkiego. Bez połączenia: odczyt co 3 s i dopisek „odświeżanie co kilka sekund”.
 - Połączenie: automatyczne ponowienia SignalR (0, 2, 5, 10, 30 s), po ich wyczerpaniu - nowe połączenie co 5 s. Opuszczenie rozmowy usuwa ją z pamięci zapytań (stary `403` nie wyrzuca po ponownym przejęciu).
 - „Pisze”: wysyłane przy pisaniu najwyżej co 2 s, tylko w zgłoszeniu `Assigned`; pokazywane 5 s od ostatniego sygnału, gaszone przez `messageAdded`.
-- Biblioteki: `@microsoft/signalr` (hub), `use-stick-to-bottom` (przewijanie rozmowy), shadcn `textarea`, `checkbox`.
+- Biblioteki: `@microsoft/signalr` (hub), AI Elements `conversation`/`message` ([ADR 0015](/decyzje/0015-komponenty-czatu-ai-elements/)), shadcn `textarea`, `checkbox`.
 
 ## Konto konsultanta
 

@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     ".next-browser/**",
     "test-results/**",
     "playwright-report/**",
+    // Vendored from the AI Elements registry (like components/ui from shadcn): kept as published.
+    "components/ai-elements/**",
   ]),
 ]);
 

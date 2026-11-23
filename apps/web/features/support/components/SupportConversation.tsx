@@ -2,7 +2,11 @@
 
 import { CircleAlert, Headset, Send } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { StickToBottom } from "use-stick-to-bottom";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/problem";
@@ -92,15 +96,12 @@ export function SupportConversation({
         </p>
       )}
 
-      {/* The library scrolls Content's own element: the limit goes there, not on the root. */}
-      <StickToBottom className="relative">
-        <StickToBottom.Content
-          scrollClassName="max-h-[60vh]"
-          role="log"
-          aria-live="polite"
-          aria-label="Wiadomości"
-          className="flex flex-col gap-2"
-        >
+      <Conversation
+        aria-live="polite"
+        aria-label="Wiadomości"
+        className="h-[50dvh] min-h-64"
+      >
+        <ConversationContent className="gap-3 p-0">
           <AttachedHistory
             side={side}
             items={items.filter((m) => m.clientProvidedHistory)}
@@ -122,8 +123,9 @@ export function SupportConversation({
               {side === "customer" ? "Konsultant pisze…" : "Klient pisze…"}
             </p>
           )}
-        </StickToBottom.Content>
-      </StickToBottom>
+        </ConversationContent>
+        <ConversationScrollButton aria-label="Przewiń na dół" />
+      </Conversation>
 
       {open && (
         <form

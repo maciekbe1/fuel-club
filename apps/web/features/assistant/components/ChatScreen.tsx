@@ -1,7 +1,14 @@
 "use client";
 
 import { Headset, Send, Square } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { HANDOFF_ACTIVE, MAX_MESSAGE_LENGTH, useChat } from "../hooks";
@@ -33,6 +40,7 @@ export function ChatScreen({
   onHandoffActive?: () => void;
 } = {}) {
   const chat = useChat();
+  const [draft, setDraft] = useState("");
   // Each refused turn, not just the first: a later case may be opened in another tab too.
   const refused = chat.turns.findLast(
     (turn) => turn.errorCode === HANDOFF_ACTIVE,
@@ -44,13 +52,6 @@ export function ChatScreen({
     onTalkToAgent && !locked
       ? () => onTalkToAgent(chat.history, chat.cancel)
       : undefined;
-  const [draft, setDraft] = useState("");
-  const end = useRef<HTMLDivElement>(null);
-  const last = chat.turns.at(-1);
-
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" });
-  }, [chat.turns.length, last?.text, last?.status]);
 
   const submit = (text = draft) => {
     if (chat.streaming || !chat.send(text)) return;
@@ -59,7 +60,7 @@ export function ChatScreen({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {chat.demo && (
         <p
           data-testid="chat-demo"
@@ -69,52 +70,52 @@ export function ChatScreen({
         </p>
       )}
 
-      <div
-        role="log"
+      <Conversation
         aria-label="Rozmowa z asystentem"
         aria-live="polite"
-        className="flex flex-col gap-4"
+        className="h-[45dvh] min-h-64 rounded-3xl border sm:h-[calc(100dvh-20rem)]"
       >
-        {chat.turns.length === 0 && !locked && (
-          <div className="flex flex-col gap-3 rounded-3xl border p-5">
-            <p className="text-muted-foreground">
-              Zapytaj o saldo, oferty albo swoje kupony. Aktywację kuponu
-              asystent tylko proponuje - zatwierdzasz ją przyciskiem.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTIONS.map((suggestion) => (
-                <Button
-                  key={suggestion}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => submit(suggestion)}
-                >
-                  {suggestion}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-        {chat.turns.map((turn) => (
-          <ChatTurn
-            key={turn.id}
-            turn={turn}
-            locked={locked}
-            onTalkToAgent={talkToAgent}
-          />
-        ))}
-        <div ref={end} />
-      </div>
+        <ConversationContent className="gap-4">
+          {chat.turns.length === 0 && !locked ? (
+            <ConversationEmptyState>
+              <p className="text-muted-foreground">
+                Zapytaj o saldo, oferty albo swoje kupony. Aktywację kuponu
+                asystent tylko proponuje - zatwierdzasz ją przyciskiem.
+              </p>
+            </ConversationEmptyState>
+          ) : (
+            chat.turns.map((turn) => (
+              <ChatTurn
+                key={turn.id}
+                turn={turn}
+                locked={locked}
+                onTalkToAgent={talkToAgent}
+              />
+            ))
+          )}
+        </ConversationContent>
+        <ConversationScrollButton aria-label="Przewiń na dół" />
+      </Conversation>
 
       {!locked && (
         <form
-          className="sticky bottom-0 flex flex-col gap-2 bg-background pt-2 pb-4"
+          className="flex flex-col gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             submit();
           }}
         >
+          {chat.turns.length === 0 && (
+            <Suggestions>
+              {SUGGESTIONS.map((suggestion) => (
+                <Suggestion
+                  key={suggestion}
+                  suggestion={suggestion}
+                  onClick={submit}
+                />
+              ))}
+            </Suggestions>
+          )}
           <label htmlFor="chat-message" className="sr-only">
             Wiadomość do asystenta
           </label>
