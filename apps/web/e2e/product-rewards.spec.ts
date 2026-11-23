@@ -118,12 +118,16 @@ test("a product reward: exchange, activate pickup, the cashier hands it over onc
 
   // The same code again: already handed over.
   await register.getByLabel("Kod kuponu").fill(code);
+  // Shown as the reward's state, not as a failed operation: no error, no button to hand it over.
+  const collected = register
+    .getByRole("status")
+    .filter({ hasText: "Nagroda jest odebrana" })
+    .filter({ hasText: "na tej kasie" });
+  await expect(collected).toBeVisible();
+  await expect(register.locator("form").getByRole("alert")).toHaveCount(0);
   await expect(
-    register
-      .getByRole("alert")
-      .filter({ hasText: `Nagroda została już wydana` })
-      .filter({ hasText: "na tej kasie" }),
-  ).toBeVisible();
+    register.getByRole("button", { name: "Wydaj nagrodę" }),
+  ).toHaveCount(0);
   await context.close();
 
   await page.reload();
@@ -249,7 +253,7 @@ test("an unknown handover stays in its panel; the next code starts clean and the
   await cardField.fill(card);
   await coupon.fill(codes[0]);
   await expect(
-    register.getByRole("alert").filter({ hasText: "na tej kasie" }),
+    register.getByRole("status").filter({ hasText: "na tej kasie" }),
   ).toBeVisible();
   await expect(handover).toHaveCount(0);
   await context.close();
@@ -369,9 +373,12 @@ test("a final 409 from another till stays in the panel with that station and til
   await expect(handover).toBeVisible();
   const beforeHandover = previews;
   await handover.getByRole("button", { name: "Wydaj nagrodę" }).click();
-  const alert = handover.getByRole("alert");
+  const alert = handover.getByRole("status");
+  await expect(alert).toContainText("Nagroda jest odebrana");
   await expect(alert).toContainText("na stanowisku S-99, kasa K9");
   await expect(alert).toContainText("14:32");
+  await expect(handover.getByRole("alert")).toHaveCount(0);
+  await expect(handover.getByRole("button")).toHaveCount(0);
   // Not replaced by a refetched preview: none within 2 s of the answer (a refetch starts at once).
   await register.waitForTimeout(2000);
   expect(previews).toBe(beforeHandover);

@@ -33,15 +33,13 @@ const money = new Intl.NumberFormat("pl-PL", {
 });
 const plain = new Intl.NumberFormat("pl-PL");
 
-function previewError(error: unknown, own: CashierStation | undefined) {
+function previewError(error: unknown) {
   if (error instanceof ApiError && error.status === 429)
     return "Limit podglądów kuponów na tej kasie został wyczerpany. Spróbuj za chwilę - zakup z kuponem można zapisać bez podglądu.";
   if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
     return "Nie znaleziono aktywnego kuponu tego klienta o tym kodzie. Kupon musi być aktywowany w telefonie klienta.";
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
-    return (
-      handedOverMessage(error, own) ?? "Ten kupon został już wykorzystany."
-    );
+    return "Ten kupon został już wykorzystany.";
   if (error instanceof ApiError && error.code === "rewards.coupon_wrong_kind")
     return "To kod nagrody - rabatu nie da się przeliczyć. Wydaj nagrodę przyciskiem.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
@@ -156,11 +154,18 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
         </p>
       )}
 
-      {terms.isError && couponCode && cardCode && (
-        <p role="alert" className="text-sm text-destructive">
-          {previewError(terms.error, station.data)}
-        </p>
-      )}
+      {terms.isError &&
+        couponCode &&
+        cardCode &&
+        (handedOverMessage(terms.error, station.data) ? (
+          <p role="status" className="text-sm font-medium">
+            {handedOverMessage(terms.error, station.data)}
+          </p>
+        ) : (
+          <p role="alert" className="text-sm text-destructive">
+            {previewError(terms.error)}
+          </p>
+        ))}
 
       {terms.isSuccess && couponCode && cardCode && isProduct(terms.data) && (
         <RewardHandover
@@ -234,7 +239,7 @@ export function CouponSection({ flow }: { flow: PurchaseFlow }) {
           )}
           {sameCodes && computed?.error != null && (
             <p role="alert" className="text-sm text-destructive">
-              {previewError(computed.error, station.data)}
+              {previewError(computed.error)}
             </p>
           )}
 
@@ -282,10 +287,13 @@ const clock = new Intl.DateTimeFormat("pl-PL", {
 });
 
 /**
- * A handed-over product reward: the server says when and where (station and till), so a lost answer
- * of this till's own attempt is told apart from a handover elsewhere. Null without a usable time.
+ * The current state of a handed-over product reward: when and where (station and till) the server
+ * recorded it. A 409 says the reward is collected, not that an earlier attempt failed - after a lost
+ * answer that attempt may be the one recorded. Null without a usable time.
  */
-function handedOverMessage(error: ApiError, own: CashierStation | undefined) {
+function handedOverMessage(error: unknown, own: CashierStation | undefined) {
+  if (!(error instanceof ApiError) || error.code !== "rewards.coupon_redeemed")
+    return null;
   const problem = error.problem as RewardsConflictProblem;
   if (!problem.handedOverAt) return null;
   const at = new Date(problem.handedOverAt);
@@ -296,16 +304,16 @@ function handedOverMessage(error: ApiError, own: CashierStation | undefined) {
     problem.stationCode === own.stationCode &&
     problem.registerCode === own.registerCode;
   if (here)
-    return `Nagroda została już wydana ${when} na tej kasie. Jeśli to przed chwilą, odpowiedź poprzedniej próby nie dotarła - sprawdź, czy klient ją otrzymał.`;
+    return `Nagroda jest odebrana: zapisano wydanie ${when} na tej kasie. Jeśli klient nie dostał jeszcze produktu, przekaż mu go.`;
   const where = problem.stationCode
     ? ` na stanowisku ${problem.stationCode}${problem.registerCode ? `, kasa ${problem.registerCode}` : ""}`
     : "";
-  return `Nagroda została już wydana ${when}${where}.`;
+  return `Nagroda jest odebrana: zapisano wydanie ${when}${where}.`;
 }
 
-function handoverError(error: unknown, own: CashierStation | undefined) {
+function handoverError(error: unknown) {
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
-    return handedOverMessage(error, own) ?? "Ta nagroda została już wydana.";
+    return "Ta nagroda jest już odebrana.";
   if (error instanceof ApiError && error.code === "rewards.coupon_not_found")
     return "Nie znaleziono aktywnej nagrody tego klienta o tym kodzie.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")
@@ -350,6 +358,8 @@ function RewardHandover({
   const unknown =
     error !== null && (uncertain || (keepsIdempotencyKey(error) && !busy));
   const refusal = unknown ? null : busy;
+  // Final: the reward is collected. Shown as its state, with no button to hand it over again.
+  const collected = unknown ? null : handedOverMessage(error, station);
 
   const send = async () => {
     try {
@@ -372,18 +382,24 @@ function RewardHandover({
       data-testid="reward-handover"
       className="flex flex-col gap-3 rounded-xl bg-muted p-3 text-sm"
     >
-      <p>
-        <span className="font-semibold">{offerName}</span>: nagroda do wydania.
-        Nie zapisuj tankowania z tym kodem.
-      </p>
+      {collected ? (
+        <p role="status" className="font-medium">
+          <span className="font-semibold">{offerName}</span>: {collected}
+        </p>
+      ) : (
+        <p>
+          <span className="font-semibold">{offerName}</span>: nagroda do
+          wydania. Nie zapisuj tankowania z tym kodem.
+        </p>
+      )}
       {refusal && (
         <p role="alert" className="text-destructive">
           {refusal}
         </p>
       )}
-      {error && !unknown && !refusal && (
+      {error && !unknown && !refusal && !collected && (
         <p role="alert" className="text-destructive">
-          {handoverError(error, station)}
+          {handoverError(error)}
         </p>
       )}
       {unknown && (
@@ -396,18 +412,20 @@ function RewardHandover({
           Ponów: nagroda nie zostanie wydana dwa razy.
         </p>
       )}
-      <Button
-        type="button"
-        className="self-start"
-        disabled={locked || handOver.isPending}
-        onClick={send}
-      >
-        {handOver.isPending
-          ? "Wydawanie…"
-          : unknown
-            ? "Ponów wydanie"
-            : "Wydaj nagrodę"}
-      </Button>
+      {!collected && (
+        <Button
+          type="button"
+          className="self-start"
+          disabled={locked || handOver.isPending}
+          onClick={send}
+        >
+          {handOver.isPending
+            ? "Wydawanie…"
+            : unknown
+              ? "Ponów wydanie"
+              : "Wydaj nagrodę"}
+        </Button>
+      )}
     </div>
   );
 }
