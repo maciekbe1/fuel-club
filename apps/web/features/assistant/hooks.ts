@@ -25,6 +25,8 @@ export type Turn = {
   tools: ToolCall[];
   text: string;
   confirmations: ChatConfirmation[];
+  /** The model proposed talking to an agent (propose_handoff); nothing was handed over. */
+  handoff: boolean;
   /** `done` only after the server's done event; anything else is not a successful answer. */
   status: "streaming" | "done" | "error" | "cancelled";
   error?: string;
@@ -60,6 +62,7 @@ function reducer(state: State, action: Action): State {
             tools: [],
             text: "",
             confirmations: [],
+            handoff: false,
             status: "streaming",
           },
         ],
@@ -89,6 +92,8 @@ function reducer(state: State, action: Action): State {
               ...turn,
               confirmations: [...turn.confirmations, event.data],
             };
+          case "handoff":
+            return { ...turn, handoff: true };
           case "done":
             return { ...turn, status: "done" };
           case "error":
