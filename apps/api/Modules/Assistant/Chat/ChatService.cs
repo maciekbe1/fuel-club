@@ -154,6 +154,23 @@ public sealed class ChatService(
                 if (step is ModelStep.Reply reply)
                 {
                     await Send("delta", new ChatDeltaEvent(reply.Text), turn.Token);
+                    // Only when no search of this turn found anything: a later search that found
+                    // the answer must not leave a consultant button under it.
+                    if (
+                        !handoffProposed
+                        && results.Any(r =>
+                            r.Name == AssistantTools.SearchProgramRules && r.Handoff is not null
+                        )
+                        && !results.Any(r =>
+                            r.Name == AssistantTools.SearchProgramRules
+                            && r.Status == ToolStatus.Ok
+                            && r.Handoff is null
+                        )
+                    )
+                    {
+                        handoffProposed = true;
+                        await Send("handoff", new ChatHandoffEvent(), turn.Token);
+                    }
                     await Send("done", new ChatDoneEvent(results.Count), turn.Token);
                     recorder.Finish(TurnOutcome.Done);
                     return;
@@ -194,8 +211,12 @@ public sealed class ChatService(
                     await Send("tool", new ChatToolEvent(result.Name, result.Status), turn.Token);
                     if (result.Confirmation is { } confirmation)
                         await Send("confirmation", confirmation, turn.Token);
-                    // Once per turn: the rules tool and the model may both propose it.
-                    if (result.Handoff is { } handoff && !handoffProposed)
+                    // Once per turn. An empty rules result waits for the end of the turn (above).
+                    if (
+                        result.Handoff is { } handoff
+                        && !handoffProposed
+                        && result.Name != AssistantTools.SearchProgramRules
+                    )
                     {
                         handoffProposed = true;
                         await Send("handoff", handoff, turn.Token);

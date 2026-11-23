@@ -33,7 +33,7 @@ Stan na 2026-11-22. Dowód to test, który przechodzi, albo opisany ręczny prze
 
 | Kryterium | Dowód |
 | --- | --- |
-| Wersjonowane przypadki wszystkich kategorii, asercje na narzędzia, właściciela i skutki w bazie | `AssistantEvals` (`assistant-evals-v2`, 22 przypadki) |
+| Wersjonowane przypadki wszystkich kategorii, asercje na narzędzia, właściciela i skutki w bazie | `AssistantEvals` (`assistant-evals-v2`, 24 przypadki) |
 | Ślady: correlationId, pseudonim, narzędzia, czasy, tryb dostawcy; bez treści i kodów | `AssistantTracingTests`, `TurnRecorderTests`, [ADR 0008](/decyzje/0008-slady-i-evale-czatu/) |
 | OpenTelemetry, opcjonalny Phoenix, niedostępny odbiorca nie blokuje | `AssistantTracingTests` (eksport OTLP, nieosiągalny kolektor); ręcznie: Phoenix w P7a |
 | Metryki całego ruchu (p95, błędy, narzędzia, odmowy, limity) | `ObservabilityTests`, `e2e/observability.spec.ts` |

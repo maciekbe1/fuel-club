@@ -1142,6 +1142,75 @@ public sealed class AssistantTests(ApiFactory factory) : IAsyncLifetime
         Assert.Single(stream.Of("handoff"));
     }
 
+    [Fact]
+    public async Task A_later_search_that_finds_the_answer_leaves_no_agent_proposal()
+    {
+        await using var host = Host(
+            model: new ScriptedModel(
+                (context, _) =>
+                    Task.FromResult(
+                        context.ToolResults.Count switch
+                        {
+                            0 => Tool(
+                                AssistantTools.SearchProgramRules,
+                                new { query = "hot dog sklep pozapaliwowe" }
+                            ),
+                            1 => Tool(
+                                AssistantTools.SearchProgramRules,
+                                new { query = "punkty za hot doga" }
+                            ),
+                            _ => new ModelStep.Reply("Według regulaminu: §3.1."),
+                        }
+                    )
+            )
+        );
+        var customer = await AccountAsync(host: host);
+
+        var stream = await ChatAsync(customer.Client, "Czy dostanę punkty za hot doga?");
+
+        Assert.Equal(["search_program_rules:ok", "search_program_rules:ok"], ToolsOf(stream));
+        Assert.Empty(stream.Of("handoff"));
+    }
+
+    [Theory]
+    [InlineData("Ile punktów brakuje mi do kawy?")]
+    [InlineData("Ile mam punktów? Chcę kawę.")]
+    public async Task A_question_about_own_points_mentioning_a_product_gets_the_balance(
+        string message
+    )
+    {
+        var customer = await AccountAsync(balance: 10);
+
+        var stream = await ChatAsync(customer.Client, message);
+
+        Assert.Contains("get_my_balance:ok", ToolsOf(stream));
+    }
+
+    [Theory]
+    [InlineData("zakup w sklepie", "Regulamin, §3.1")]
+    [InlineData("odbiór nagrody", "Regulamin, §3.6")]
+    public async Task Demo_answers_the_product_question_with_the_chosen_meaning(
+        string answer,
+        string source
+    )
+    {
+        var customer = await AccountAsync(balance: 10);
+        var first = await ChatAsync(customer.Client, "Czy dostanę punkty za hot doga?");
+
+        var stream = await ChatAsync(
+            customer.Client,
+            answer,
+            history: new[]
+            {
+                new { role = "user", text = "Czy dostanę punkty za hot doga?" },
+                new { role = "assistant", text = first.Text },
+            }
+        );
+
+        Assert.Equal(["search_program_rules:ok"], ToolsOf(stream));
+        Assert.Contains(source, stream.Text);
+    }
+
     [Theory]
     [InlineData("Czy dostanę punkty za hot doga?")]
     [InlineData("Dostanę punkty za kawę?")]

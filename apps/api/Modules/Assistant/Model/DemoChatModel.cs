@@ -71,13 +71,10 @@ public sealed partial class DemoChatModel : IChatModel
             && PointsForProduct().IsMatch(text)
             && !PurchaseOrPickup().IsMatch(text)
         )
-            return Task.FromResult<ModelStep>(
-                new ModelStep.Reply(
-                    intro
-                        + "Pytasz o zakup tego produktu w sklepie stacji czy o odbiór nagrody "
-                        + "z kuponu za punkty? Zasady są różne - napisz, o które chodzi."
-                )
-            );
+            return Task.FromResult<ModelStep>(new ModelStep.Reply(intro + ProductQuestion));
+        // The answer to that question: the original question with the chosen meaning.
+        if (AnswersProductQuestion(context.History, text) is { } meaning)
+            return Task.FromResult(NextRulesStep(context, intro, meaning));
 
         if (aboutPeople || RulesQuestion().IsMatch(text))
             return Task.FromResult(NextRulesStep(context, intro));
@@ -162,14 +159,42 @@ public sealed partial class DemoChatModel : IChatModel
     /// Searches the rules with the question; cites the best point, or says the rules do not cover it
     /// and proposes a person.
     /// </summary>
-    private static ModelStep NextRulesStep(ChatModelContext context, string intro)
+    private const string ProductQuestion =
+        "Pytasz o zakup tego produktu w sklepie stacji czy o odbiór nagrody z kuponu za punkty? "
+        + "Zasady są różne - napisz, o które chodzi.";
+
+    /// <summary>A rules query for the chosen meaning, or null when this is not that answer.</summary>
+    private static string? AnswersProductQuestion(
+        IReadOnlyList<Chat.ChatHistoryItem> history,
+        string text
+    )
+    {
+        if (
+            history.Count < 2
+            || history[^1] is not { Role: "assistant", Text: { } last }
+            || !last.Contains(ProductQuestion, StringComparison.Ordinal)
+            || history[^2] is not { Role: "user", Text: { } question }
+        )
+            return null;
+        var product = Product().Match(Normalize(question)).Value;
+        return Pickup().IsMatch(text)
+                ? $"Czy dostanę punkty za odebranie nagrody {product} z kuponu?"
+            : Purchase().IsMatch(text) ? $"Czy dostanę punkty, jeśli kupię {product}?"
+            : null;
+    }
+
+    private static ModelStep NextRulesStep(
+        ChatModelContext context,
+        string intro,
+        string? query = null
+    )
     {
         var found = context.ToolResults.LastOrDefault(r =>
             r.Name == AssistantTools.SearchProgramRules
         );
         if (found is null)
         {
-            var query = context.Message.Trim();
+            query ??= context.Message.Trim();
             if (query.Length > AssistantTools.MaxRulesQueryLength)
             {
                 var cut = AssistantTools.MaxRulesQueryLength;
@@ -395,10 +420,18 @@ public sealed partial class DemoChatModel : IChatModel
     )]
     private static partial Regex RulesQuestion();
 
-    [GeneratedRegex(
-        @"punkt\w*.*(hot\s*dog|kaw[aey]\b|kawk|myjni)|(hot\s*dog|kaw[aey]\b|kawk|myjni).*punkt"
-    )]
+    // "Czy dostanę punkty za hot doga?", "punkty za kawę" - not "ile punktów kosztuje kawa".
+    [GeneratedRegex(@"punkt\w*\s+za\s+(hot\s*dog|kaw|myjni)")]
     private static partial Regex PointsForProduct();
+
+    [GeneratedRegex(@"hot\s*dog\w*|kaw\w*|myjni\w*")]
+    private static partial Regex Product();
+
+    [GeneratedRegex(@"odbi|odbior|odebr|nagrod|kupon")]
+    private static partial Regex Pickup();
+
+    [GeneratedRegex(@"zakup|kupi|kupuj|sklep|place|zaplac")]
+    private static partial Regex Purchase();
 
     [GeneratedRegex(@"kup|zaplac|place|odbi|odbier|odebr|kupon|wymian|wymien|nagrod|sklep")]
     private static partial Regex PurchaseOrPickup();

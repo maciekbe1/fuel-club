@@ -58,10 +58,10 @@ Rozszerzenie `pg_trgm` (migracja). Wiersze zapisuje tylko migracja; nowa wersja 
 
 | Plik | Co sprawdza |
 | --- | --- |
-| `apps/api.tests/ProgramRulesSearchTests.cs` | skrót `regulamin-v1`, podział na 32 punkty, baza = plik; 23 pytania (13 strojących, 10 kontrolnych) trafiają właściwy punkt wśród wyników; 9 pytań spoza regulaminu nic nie znajduje; odmiana („punktów/punkty”, „nagrody/nagrodę”) daje ten sam termin; do zapytania trafiają tylko litery i cyfry |
-| `apps/api.tests/AssistantTests.cs` | demo cytuje §6.1 z wersją; brak odpowiedzi → `propose_handoff` i zdarzenie `handoff`; złe argumenty odrzucone; model dostaje fragmenty jako dane |
+| `apps/api.tests/ProgramRulesSearchTests.cs` | skrót `regulamin-v1`, podział na 32 punkty, baza = plik; 32 pytania (strojące, kontrolne i regresje z evali Gemini: karta lojalnościowa, krótkie zapytania o hot doga) trafiają właściwy punkt wśród wyników; 12 pytań spoza regulaminu (m.in. karta kredytowa) nic nie znajduje; odmiana („punktów/punkty”, „nagrody/nagrodę”) daje ten sam termin; do zapytania trafiają tylko litery i cyfry |
+| `apps/api.tests/AssistantTests.cs` | demo cytuje §6.1 z wersją; brak odpowiedzi → zdarzenie `handoff` z pustego wyniku (raz na turę, nie gdy późniejsze wyszukiwanie coś znalazło); dopytanie o hot doga i odpowiedź na nie; złe argumenty odrzucone; model dostaje fragmenty jako dane |
 | `apps/api.tests/GeminiTests.cs` | fragmenty wracają do Gemini ze źródłem i wersją |
-| `apps/api.tests/Evals/assistant-cases.v2.json` | 6 przypadków regulaminu (kategorie `regulamin-*`) |
+| `apps/api.tests/Evals/assistant-cases.v2.json` | 9 przypadków regulaminu (kategorie `regulamin-*`) |
 | `apps/web/e2e/chat.spec.ts` | pytanie o zasady → odpowiedź z §6.1 i znacznik „Regulamin”; pytanie spoza regulaminu → przycisk konsultanta |
 
 Znane pudła i margines progu: [ADR 0016](/decyzje/0016-regulamin-w-czacie/#konsekwencje).

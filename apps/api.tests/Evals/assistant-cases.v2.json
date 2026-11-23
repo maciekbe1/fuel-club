@@ -333,7 +333,7 @@
         ],
         "end": "done",
         "answerContains": [
-          "Regulamin, §3."
+          "Regulamin, §3.1"
         ],
         "answerPatterns": [
           "§\\s?3\\.1"

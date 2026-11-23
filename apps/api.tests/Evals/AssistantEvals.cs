@@ -230,6 +230,8 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
             chosen is { Length: > 0 } ? applicable.Where(c => chosen.Contains(c.Id)).ToList()
             : mode == "full" ? applicable
             : applicable.Where(c => PilotCases.Contains(c.Id)).ToList();
+        // A mistyped id must not silently shrink a paid run.
+        Assert.Empty((chosen ?? []).Except(selected.Select(c => c.Id)));
         Assert.NotEmpty(selected);
 
         var runs = new List<CaseReport>();
@@ -367,13 +369,17 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         public string PromptVersion => inner.PromptVersion;
         public bool Demo => inner.Demo;
 
+        private int _step;
+
         public async Task<ModelStep> NextAsync(ChatModelContext context, CancellationToken ct)
         {
             Last = context;
             Unanswered.Clear();
             var step = await inner.NextAsync(context, ct);
+            // ChatService numbers the calls it runs; these may never run (e.g. the tool limit).
             if (step is ModelStep.Tool tool)
-                Unanswered.AddRange(tool.Calls);
+                Unanswered.AddRange(tool.Calls.Select(c => c with { Step = _step }));
+            _step++;
             return step;
         }
     }
@@ -454,11 +460,23 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
         var client = await LoginAsync(host, customer.Email);
         var before = await StateAsync(customer.UserId);
 
-        var stream = await ChatAsync(client, Fill(evalCase.Message));
-        // Before the planted point goes: the scores must see what the model saw.
-        var calls = recorder?.Model is { } recorded
-            ? await DiagnoseAsync(host, recorded, Redact)
-            : null;
+        Stream stream;
+        List<ToolDiagnostic>? calls = null;
+        try
+        {
+            stream = await ChatAsync(client, Fill(evalCase.Message));
+            // Before the planted point goes: the scores must see what the model saw.
+            if (recorder?.Model is { } recorded)
+                calls = await DiagnoseAsync(host, recorded, Redact);
+        }
+        finally
+        {
+            // Removed at once, even on failure: later cases of the same run must not find it.
+            if (setup.RuleFragment is not null)
+                await DbAsync(db =>
+                    db.RuleFragments.Where(f => f.Section == PlantedSection).ExecuteDeleteAsync()
+                );
+        }
         string Redact(string text) =>
             own.Aggregate(
                 text.Replace(customer.Email, "{email}")
@@ -466,12 +484,6 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                 (t, o) =>
                     t.Replace(o.Id.ToString(), "{ownCouponId}").Replace(o.Code ?? "\u0000", "[kod]")
             );
-        // Removed at once: later cases of the same run must not find it.
-        if (setup.RuleFragment is not null)
-            await DbAsync(db =>
-                db.RuleFragments.Where(f => f.Section == PlantedSection).ExecuteDeleteAsync()
-            );
-
         // Tools and how the turn ended.
         var tools = stream
             .Of("tool")
@@ -692,21 +704,8 @@ public sealed class AssistantEvals(ApiFactory factory, ITestOutputHelper output)
                 new(
                     call.Step,
                     call.Name,
-                    redact(
-                        JsonSerializer.Serialize(
-                            call.Arguments,
-                            new JsonSerializerOptions
-                            {
-                                // Readable Polish in the report; it is never rendered as HTML.
-                                Encoder = System
-                                    .Text
-                                    .Encodings
-                                    .Web
-                                    .JavaScriptEncoder
-                                    .UnsafeRelaxedJsonEscaping,
-                            }
-                        )
-                    ),
+                    // As the model wrote it (readable Polish), on one line.
+                    redact(Regex.Replace(call.Arguments.GetRawText(), @"\s*\n\s*", " ")),
                     result?.Status,
                     result?.Reason,
                     sources,

@@ -35,8 +35,9 @@ public static class ToolStatus
 
 /// <summary>
 /// The outcome for the model. <c>Reason</c> explains a rejection; <c>Confirmation</c> is set only by
-/// propose_coupon_activation and <c>Handoff</c> only by propose_handoff - both go to the client as
-/// events, not to the model.
+/// propose_coupon_activation; <c>Handoff</c> by propose_handoff and by an empty search_program_rules
+/// result (sent at the end of the turn if no other search found anything) - both go to the client
+/// as events, not to the model.
 /// </summary>
 public sealed record ToolResult(
     string Name,
@@ -448,7 +449,8 @@ public sealed class AssistantTools(
                 m.Text
             ))
             .ToList();
-        // No source: the consultant is proposed here, not left to the model's wording (ADR 0016).
+        // No source: the consultant is proposed by the backend, not left to the model's wording;
+        // ChatService sends it at the end of the turn if no other search found anything (ADR 0016).
         return new(
             SearchProgramRules,
             ToolStatus.Ok,
