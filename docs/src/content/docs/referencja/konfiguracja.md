@@ -42,6 +42,7 @@ sidebar:
 | `Assistant:TraceSaveTimeout` | nie | `00:00:02` (do 30 s); jak długo koniec tury czeka na zapis śladu |
 | `DataProtection:Certificate` / `CertificatePassword` | poza Development | base64 PKCS#12 szyfrujący klucze Data Protection w bazie; bez niego start poza Development się nie powiedzie ([ADR 0010](/decyzje/0010-obrazy-i-hosting/)) |
 | `ForwardedHeaders:KnownProxies` / `KnownNetworks` | nie | adresy IP / zakresy CIDR proxy, którym API wierzy w `X-Forwarded-For` i `X-Forwarded-Proto` (poza loopback). Na hostingu zakres sieci prywatnej z Nextem ([ADR 0010](/decyzje/0010-obrazy-i-hosting/)). Adres klienta służy limitom logowania - [ADR 0009](/decyzje/0009-zdarzenia-anomalie-i-retencja/#limity) |
+| `ForwardedHeaders:ForwardLimit` | nie | `1` (1 - 10, inaczej API nie startuje); ile hopów `X-Forwarded-For` czytać od prawej. Każdy musi pochodzić od znanego proxy, więc pierwszy nieznany adres to klient. Cloud Run: `3` ([instrukcja](/instrukcje/obrazy-i-hosting/#adres-klienta-na-cloud-run)) |
 | `Observability:MaxSecurityEventsPerMinute` | nie | `600`; więcej zdarzeń bezpieczeństwa w minucie jest tylko liczonych w logu |
 | `RateLimits:AuthPermitLimit` / `AuthWindow` | nie | `10` / `00:01:00`; próby logowania i rejestracji na adres IP, potem `429` (blokada konta Identity działa niezależnie) |
 | `RateLimits:PurchasePermitLimit` / `PurchaseWindow` | nie | `60` / `00:01:00`; zakupy (z odbiorem kuponu) na kasjera, potem `429` |

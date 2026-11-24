@@ -3,7 +3,7 @@
 Spec: `specs/SPEC.md`. Plan: `specs/PLAN.md`. Pętla: `specs/LOOP.md`.
 
 HEAD / branch: main (commity kroków lokalnie, bez push; ostatni push: c4a7883)
-Etap i status: P0-P6 - done; P7a - done; P7b - done; P7c - judge offline zrobiony w P16d (kalibracja czeka na oceny człowieka), online w P15e; P8 - done; P9 - done lokalnie (wdrożenie wymaga konta); P10 - done; poprawki review - done
+Etap i status: P0-P6 - done; P7a - done; P7b - done; P7c - judge offline zrobiony w P16d (kalibracja czeka na oceny człowieka), online w P15e; P8 - done; P9 - done (Cloud Run 2026-11-24); P10 - done; poprawki review - done
 
 ## P0 - baza pracy (done, 2026-11-22)
 
@@ -206,6 +206,12 @@ Stabilność E2E:
 - test „stop cancels the turn” polegał na `requestfailed` dla wstrzymanej trasy, co nie jest pewne → sprawdza przerwanie sygnału `fetch` w stronie.
 
 Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane przez `proxy.ts` na `/api`.
+
+## P9b - wdrożenie na Cloud Run (2026-11-24)
+
+- Projekt `fuelclub-demo-a0999e`, `europe-central2`: Cloud SQL (prywatny IP), Artifact Registry, Secret Manager, job migracji, api (`internal`, 1 instancja), web (publiczny). `deploy/cloudbuild-*.yaml`.
+- Znalezione na wdrożeniu: z `ForwardLimit=1` wszyscy klienci mieli jeden limit logowań (API brało hop `0.0.0.0`). Dodane `ForwardedHeaders:ForwardLimit`, test middleware z łańcuchem Cloud Run; na Cloud Run `3`, zaufane `169.254.0.0/16` i `0.0.0.0`. Sprawdzone z dwóch adresów i z podrobionym `X-Forwarded-For`.
+- Sprawdzone: rejestracja, logowanie, `Secure`, SSE bez buforowania, SignalR (WebSocket), konta startowe z rolami, sesja po nowych rewizjach. Telefon - do zrobienia ręcznie.
 
 ## P9 - hosting w dostępnym zakresie (częściowo, 2026-11-22)
 

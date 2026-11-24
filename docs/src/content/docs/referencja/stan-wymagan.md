@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-Stan na 2026-11-23. Poziomy:
+Stan na 2026-11-24. Poziomy:
 
 - **Zbudowane** - kod w repozytorium, działa lokalnie.
 - **Przetestowane** - automatyczne testy lokalnie i w CI (zielone od `1c3182b`). Przy usługach zewnętrznych osobno: na atrapie albo na prawdziwej usłudze.
@@ -16,7 +16,7 @@ Stan na 2026-11-23. Poziomy:
 | --- | --- | --- | --- | --- |
 | Gemini API (czat, wybór narzędzi) | tak | na atrapie odpowiedzi i na prawdziwym modelu: pełny przebieg evali `gemini-v10` 61/63, symulacja `gemini-1` (30 rozmów) | nie | [Evale Gemini](#evale-na-prawdziwym-modelu), [symulacja](/instrukcje/symulacja-ruchu/) |
 | RAG - regulamin | tak | tak, lokalnie i w CI (model demo); na Gemini w pilotażu: oba przypadki (z odpowiedzią i bez) zaliczone po poprawce `gemini-v6` | nie | Wyszukiwanie leksykalne w PostgreSQL, bez embeddingów; znane pudła. [ADR 0016](/decyzje/0016-regulamin-w-czacie/) |
-| Hosting - Cloud Run | obrazy Docker, próba produkcyjna lokalnie | obrazy budowane w CI | nie | [Instrukcja](/instrukcje/obrazy-i-hosting/#cloud-run) |
+| Hosting - Cloud Run | tak, od 2026-11-24 (projekt `fuelclub-demo-a0999e`, Cloud SQL z prywatnym IP) | po wdrożeniu: rejestracja, logowanie, `Secure`, SSE, SignalR, limit logowań per klient, sesja po nowych rewizjach; telefon - nie | nie | [Instrukcja](/instrukcje/obrazy-i-hosting/#cloud-run) |
 | Vertex AI | nie | nie | nie | [Niżej](#vertex-ai) |
 | Agent Builder / Dialogflow CX | nie | nie | nie | Ewentualnie osobny eksperyment po ukończeniu aplikacji, bez przepisywania agenta. |
 | Agent głosowy | nie | nie | nie | Mikrofon z zamianą mowy na tekst to jeszcze nie agent głosowy. |

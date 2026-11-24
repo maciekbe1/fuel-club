@@ -55,6 +55,8 @@ Przed P9:
 
 ## Konsekwencje
 
+- Wdrożenie na Cloud Run (2026-11-24): gniazdo API to proxy instancji (`169.254.x`), a `X-Forwarded-For` kończy się wpisem `0.0.0.0` dopisanym przez wewnętrzny hop; Next nic nie dopisuje. Z jednym czytanym wpisem klientem był `0.0.0.0`. Stąd `ForwardedHeaders:ForwardLimit` (domyślnie 1; na Cloud Run 3 - dwa potrzebne i zapas) - [instrukcja](/instrukcje/obrazy-i-hosting/#adres-klienta-na-cloud-run).
+
 - Backup bazy obejmuje zaszyfrowane klucze. Po odtworzeniu z tym samym certyfikatem sesje i potwierdzenia dalej działają (sprawdzone). Utrata certyfikatu unieważnia wszystkie sesje i potwierdzenia: certyfikat trzymaj w menedżerze sekretów, osobno od kopii.
 - `UseHttpsRedirection` loguje ostrzeżenie o braku portu HTTPS przy żądaniach bez `X-Forwarded-Proto` - oczekiwane, TLS kończy brzeg.
 - Konta demo działają tylko w Development. Na hostingu personel tworzą `BootstrapAdmin` i `BootstrapCashier`, a klienci się rejestrują.

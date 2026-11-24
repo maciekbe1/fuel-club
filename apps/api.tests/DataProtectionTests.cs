@@ -136,6 +136,53 @@ public sealed class DataProtectionTests(ApiFactory factory)
                 Config(("ForwardedHeaders:KnownNetworks:0", "172.16.0.0/12 # comment"))
             )
         );
+        foreach (var limit in new[] { "0", "11" })
+            Assert.Throws<InvalidOperationException>(() =>
+                new ServiceCollection().AddClientAddress(
+                    Config(("ForwardedHeaders:ForwardLimit", limit))
+                )
+            );
+    }
+
+    [Theory]
+    // Cloud Run: edge -> Next -> private hops -> API. The first unknown address from the right wins.
+    [InlineData("5", "198.51.100.7, 169.254.8.1, 10.186.0.5", "198.51.100.7")]
+    // A client-supplied prefix stays to the left of the address the edge appended.
+    [InlineData("5", "6.6.6.6, 198.51.100.7, 169.254.8.1, 10.186.0.5", "198.51.100.7")]
+    // The default reads one hop: every client would share the private address.
+    [InlineData(null, "198.51.100.7, 169.254.8.1, 10.186.0.5", "10.186.0.5")]
+    public async Task Client_address_skips_known_private_hops_by_range(
+        string? limit,
+        string forwardedFor,
+        string expected
+    )
+    {
+        var services = new ServiceCollection();
+        services.AddClientAddress(
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["ForwardedHeaders:KnownNetworks:0"] = "10.186.0.0/20",
+                        ["ForwardedHeaders:KnownNetworks:1"] = "169.254.0.0/16",
+                        ["ForwardedHeaders:ForwardLimit"] = limit,
+                    }
+                )
+                .Build()
+        );
+        using var provider = services.BuildServiceProvider();
+        var options =
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>>();
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("::ffff:169.254.169.126");
+        context.Request.Headers["X-Forwarded-For"] = forwardedFor;
+        var middleware = new Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersMiddleware(
+            _ => Task.CompletedTask,
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            options
+        );
+        await middleware.Invoke(context);
+        Assert.Equal(expected, context.Connection.RemoteIpAddress!.ToString());
     }
 
     private sealed class TestEnvironment : IHostEnvironment
@@ -145,5 +192,38 @@ public sealed class DataProtectionTests(ApiFactory factory)
         public string ContentRootPath { get; set; } = "";
         public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
             null!;
+    }
+
+    [Theory]
+    // The configuration deployed on Cloud Run (instructions, "Adres klienta na Cloud Run").
+    [InlineData("198.51.100.7, 0.0.0.0", "198.51.100.7")]
+    [InlineData("6.6.6.6, 198.51.100.7, 0.0.0.0", "198.51.100.7")]
+    public async Task Client_address_on_cloud_run(string forwardedFor, string expected)
+    {
+        var services = new ServiceCollection();
+        services.AddClientAddress(
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["ForwardedHeaders:KnownNetworks:0"] = "169.254.0.0/16",
+                        ["ForwardedHeaders:KnownProxies:0"] = "0.0.0.0",
+                        ["ForwardedHeaders:ForwardLimit"] = "3",
+                    }
+                )
+                .Build()
+        );
+        using var provider = services.BuildServiceProvider();
+        var options =
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>>();
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("::ffff:169.254.169.126");
+        context.Request.Headers["X-Forwarded-For"] = forwardedFor;
+        await new Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersMiddleware(
+            _ => Task.CompletedTask,
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            options
+        ).Invoke(context);
+        Assert.Equal(expected, context.Connection.RemoteIpAddress!.ToString());
     }
 }

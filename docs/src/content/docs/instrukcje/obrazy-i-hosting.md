@@ -76,31 +76,75 @@ Kopia zawiera dane osobowe i zaszyfrowane klucze - przechowuj ją jak bazę, a c
 
 ## Cloud Run
 
-:::caution[Planowane]
-Docelowy hosting od 2026-11-23 (zamiast Railway). Wdrożenie wymaga projektu Google Cloud i decyzji o kosztach - nie zostało wykonane. Punkty oznaczone „sprawdź” trzeba potwierdzić w aktualnej dokumentacji Google Cloud przy wdrożeniu.
-:::
+Wdrożone 2026-11-24 w osobnym projekcie `fuelclub-demo-a0999e`, region `europe-central2`. Adres: `https://fuelclub-web-407499358574.europe-central2.run.app`.
 
 Cloud Run to tylko hosting aplikacji. Model nadal idzie przez Gemini API z kluczem (`Assistant:Gemini:ApiKey`); dostęp przez Vertex AI to osobna decyzja - [Stan wymagań](/referencja/stan-wymagan/#vertex-ai).
 
-Zasoby w jednym projekcie i regionie:
+### Zasoby
 
-1. **Cloud SQL for PostgreSQL**: prywatny adres IP, bez publicznego. Rozszerzenie `pg_trgm` (regulamin, [ADR 0016](/decyzje/0016-regulamin-w-czacie/)) - sprawdź listę obsługiwanych rozszerzeń. Kopie: automatyczne Cloud SQL (sprawdź retencję) albo `pg_dump` jak wyżej.
-2. **api**: usługa Cloud Run z obrazem `apps/api/Dockerfile`, ingress „internal” (bez publicznego adresu). Zmienne jak w próbie produkcyjnej; sekrety (`ConnectionStrings__DefaultConnection`, `Assistant__PseudonymKey`, `Assistant__Gemini__ApiKey`, `DataProtection__Certificate*`, `BootstrapAdmin__*`, `BootstrapCashier__*`) z Secret Managera, nie w zmiennych jawnych. `ForwardedHeaders__KnownNetworks__0` - zakres podsieci, z której wychodzi web (sprawdź).
-3. **migracje**: Cloud Run Job z `./efbundle`, uruchamiany przed nową rewizją api. API nie migruje samo.
-4. **web**: usługa Cloud Run z obrazem `apps/web/Dockerfile`, publiczny adres HTTPS (albo własna domena). Ruch do api przez Direct VPC egress na wewnętrzny adres usługi api (`API_INTERNAL_URL`, sprawdź format adresu przy ingress „internal”). `TRUST_FORWARDED_FOR=true` tylko po sprawdzeniu, że brzeg Google ustawia `X-Forwarded-For` i `X-Forwarded-Proto`.
+| Zasób | Ustawienia |
+| --- | --- |
+| Cloud SQL `fuelclub-db` | PostgreSQL 17, `db-f1-micro`, 10 GB SSD, tylko prywatny IP (peering `google-managed-services-default`), kopie codziennie 02:00, 7 kopii. Połączenie z `SSL Mode=Require`. |
+| Artifact Registry `fuelclub` | obrazy `api:<sha>` i `web:<sha>`, budowane w Cloud Build |
+| Secret Manager | `db-connection`, `pseudonym-key`, `gemini-api-key`, `dp-certificate`, `dp-certificate-password`, `admin-password`, `cashier-password`, `support-password`; dostęp tylko konto usługi `fuelclub-api` |
+| Job `fuelclub-migrate` | `./efbundle` z obrazu api, Direct VPC egress; uruchamiany przed nową rewizją api |
+| Usługa `fuelclub-api` | ingress `internal`, Direct VPC egress (podsieć `default`, tylko zakresy prywatne), `min=max=1` instancja (SignalR, workery), CPU naliczane w trakcie żądań, timeout 300 s |
+| Usługa `fuelclub-web` | publiczna, Direct VPC egress `all-traffic` (żądania do `*.run.app` api liczą się jako wewnętrzne), `min=0`, `max=2`, `TRUST_FORWARDED_FOR=true` |
 
-Do sprawdzenia przed wdrożeniem:
+Konta startowe: `admin@`, `kasjer@` (stanowisko `DEMO-01`, kasa `K1`), `konsultant@demo.fuelclub.test`. Hasła są tylko w Secret Managerze:
 
-- **SSE czatu**: odpowiedź strumieniowa bez buforowania, limit czasu żądania powyżej `Assistant:TurnTimeout` (sprawdź limit Cloud Run i ustawienie timeoutu usługi).
-- **SignalR** (konsultant, [ADR 0014](/decyzje/0014-signalr-rozmowa-z-konsultantem/)): WebSocket przez Cloud Run; przy więcej niż jednej instancji api potrzebne „session affinity” albo backplane - na start jedna instancja (`max-instances=1`) albo affinity (sprawdź).
-- **Data Protection**: klucze w bazie, certyfikat stały z Secret Managera - restart rewizji nie wylogowuje.
-- **Skala do zera**: worker zgłoszeń i retencji działa tylko w uruchomionej instancji; na demo `min-instances=1` dla api albo akceptacja opóźnień (sprawdź koszt).
+```sh
+gcloud secrets versions access latest --secret admin-password --project fuelclub-demo-a0999e
+```
 
-Po wdrożeniu, na telefonie:
+### Wdrożenie nowej wersji
 
-- logowanie;
-- karta z QR;
-- kasa: skan kamerą kodu karty i kuponu (kamera wymaga HTTPS);
-- czat: odpowiedź pojawia się w trakcie, a nie po końcu - brzeg nie może buforować SSE;
-- wylogowanie;
-- restart usługi api nie wylogowuje.
+```sh
+P=fuelclub-demo-a0999e R=europe-central2 TAG=$(git describe --always --dirty) REPO=$R-docker.pkg.dev/$P/fuelclub
+gcloud builds submit --project $P --region $R --config deploy/cloudbuild-api.yaml --substitutions _TAG=$TAG .
+gcloud run jobs update fuelclub-migrate --project $P --region $R --image $REPO/api:$TAG
+gcloud run jobs execute fuelclub-migrate --project $P --region $R --wait
+gcloud run deploy fuelclub-api --project $P --region $R --image $REPO/api:$TAG
+gcloud builds submit --project $P --region $R --config deploy/cloudbuild-web.yaml --substitutions _TAG=$TAG apps/web
+gcloud run deploy fuelclub-web --project $P --region $R --image $REPO/web:$TAG
+```
+
+Wdrażaj tylko zacommitowany kod: tag to commit, a Cloud Build wysyła katalog roboczy. `git status` musi być czysty (albo tag z `git describe --always --dirty`). Zmienne i sekrety zostają z poprzedniej rewizji. Pełna lista: `gcloud run services describe fuelclub-api`.
+
+### Adres klienta na Cloud Run
+
+Łańcuch do API: brzeg Google przed web (dopisuje adres klienta) → Next (przekazuje `X-Forwarded-For` bez zmian) → wewnętrzny hop Cloud Run (dopisuje `0.0.0.0`) → proxy instancji (gniazdo `169.254.169.126`) → API. Sprawdzone logiem `ForwardedHeadersMiddleware` (Debug): przed zaufaniem zatrzymywał się na `169.254.169.126`, potem na `0.0.0.0`. Z domyślnym `ForwardLimit=1` API brało `0.0.0.0` - wszyscy klienci mieli jeden limit logowań. Sprawdzone: 11 prób z jednego adresu, a próba z drugiego (Cloud Build) w tym samym oknie dostała `429`.
+
+Ustawienia api:
+
+- `ForwardedHeaders__KnownNetworks__0=169.254.0.0/16`;
+- `ForwardedHeaders__KnownProxies__0=0.0.0.0`;
+- `ForwardedHeaders__ForwardLimit=3`.
+
+Po zmianie, w jednym oknie: pierwszy adres `429`, drugi `401`. Własny `X-Forwarded-For` klienta z internetu nie zdejmuje limitu - brzeg dopisuje prawdziwy adres na prawo (sprawdzone dwoma podrobionymi nagłówkami: `429`).
+
+Gwarancja dotyczy ruchu przez publiczny brzeg web. Inna usługa w tym projekcie, która woła api bezpośrednio (ingress `internal`), też przychodzi z `169.254.x` i jej `X-Forwarded-For` byłby zaufany. Dziś takich usług nie ma; nowa wymaga zawężenia zaufania.
+
+### Sprawdzone po wdrożeniu (2026-11-24)
+
+- rejestracja `201`, logowanie `204`, ciasteczka sesji i CSRF z `Secure` i `HttpOnly`;
+- api z internetu: `404` (ingress `internal`);
+- czat przez web: `text/event-stream`, `Content-Encoding: identity`, `Cache-Control: no-store, no-transform`, `meta`, `tool`, `delta`, `done`; pierwszy bajt po 0,27 s, całość 1,7 s (bez buforowania); provider Gemini;
+- SignalR: negocjacja `200` (WebSockets, SSE, long polling), handshake WebSocket przez rewrite Next;
+- sesja ważna po pięciu nowych rewizjach api;
+- wylogowanie `204`: ciasteczka wygaszone z `Secure`, potem `/api/auth/me` → `401`;
+- konta startowe logują się z rolami `Admin`, `Cashier`, `Support`;
+- migracje z joba, logi startu bez błędów (`Production`).
+
+:::caution[Do sprawdzenia na telefonie]
+Karta z QR, skan kamerą przy kasie, czat i rozmowa z konsultantem w przeglądarce - jeszcze nie sprawdzone ręcznie.
+:::
+
+Ograniczenia:
+
+- Rewrite Next ma limit 30 s na żądanie (`proxyTimeout` w Next). `Assistant:TurnTimeout` też wynosi 30 s - dłuższego limitu tury nie ustawiaj bez zmiany proxy.
+- Workery (retencja, zgłoszenia, reguły anomalii) dostają CPU tylko w trakcie żądań. Na demo to akceptowalne opóźnienie; stały CPU (`--no-cpu-throttling`) to ok. 45 USD/mies. więcej.
+
+### Koszt (szacunek, cennik z 2026-11-24 - sprawdź w rozliczeniach)
+
+Cloud SQL `db-f1-micro` z dyskiem ok. 10-12 USD, api z jedną bezczynną instancją ok. 5-10 USD, web od zera ok. 0-2 USD, rejestr i sekrety poniżej 1 USD. Razem ok. 20 USD/mies. bez ruchu, plus Gemini według użycia.
