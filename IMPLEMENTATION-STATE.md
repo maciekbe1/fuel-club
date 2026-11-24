@@ -594,4 +594,11 @@ P13 zamknięty (9 rund review, ostatnia bez uwag blokujących). P11: API, `propo
 
 ## P15 - panel LLMOps (pending, 2026-11-23)
 
+### P15c - lista rozmów i trace (2026-11-24)
+
+- `GET /api/admin/observability/conversations` (kursor `(StartedAt, Id)`, filtry metryk, `suspicious`) i `/conversations/{id}` (tury po kolei: czasy, kroki, tokeny, koszt, narzędzia); `ReviewItem.conversationId`. ADR 0020.
+- Web: `/admin/obserwowalnosc/rozmowy` (lista, okno, ruch, „Tylko podejrzane”, „Pokaż więcej”) i `/rozmowy/[id]` (trace); „Cała rozmowa →” z kolejki; `ReasonBadges` wspólne z kolejką.
+- Testy API (lista, strony, flagi, filtry, 400, 403, 404) i E2E (kolejka → trace → lista podejrzanych → trace).
+- Nadal otwarte w P15: spany wywołań modelu (P15a), odmowy na karcie (P15b), zakładka Evale (P15d), judge online (P15e).
+
 Na prośbę właściciela dodano zakres do specs/PLAN.md i specs/SPEC.md: trace, metryki/koszty, rozmowy/anomalie, raporty offline i judge na próbce. P7c realizowany jako P15e, bez dublowania etapu. Implementacja po P14. Zmiana wyłącznie planistyczna; nie włącza zapisu treści ani eksportu do judge'a. Testy aplikacji nieuruchamiane (brak zmian kodu); sprawdzono diff i spójność odwołań P15/P7c.

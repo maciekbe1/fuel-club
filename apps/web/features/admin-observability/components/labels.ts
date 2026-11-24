@@ -24,6 +24,18 @@ export const REASONS: Record<string, string> = {
   repeated_errors: "powtarzające się błędy użytkownika",
 };
 
+export const END_REASONS: Record<string, string> = {
+  Client: "zakończona przez klienta",
+  Idle: "wygasła (brak aktywności)",
+  Handoff: "przekazana konsultantowi",
+};
+
+export const OUTCOMES: Record<string, string> = {
+  Done: "zakończona",
+  Error: "błąd",
+  Cancelled: "przerwana przez klienta",
+};
+
 export const dateTime = new Intl.DateTimeFormat("pl-PL", {
   dateStyle: "short",
   timeStyle: "medium",

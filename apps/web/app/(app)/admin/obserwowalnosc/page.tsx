@@ -16,6 +16,12 @@ export default function ObservabilityPage() {
           Metryki czatu i zdarzeń bezpieczeństwa, reguły anomalii i tury do
           przejrzenia.
         </p>
+        <Link
+          href="/admin/obserwowalnosc/rozmowy"
+          className="self-start text-sm font-medium underline underline-offset-4"
+        >
+          Rozmowy i ich tury →
+        </Link>
       </div>
       <ObservabilityDashboard />
     </div>

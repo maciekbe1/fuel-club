@@ -114,7 +114,9 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | Kod | Pole | Kiedy |
 | --- | --- | --- |
 | `observability.validation_failed` | - | `400`: błędy parametrów w `errors` |
-| `observability.out_of_range` | `hours` | okno spoza 1-720 h |
+| `observability.out_of_range` | `hours`, `traffic`, `limit`, `runId`, `model`, `promptVersion` | okno spoza 1-720 h, nieznany ruch, `limit` spoza 1-100, pusty albo za długi filtr |
+| `observability.invalid_cursor` | `cursor` | kursor listy rozmów nie pochodzi z API |
+| `observability.conversation_not_found` | - | `404`: rozmowa nie istnieje (albo wygasła według retencji) |
 | `observability.turn_not_found` | - | `404`: oznaczanie nieistniejącej tury |
 
 ## Idempotency

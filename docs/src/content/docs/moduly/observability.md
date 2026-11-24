@@ -18,9 +18,9 @@ Liczy odrzucone żądania (odmowy, nieudane logowania, konflikty kluczy, ponowne
 | Przechwycenie kodu i zapis zdarzeń | `SecurityEvents.cs` (`ProblemCodeCapture`, `SecurityEventsMiddleware`) |
 | Ustawienia i reguły | `ObservabilityOptions.cs`, `AnomalyRules.cs` (`AnomalyRules`, `AnomalyAlerts`) |
 | Retencja i worker | `ObservabilityJobs.cs` |
-| Endpointy admina | `ObservabilityEndpoints.cs` |
+| Endpointy admina | `ObservabilityEndpoints.cs` (metryki, kolejka), `ConversationTraces.cs` (lista rozmów, trace) |
 | Limity logowania i zakupów, adres klienta | `apps/api/Infrastructure/RateLimiting.cs`, `apps/api/Infrastructure/ClientAddress.cs` |
-| Ekran | `apps/web/app/(app)/admin/obserwowalnosc/page.tsx`, `apps/web/features/admin-observability/` |
+| Ekran | `apps/web/app/(app)/admin/obserwowalnosc/page.tsx`, `.../obserwowalnosc/rozmowy/` (lista i trace), `apps/web/features/admin-observability/` |
 
 ## Przepływ
 
@@ -32,6 +32,7 @@ Liczy odrzucone żądania (odmowy, nieudane logowania, konflikty kluczy, ponowne
    - Koszt: demo „nie dotyczy”, brak użycia lub ceny - „nieznany”; częściowa suma oznaczona „niepełny”.
    - Rozmowy: przekazanie raz na rozmowę, odsetek bez przekazania z mianownikiem (zakończone), „Bezczynne” to nie rozwiązanie.
    - Widok, w którym wszystkie tury są z adaptera demo, ma komunikat: to nie pomiar wydajności ani kosztu Gemini. „Oznacz jako przejrzane” usuwa turę z kolejki.
+4. „Rozmowy” ([ADR 0020](/decyzje/0020-lista-rozmow-i-trace/)): lista rozmów w oknie 24 h / 7 dni / 30 dni, ruch rzeczywisty, syntetyczny albo wszystko, „Tylko podejrzane”. Strony przyciskiem „Pokaż więcej” (kursor). Wiersz prowadzi do rozmowy: tury po kolei z czasami, krokami modelu, tokenami, kosztem i narzędziami (pasek - udział czasu narzędzia w turze). Z kolejki prowadzi tam „Cała rozmowa →”.
 
 ## Dane
 
@@ -56,6 +57,8 @@ Szczegóły: [baza danych](/referencja/baza-danych/).
 | `apps/api.tests/ObservabilityTests.cs` (P16c) | tury, kroki modelu i wywołania narzędzi jako osobne liczniki; koszt: demo „nie dotyczy”, Gemini bez użycia „nieznany”, znany sumowany z wersją cennika; widok rzeczywisty bez ruchu syntetycznego; filtry modelu i wersji promptu zawężają tury i rozmowy, a łączone muszą pasować do tej samej tury; przekazanie raz na rozmowę (dwie propozycje = jedna rozmowa), bezczynna ponad limit liczona jako `Idle`; złe filtry → `400` |
 | `apps/api.tests/GeminiTests.cs` (koszt) | krok ponowiony po utracie połączenia: tokeny i koszt nieznane (utracona próba mogła być rozliczona); ponowienie po `503`/`429` i krok bez ponowienia: tokeny i koszt zapisane |
 | `apps/api.tests/ModelPricingTests.cs` | cena obowiązująca w chwili tury (nie przyszła), demo bez kosztu, brak użycia lub ceny → `null`, walidacja cennika |
+| `apps/api.tests/ObservabilityTests.cs` (P15c) | lista rozmów: najnowsze pierwsze, dwie strony kursorem bez powtórzeń, okno pierwszej strony w kursorze (zegar przesunięty między stronami), przerwana tura i „powtarzające się błędy” na czystej rozmowie bez flag, flagi, `hasCase`, modele, filtr podejrzanych, ruch rzeczywisty bez syntetycznego; trace: tury po kolei z narzędziami, kosztem i tokenami, bez id użytkownika, id zgłoszenia i treści; `404`; zły kursor, `limit`, `hours`, `traffic` → `400`; `403` dla User, Cashier, Support; pozycja kolejki z `conversationId` |
+| `apps/web/e2e/observability.spec.ts` (P15c) | z kolejki „Cała rozmowa →” do trace (tura po `correlationId`, odrzucone narzędzie, bez e-maila klienta), powrót do listy, „Tylko podejrzane” pokazuje tę rozmowę, wiersz prowadzi do trace; klient: `403` z API listy i przekierowanie z ekranu |
 | `apps/web/e2e/observability.spec.ts` | tura klienta z odrzuconym narzędziem trafia do kolejki admina (po `correlationId`), bez e-maila klienta; metryki, 8 reguł, przełącznik okna; sekcja rozmów, koszt demo „nie dotyczy” i komunikat demo (po filtrze modelu), przełącznik ruchu; „Oznacz jako przejrzane” usuwa ją z kolejki; klient nie wejdzie na ekran (przekierowanie) ani do API (`403`) |
 
 Próby negatywne: bez `UseForwardedHeaders` pada test limitów; bez wykluczenia przerwanych tur pada test kolejki; bez `ProblemCodeCapture` pada test zdarzeń (brak konfliktu i ponownego odbioru); ocena reguły udziału bez minimalnej próbki wywraca test reguł.

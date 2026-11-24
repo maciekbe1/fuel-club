@@ -14,15 +14,15 @@ Stan na 2026-11-23. Poziomy:
 
 | Wymaganie | Zbudowane | Przetestowane | Wdrożone | Uwagi |
 | --- | --- | --- | --- | --- |
-| Gemini API (czat, wybór narzędzi) | tak | na atrapie odpowiedzi; na prawdziwym modelu: test salda i pilotaż evali 5×1 | nie | Pilotaż: 4/5 (`gemini-v5`), po poprawce 5/5 (`gemini-v6`) - [evale Gemini](#evale-na-prawdziwym-modelu). [ADR 0011](/decyzje/0011-adapter-gemini/) |
+| Gemini API (czat, wybór narzędzi) | tak | na atrapie odpowiedzi i na prawdziwym modelu: pełny przebieg evali `gemini-v10` 61/63, symulacja `gemini-1` (30 rozmów) | nie | [Evale Gemini](#evale-na-prawdziwym-modelu), [symulacja](/instrukcje/symulacja-ruchu/) |
 | RAG - regulamin | tak | tak, lokalnie i w CI (model demo); na Gemini w pilotażu: oba przypadki (z odpowiedzią i bez) zaliczone po poprawce `gemini-v6` | nie | Wyszukiwanie leksykalne w PostgreSQL, bez embeddingów; znane pudła. [ADR 0016](/decyzje/0016-regulamin-w-czacie/) |
 | Hosting - Cloud Run | obrazy Docker, próba produkcyjna lokalnie | obrazy budowane w CI | nie | [Instrukcja](/instrukcje/obrazy-i-hosting/#cloud-run) |
 | Vertex AI | nie | nie | nie | [Niżej](#vertex-ai) |
 | Agent Builder / Dialogflow CX | nie | nie | nie | Ewentualnie osobny eksperyment po ukończeniu aplikacji, bez przepisywania agenta. |
 | Agent głosowy | nie | nie | nie | Mikrofon z zamianą mowy na tekst to jeszcze nie agent głosowy. |
-| Obserwowalność (ślady, metryki, anomalie) | tak | tak | nie | Panel LLMOps rozbudowuje P15. [Observability](/moduly/observability/) |
+| Obserwowalność (ślady, metryki, anomalie) | tak; lista rozmów i trace tur (P15c) | tak (API i E2E) | nie | Brakuje: osobnych spanów wywołań modelu (P15a), metryki odmów na karcie potwierdzenia (P15b), zakładki Evale (P15d). [Observability](/moduly/observability/) |
 | Alerty anomalii na Slacka | reguły tak, wysyłka nie | reguły tak | nie | |
-| LLM-as-judge | offline na syntetycznych transkryptach (P16d) | nie | nie | Rubryka z wersją (v2: cel propozycji kuponu, „nie można ocenić” bez dowodu), limit kosztu, arkusz kalibracji; kalibracja ocenami człowieka jeszcze niewykonana. Online (próbka ruchu, P15e) - nie. [Symulacja](/instrukcje/symulacja-ruchu/#judge) |
+| LLM-as-judge | offline na syntetycznych transkryptach (P16d), rubryka `judge-rubric-v3` | kalibracja ocenami człowieka: `demo-1` 29/30 (kappa 0,93, dane uczące rubrykę); `gemini-1` w Phoenix czeka na ocenę | nie | Judge online (P15e) - nie. [Symulacja](/instrukcje/symulacja-ruchu/), [ADR 0019](/decyzje/0019-ocena-czlowieka-w-phoenix/) |
 | Konsultant (przekazanie rozmowy) | tak | tak | nie | Własny panel, nie integracja z LiveChat. [Support](/moduly/support/) |
 | Twilio / WhatsApp / CRM / LiveChat | nie | nie | nie | |
 

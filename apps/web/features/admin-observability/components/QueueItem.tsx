@@ -1,7 +1,8 @@
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { ReviewItem } from "../services";
-import { REASONS, dateTime, ms } from "./labels";
+import { dateTime, ms } from "./labels";
+import { ReasonBadges } from "./ReasonBadges";
 
 export function QueueItem({
   item,
@@ -25,16 +26,7 @@ export function QueueItem({
           {dateTime.format(new Date(item.startedAt))} · {item.outcome}
           {item.errorCode && ` · ${item.errorCode}`}
         </span>
-        <span className="flex flex-wrap gap-1">
-          {item.reasons.map((reason) => (
-            <Badge
-              key={reason}
-              className="h-auto bg-amber-100 font-normal whitespace-normal text-amber-950 dark:bg-amber-900 dark:text-amber-50"
-            >
-              {REASONS[reason] ?? reason}
-            </Badge>
-          ))}
-        </span>
+        <ReasonBadges reasons={item.reasons} />
       </div>
       <dl className="grid gap-x-4 gap-y-1 text-muted-foreground sm:grid-cols-2">
         <div>
@@ -63,6 +55,14 @@ export function QueueItem({
           Narzędzia:{" "}
           {item.tools.map((t) => `${t.name} (${t.status})`).join(", ")}
         </p>
+      )}
+      {item.conversationId && (
+        <Link
+          href={`/admin/obserwowalnosc/rozmowy/${item.conversationId}`}
+          className="self-start text-sm underline underline-offset-4"
+        >
+          Cała rozmowa →
+        </Link>
       )}
       {failed && (
         <p role="alert" className="text-destructive">

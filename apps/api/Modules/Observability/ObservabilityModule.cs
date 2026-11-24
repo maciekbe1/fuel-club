@@ -51,6 +51,25 @@ public static class ObservabilityModule
                     + "`promptVersion` filter turns and conversations; security and anomalies are not "
                     + "filtered. Metadata only, users as pseudonyms."
             );
+        admin
+            .MapGet("/conversations", ConversationTraces.List)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .WithDescription(
+                "Conversations started in the last `hours` (1-720, default 24), newest first, with the "
+                    + "same `traffic`, `runId`, `model`, `promptVersion` filters as the summary (model and "
+                    + "prompt: one turn of the conversation has both). `suspicious=true`: only conversations with a "
+                    + "failed turn or a tool that did not succeed (the review queue's rule). Keyset pages: "
+                    + "`limit` 1-100 (default 25), `nextCursor` gives the next page; rows added later show "
+                    + "up after reloading the first page. Metadata and pseudonyms only; the support case "
+                    + "only as `hasCase`."
+            );
+        admin
+            .MapGet("/conversations/{id:guid}", ConversationTraces.Get)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithDescription(
+                "One conversation with its turns in order: timing, outcome, model steps, tokens, cost "
+                    + "and tool calls (name, status, duration). No text, arguments or results."
+            );
         admin.MapGet("/review", ObservabilityEndpoints.Queue);
         admin
             .MapPost("/review/{id:guid}", ObservabilityEndpoints.MarkReviewed)

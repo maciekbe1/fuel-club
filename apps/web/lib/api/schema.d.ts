@@ -2222,6 +2222,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/observability/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Conversations started in the last `hours` (1-720, default 24), newest first, with the same `traffic`, `runId`, `model`, `promptVersion` filters as the summary (model and prompt: one turn of the conversation has both). `suspicious=true`: only conversations with a failed turn or a tool that did not succeed (the review queue's rule). Keyset pages: `limit` 1-100 (default 25), `nextCursor` gives the next page; rows added later show up after reloading the first page. Metadata and pseudonyms only; the support case only as `hasCase`. */
+        get: {
+            parameters: {
+                query?: {
+                    hours?: number;
+                    traffic?: string;
+                    runId?: string;
+                    model?: string;
+                    promptVersion?: string;
+                    suspicious?: boolean;
+                    limit?: number;
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationPage"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/observability/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description One conversation with its turns in order: timing, outcome, model steps, tokens, cost and tool calls (name, status, duration). No text, arguments or results. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationTrace"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/observability/review": {
         parameters: {
             query?: never;
@@ -2421,6 +2522,27 @@ export interface components {
         ConfirmationRequest: {
             token: null | string;
         };
+        ConversationListItem: {
+            /** Format: uuid */
+            id: string;
+            userPseudonym: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            lastActivityAt: string;
+            /** Format: date-time */
+            endedAt: null | string;
+            endReason: null | string;
+            /** Format: int32 */
+            turns: number;
+            handoffProposed: boolean;
+            hasCase: boolean;
+            synthetic: boolean;
+            runId: null | string;
+            models: string[];
+            promptVersions: string[];
+            reasons: string[];
+        };
         ConversationMetrics: {
             /** Format: int32 */
             started: number;
@@ -2441,6 +2563,10 @@ export interface components {
             /** Format: int32 */
             endedWithoutCase: number;
         };
+        ConversationPage: {
+            items: components["schemas"]["ConversationListItem"][];
+            nextCursor: null | string;
+        };
         ConversationResponse: {
             /** Format: uuid */
             id: string;
@@ -2451,6 +2577,10 @@ export interface components {
             endReason: null | string;
             /** Format: int32 */
             turns: number;
+        };
+        ConversationTrace: {
+            conversation: components["schemas"]["ConversationListItem"];
+            turns: components["schemas"]["TurnTrace"][];
         };
         CostMetrics: {
             /** Format: double */
@@ -2618,6 +2748,8 @@ export interface components {
         ReviewItem: {
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            conversationId: null | string;
             correlationId: string;
             userPseudonym: string;
             /** Format: date-time */
@@ -2850,6 +2982,36 @@ export interface components {
             turnsWithoutTokenData: number;
             /** Format: int32 */
             demoTurns: number;
+        };
+        TurnTrace: {
+            /** Format: uuid */
+            id: string;
+            correlationId: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: int32 */
+            firstEventMs: null | number;
+            /** Format: int32 */
+            totalMs: number;
+            outcome: string;
+            errorCode: null | string;
+            provider: string;
+            model: string;
+            promptVersion: string;
+            /** Format: int32 */
+            modelSteps: null | number;
+            /** Format: int32 */
+            inputTokens: null | number;
+            /** Format: int32 */
+            outputTokens: null | number;
+            /** Format: double */
+            costUsd: null | number;
+            priceVersion: null | string;
+            handoffProposed: boolean;
+            /** Format: date-time */
+            reviewedAt: null | string;
+            tools: components["schemas"]["ReviewTool"][];
+            reasons: string[];
         };
         UpdateRewardRequest: {
             name: null | string;

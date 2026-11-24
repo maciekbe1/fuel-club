@@ -70,6 +70,60 @@ test("admin sees chat metrics and rules, and clears a suspicious turn from the r
   await context.close();
 });
 
+test("admin goes from a suspicious turn to its whole conversation and back to the list", async ({
+  page,
+  customer,
+  browser,
+  baseURL,
+}) => {
+  await page.goto("/czat");
+  const turnResponse = page.waitForResponse(
+    (r) => r.url().endsWith("/api/chat") && r.request().method() === "POST",
+  );
+  await page
+    .getByLabel("Wiadomość do asystenta")
+    .fill(`Aktywuj kupon ${crypto.randomUUID()}`);
+  await page.getByRole("button", { name: "Wyślij" }).click();
+  const correlationId = (await turnResponse).headers()["x-correlation-id"];
+  await expect(page.getByTestId("chat-turn")).toHaveAttribute(
+    "data-status",
+    "done",
+  );
+
+  const context = await browser.newContext({ baseURL });
+  const admin = await context.newPage();
+  await loginAs(admin, ADMIN.email, ADMIN.password);
+  await admin.goto("/admin/obserwowalnosc");
+  const item = admin
+    .getByTestId("review-item")
+    .filter({ hasText: correlationId });
+  await item.getByRole("link", { name: "Cała rozmowa →" }).click();
+  await admin.waitForURL(/\/admin\/obserwowalnosc\/rozmowy\/[0-9a-f-]{36}$/);
+  const conversationId = admin.url().split("/").pop()!;
+
+  // The trace: the turn with its correlation id and the rejected tool, metadata only.
+  const turn = admin
+    .getByTestId("turn-trace")
+    .filter({ hasText: correlationId });
+  await expect(turn).toContainText("propose_coupon_activation · rejected");
+  await expect(turn).toContainText("odrzucone narzędzie");
+  expect(await admin.getByRole("main").textContent()).not.toContain(
+    customer.email,
+  );
+
+  // The list, only suspicious ones: the same conversation, a link back to the trace.
+  await admin.getByRole("link", { name: "← Rozmowy" }).click();
+  await admin.waitForURL("/admin/obserwowalnosc/rozmowy");
+  await admin.getByRole("checkbox", { name: "Tylko podejrzane" }).click();
+  const row = admin.locator(
+    `[data-testid="conversation-row"][data-id="${conversationId}"]`,
+  );
+  await expect(row).toContainText("odrzucone narzędzie");
+  await row.getByRole("link").click();
+  await admin.waitForURL(`/admin/obserwowalnosc/rozmowy/${conversationId}`);
+  await context.close();
+});
+
 test("the observability screen and its API are for admins only", async ({
   page,
   customer,
@@ -80,4 +134,9 @@ test("the observability screen and its API are for admins only", async ({
   expect((await page.request.get("/api/admin/observability")).status()).toBe(
     403,
   );
+  expect(
+    (await page.request.get("/api/admin/observability/conversations")).status(),
+  ).toBe(403);
+  await page.goto("/admin/obserwowalnosc/rozmowy");
+  await page.waitForURL("/");
 });

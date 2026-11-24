@@ -958,4 +958,230 @@ public sealed class ObservabilityTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal([recent.Id], turns);
         Assert.Equal([recentEvent.Id], events);
     }
+
+    private const string Conversations = "/api/admin/observability/conversations";
+
+    private async Task<ConversationPage> PageAsync(HttpClient admin, string query)
+    {
+        var response = await admin.GetAsync($"{Conversations}?{query}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<ConversationPage>())!;
+    }
+
+    /// <summary>A metric turn with only the successful balance tool (no "no_match" search).</summary>
+    private AssistantTurn CleanTurn(
+        string run,
+        Guid conversation,
+        int steps = 1,
+        string model = "m"
+    )
+    {
+        var turn = MetricTurn(
+            run,
+            demo: false,
+            steps: steps,
+            model: model,
+            conversation: conversation
+        );
+        turn.Tools.RemoveAll(t => t.Name != "get_my_balance");
+        turn.ToolCalls = turn.Tools.Count;
+        return turn;
+    }
+
+    [Fact]
+    public async Task Conversations_page_newest_first_with_flags_and_no_repeats()
+    {
+        var run = $"l-{_tag}";
+        var older = Conversation(run, ConversationEndReason.Client);
+        older.StartedAt = _now - TimeSpan.FromMinutes(30);
+        var failed = Conversation(run, ConversationEndReason.Handoff, supportCase: Guid.NewGuid());
+        failed.StartedAt = _now - TimeSpan.FromMinutes(20);
+        var newest = Conversation(run, null);
+        newest.StartedAt = _now - TimeSpan.FromMinutes(10);
+        var error = MetricTurn(run, demo: false, steps: 2, conversation: failed.Id, proposed: true);
+        error.Outcome = TurnOutcome.Error;
+        error.ErrorCode = "assistant.provider_error";
+        await SeedAsync(
+            older,
+            failed,
+            newest,
+            CleanTurn(run, older.Id, model: "m-1"),
+            error,
+            CleanTurn(run, newest.Id)
+        );
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var first = await PageAsync(admin, $"traffic=synthetic&runId={run}&limit=2");
+        Assert.Equal([newest.Id, failed.Id], first.Items.Select(i => i.Id));
+        Assert.NotNull(first.NextCursor);
+        var second = await PageAsync(
+            admin,
+            $"traffic=synthetic&runId={run}&limit=2&cursor={first.NextCursor}"
+        );
+        Assert.Equal([older.Id], second.Items.Select(i => i.Id));
+        Assert.Null(second.NextCursor);
+
+        var flagged = first.Items[1];
+        Assert.Equal(
+            ("Handoff", true, true),
+            (flagged.EndReason, flagged.HasCase, flagged.HandoffProposed)
+        );
+        Assert.Contains("error", flagged.Reasons);
+        Assert.Empty(first.Items[0].Reasons);
+        Assert.Equal(["m-1"], second.Items[0].Models);
+
+        // Only the conversation with a failed turn; real traffic does not show synthetic rows.
+        var suspicious = await PageAsync(admin, $"traffic=synthetic&runId={run}&suspicious=true");
+        Assert.Equal([failed.Id], suspicious.Items.Select(i => i.Id));
+        var real = await PageAsync(admin, $"runId={run}");
+        Assert.Empty(real.Items);
+    }
+
+    [Fact]
+    public async Task Conversation_trace_lists_turns_in_order_with_tools_and_no_text()
+    {
+        var run = $"t-{_tag}";
+        var conversation = Conversation(run, ConversationEndReason.Client);
+        var firstTurn = CleanTurn(run, conversation.Id);
+        firstTurn.CostUsd = 0.002m;
+        firstTurn.InputTokens = 300;
+        firstTurn.StartedAt = _now - TimeSpan.FromMinutes(40);
+        var secondTurn = CleanTurn(run, conversation.Id, steps: 2);
+        secondTurn.StartedAt = _now - TimeSpan.FromMinutes(30);
+        secondTurn.Tools[0].Status = "rejected";
+        await SeedAsync(conversation, secondTurn, firstTurn);
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var response = await admin.GetAsync($"{Conversations}/{conversation.Id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var raw = await response.Content.ReadAsStringAsync();
+        var trace = JsonSerializer.Deserialize<ConversationTrace>(raw, JsonSerializerOptions.Web)!;
+
+        Assert.Equal([firstTurn.Id, secondTurn.Id], trace.Turns.Select(t => t.Id));
+        Assert.Equal(
+            (0.002m, 300),
+            (trace.Turns[0].CostUsd!.Value, trace.Turns[0].InputTokens!.Value)
+        );
+        Assert.Equal("rejected", trace.Turns[1].Tools.Single().Status);
+        Assert.Contains("rejected_tool", trace.Turns[1].Reasons);
+        Assert.Contains("rejected_tool", trace.Conversation.Reasons);
+        // Metadata only: no user id, no case id, no message fields.
+        Assert.DoesNotContain("userId", raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("supportCaseId", raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("message", raw, StringComparison.OrdinalIgnoreCase);
+
+        var missing = await admin.GetAsync($"{Conversations}/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Contains(
+            ConversationTraces.ConversationNotFound,
+            await missing.Content.ReadAsStringAsync()
+        );
+    }
+
+    [Theory]
+    [InlineData("cursor=not-a-cursor", "cursor")]
+    [InlineData("limit=0", "limit")]
+    [InlineData("limit=101", "limit")]
+    [InlineData("hours=0", "hours")]
+    [InlineData("traffic=x", "traffic")]
+    public async Task Conversations_reject_bad_parameters(string query, string field)
+    {
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+        var response = await admin.GetAsync($"{Conversations}?{query}");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains($"\"{field}\"", await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData(RoleNames.User)]
+    [InlineData(RoleNames.Cashier)]
+    [InlineData(RoleNames.Support)]
+    public async Task Conversations_are_for_admins_only(string role)
+    {
+        var client = (await AccountAsync(role)).Client;
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Conversations)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await client.GetAsync($"{Conversations}/{Guid.NewGuid()}")).StatusCode
+        );
+    }
+
+    [Fact]
+    public async Task Review_item_links_its_conversation()
+    {
+        // In this test's own 2099 slot, so DisposeAsync removes it even when an assert fails.
+        var run = $"r-{_tag}";
+        var conversation = Conversation(run, ConversationEndReason.Client);
+        var turn = MetricTurn(run, demo: false, steps: 1, conversation: conversation.Id);
+        turn.Outcome = TurnOutcome.Error;
+        await SeedAsync(conversation, turn);
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+        var queue = await admin.GetFromJsonAsync<ReviewQueue>(Review);
+        Assert.Equal(conversation.Id, queue!.Items.Single(i => i.Id == turn.Id).ConversationId);
+    }
+
+    [Fact]
+    public async Task Cancelled_turns_and_other_failures_of_the_user_do_not_flag_a_conversation()
+    {
+        var run = $"c-{_tag}";
+        // The client left while a tool ran: a signal, not a failure.
+        var left = Conversation(run, ConversationEndReason.Client);
+        var cancelled = CleanTurn(run, left.Id);
+        cancelled.Outcome = TurnOutcome.Cancelled;
+        cancelled.Tools[0].Status = "timeout";
+        // A clean conversation of a user with repeated errors elsewhere.
+        var clean = Conversation(run, ConversationEndReason.Client);
+        clean.StartedAt = _now - TimeSpan.FromMinutes(45);
+        var failing = Conversation(run, ConversationEndReason.Client);
+        failing.StartedAt = _now - TimeSpan.FromMinutes(40);
+        var errors = Enumerable
+            .Range(0, 3)
+            .Select(i =>
+            {
+                var t = CleanTurn(run, failing.Id);
+                t.Outcome = TurnOutcome.Error;
+                t.StartedAt = _now - TimeSpan.FromMinutes(30 + i);
+                return t;
+            })
+            .ToList();
+        await SeedAsync([left, cancelled, clean, CleanTurn(run, clean.Id), failing, .. errors]);
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+
+        var all = (await PageAsync(admin, $"traffic=synthetic&runId={run}")).Items.ToDictionary(i =>
+            i.Id
+        );
+        Assert.Empty(all[left.Id].Reasons);
+        Assert.Empty(all[clean.Id].Reasons);
+        Assert.Equal(["error", "repeated_errors"], all[failing.Id].Reasons.Order());
+        var suspicious = await PageAsync(admin, $"traffic=synthetic&runId={run}&suspicious=true");
+        Assert.Equal([failing.Id], suspicious.Items.Select(i => i.Id));
+    }
+
+    [Fact]
+    public async Task Later_pages_keep_the_window_of_the_first_page()
+    {
+        var run = $"w-{_tag}";
+        // Two conversations near the old edge of a 1 h window.
+        var newer = Conversation(run, ConversationEndReason.Client);
+        newer.StartedAt = _now - TimeSpan.FromMinutes(50);
+        var older = Conversation(run, ConversationEndReason.Client);
+        older.StartedAt = _now - TimeSpan.FromMinutes(55);
+        await SeedAsync(newer, older);
+        factory.Clock.Set(_now);
+        var admin = (await AccountAsync(RoleNames.Admin)).Client;
+        var first = await PageAsync(admin, $"traffic=synthetic&runId={run}&hours=1&limit=1");
+        Assert.Equal([newer.Id], first.Items.Select(i => i.Id));
+
+        // Ten minutes later the window would start after "older"; the cursor keeps the first one.
+        factory.Clock.Set(_now + TimeSpan.FromMinutes(10));
+        var second = await PageAsync(
+            admin,
+            $"traffic=synthetic&runId={run}&hours=1&limit=1&cursor={first.NextCursor}"
+        );
+        Assert.Equal([older.Id], second.Items.Select(i => i.Id));
+    }
 }

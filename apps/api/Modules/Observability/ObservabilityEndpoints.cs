@@ -96,6 +96,7 @@ public sealed record ReviewTool(string Name, string Status, int DurationMs);
 
 public sealed record ReviewItem(
     Guid Id,
+    Guid? ConversationId,
     string CorrelationId,
     string UserPseudonym,
     DateTimeOffset StartedAt,
@@ -443,6 +444,7 @@ public static class ObservabilityEndpoints
                 suspicious
                     .Select(t => new ReviewItem(
                         t.Id,
+                        t.ConversationId,
                         t.CorrelationId,
                         t.UserPseudonym,
                         t.StartedAt,
@@ -461,7 +463,7 @@ public static class ObservabilityEndpoints
         );
     }
 
-    private static List<string> Reasons(AssistantTurn turn, bool repeated)
+    internal static List<string> Reasons(AssistantTurn turn, bool repeated)
     {
         var reasons = new List<string>();
         if (turn.Outcome == TurnOutcome.Error)

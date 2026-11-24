@@ -30,6 +30,10 @@ export const queryKeys = {
     observabilitySummary: (hours: number, filters: object) =>
       ["admin", "observability", "summary", hours, filters] as const,
     reviewQueue: ["admin", "observability", "review"] as const,
+    conversations: (filters: object) =>
+      ["admin", "observability", "conversations", filters] as const,
+    conversationTrace: (id: string) =>
+      ["admin", "observability", "conversation", id] as const,
   },
 };
 
