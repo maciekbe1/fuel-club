@@ -27,6 +27,10 @@ async function fillPurchase(page: Page, code: string) {
   await expect(page.getByLabel("Numer paragonu")).toHaveValue(
     /^PAR\/\d{8}\/[0-9A-Z]{6}$/,
   );
+  // Only into an empty field: a typed (or kept) number cannot be replaced by a click.
+  await expect(
+    page.getByRole("button", { name: "Wygeneruj losowy numer" }),
+  ).toHaveCount(0);
 }
 
 test("customer shows the card, cashier registers the purchase, customer sees balance and history", async ({

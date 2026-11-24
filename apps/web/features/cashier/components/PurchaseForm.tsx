@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleCheck, Dices } from "lucide-react";
+import { useWatch } from "react-hook-form";
 import { FormAlert } from "@/components/form/FormAlert";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,12 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
     forgetPreviews,
   } = flow;
   const { errors } = form.formState;
+  // Only into an empty field: never over a typed number, and never right after an unknown outcome
+  // (the number stays, so a click cannot turn a possibly saved purchase into a second receipt).
+  const receiptEmpty =
+    (
+      useWatch({ control: form.control, name: "receiptNumber" }) ?? ""
+    ).trim() === "";
 
   return (
     <div className="flex flex-col gap-5">
@@ -149,28 +156,34 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
                 <Input
                   autoComplete="off"
                   autoCapitalize="characters"
-                  className={cn(fieldClass, "pr-12 font-mono")}
+                  className={cn(
+                    fieldClass,
+                    receiptEmpty && "pr-12",
+                    "font-mono",
+                  )}
                   {...fieldA11y("receiptNumber", errors.receiptNumber)}
                   {...form.register("receiptNumber")}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-1/2 right-1 -translate-y-1/2"
-                  aria-label="Wygeneruj losowy numer"
-                  title="Wygeneruj losowy numer"
-                  disabled={locked}
-                  onClick={() =>
-                    form.setValue(
-                      "receiptNumber",
-                      newReceiptNumber(form.getValues("saleDate")),
-                      { shouldValidate: true, shouldDirty: true },
-                    )
-                  }
-                >
-                  <Dices className="size-4" aria-hidden />
-                </Button>
+                {receiptEmpty && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1/2 right-1 -translate-y-1/2"
+                    aria-label="Wygeneruj losowy numer"
+                    title="Wygeneruj losowy numer"
+                    disabled={locked}
+                    onClick={() =>
+                      form.setValue(
+                        "receiptNumber",
+                        newReceiptNumber(form.getValues("saleDate")),
+                        { shouldValidate: true, shouldDirty: true },
+                      )
+                    }
+                  >
+                    <Dices className="size-4" aria-hidden />
+                  </Button>
+                )}
               </div>
             </FormField>
           </div>
