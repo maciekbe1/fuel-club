@@ -103,6 +103,12 @@ Klient: zwykła rejestracja w aplikacji.
 
 ### Wdrożenie nowej wersji
 
+Automatycznie po zielonym CI na `main` ([ADR 0022](/decyzje/0022-cd-na-cloud-run/), `.github/workflows/deploy.yml`): obrazy, migracja, api, web, smoke test. Ręcznie z GitHuba: Actions → Deploy → Run workflow.
+
+Rollback: `gcloud run services update-traffic fuelclub-api --project fuelclub-demo-a0999e --region europe-central2 --to-revisions <rewizja>=100` (lista: `gcloud run revisions list --service fuelclub-api`), tak samo `fuelclub-web`. Nie cofa migracji.
+
+Ręcznie z komputera (awaria Actions):
+
 ```sh
 P=fuelclub-demo-a0999e R=europe-central2 TAG=$(git describe --always --dirty) REPO=$R-docker.pkg.dev/$P/fuelclub
 gcloud builds submit --project $P --region $R --config deploy/cloudbuild-api.yaml --substitutions _TAG=$TAG .

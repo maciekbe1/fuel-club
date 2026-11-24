@@ -207,6 +207,10 @@ Stabilność E2E:
 
 Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane przez `proxy.ts` na `/api`.
 
+## CD na Cloud Run (2026-11-24)
+
+- ADR 0022: `.github/workflows/deploy.yml` po zielonym CI na `main` (commit z CI): obrazy → Artifact Registry → migracja → api → web → smoke test. WIF (pula `github`, tylko `maciekbe1/fuel-club` + `main`), konto `github-deployer` z minimalnymi rolami, bez sekretów.
+
 ## Kasa - numer paragonu i toast o punktach (2026-11-24)
 
 - Przycisk w pustym polu „Numer paragonu” wpisuje `PAR/<data>/<6 znaków>`; po nieznanym wyniku przycisku nie ma (review: inaczej drugi paragon dla tego samego zakupu).
