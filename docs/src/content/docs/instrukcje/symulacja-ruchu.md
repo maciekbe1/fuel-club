@@ -305,7 +305,7 @@ Wybór kuponu v7/v8 - kontrolowane porównanie (porównanie jakości dla tej pop
 
 Znaleziska z transkryptów (przed `pilot-6`, przyczyny zdiagnozowane, scenariusze przeformułowane):
 - „Za co dostaję punkty?” - adapter demo odpowiada saldem: wzorzec salda łapie „punkt”, a pytania o zasady nie rozpoznaje. Ograniczenie reguł demo, nie przepływu. Poprawione w `demo-rules-v9` (ocena człowieka `demo-1`).
-- „Jak działa zbieranie punktów?” - wyszukiwanie w regulaminie nie znajduje §3.1 i proponuje konsultanta. Luka wyszukiwania (brak dopasowania „zbieranie”). Poprawione w `demo-rules-v9`: demo szuka tematem §3; samo wyszukiwanie bez zmian (Gemini przekazuje słowa klienta).
+- „Jak działa zbieranie punktów?” - wyszukiwanie w regulaminie nie znajduje §3.1 i proponuje konsultanta. Luka wyszukiwania (brak dopasowania „zbieranie”). Poprawione w `demo-rules-v9`: demo szuka tematem §3. W `gemini-1` Gemini 0/3 (szuka słowami klienta). Od 2026-11-24 samo wyszukiwanie rozumie „zbieranie” (synonimy §3, „działa” jako słowo pytania): eval `rules-collecting-points` na Gemini 3/3, zapytania „zbieranie punktów” i „Jak działa zbieranie punktów?” → §3.1.
 - „Ile punktów dostanę za hot doga?” - demo rozpoznaje pytanie o produkt tylko w szyku „punkty za hot doga”; inaczej odpowiada saldem.
 - „Jakie nagrody mogę wybrać?” - demo pyta o litry: słowo „wybrać” łapie wzorzec porównania kuponów. Poprawione w `demo-rules-v10` (nagrody bez kuponu i litrów → katalog; regresja w `demo-2` 0/9, w `demo-3` 6/6).
 - „Aktywuj kupon” przy kilku kuponach kończy się pytaniem „który?”; scenariusz nazywa ofertę przebiegu.

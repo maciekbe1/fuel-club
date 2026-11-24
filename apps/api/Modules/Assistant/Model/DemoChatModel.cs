@@ -97,8 +97,8 @@ public sealed partial class DemoChatModel : IChatModel
         )
             return Task.FromResult(NextProductStep(context, intro, text));
 
-        // How points are earned is §3 of the rules: searched by its subject, not by the wording
-        // ("zbieranie", "za co"), which the search does not match (demo-1 regressions).
+        // How points are earned is §3 of the rules: searched by its subject. Since 2026-11-24 the
+        // search also matches "zbieranie punktów", but not "za co" or "sklep" (demo-1 regressions).
         if (EarningQuestion().IsMatch(text) && !Product().IsMatch(text))
             return Task.FromResult(NextRulesStep(context, intro, EarningQuery));
 
@@ -282,7 +282,7 @@ public sealed partial class DemoChatModel : IChatModel
 
     /// <summary>
     /// The subject of §3.1 (points for fuel): the search query for questions about earning points,
-    /// whose own wording ("zbieranie", "za co", "sklep") matches nothing in the rules.
+    /// whose own wording ("za co", "sklep") matches nothing in the rules.
     /// </summary>
     private const string EarningQuery = "Za każdy pełny 1 zł zapłacony za paliwo punkt";
 

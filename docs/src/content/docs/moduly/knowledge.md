@@ -28,7 +28,7 @@ Czat odpowiada na pytania o zasady programu z zatwierdzonego regulaminu i podaje
 ## Przepływ
 
 1. Model woła `search_program_rules` z pytaniem (demo: cała wiadomość, przycięta do 300 znaków).
-2. Pytanie: małe litery bez znaków diakrytycznych, bez słów pomocniczych, każde słowo przycięte do prefiksu (do 5 liter), z synonimami pojęć programu.
+2. Pytanie: małe litery bez znaków diakrytycznych, bez słów pomocniczych, każde słowo przycięte do prefiksu (do 5 liter), z synonimami pojęć programu. W pytaniu o punkty (rdzeń „punkt”) formy pytania bez tematu („działa”, „wygląda”, „zasady”) są pomijane, a „zbierać / zdobyć / uzbierać / zarobić” szuka też „naliczanie”, „dostaje”, „przyznaje” (§3). Bez „punkt” obie reguły nie działają: „Jak zdobyć kupon?” i „Jak działa myjnia?” nic nie znajdują. Regresja z przebiegu `gemini-1`.
 3. Jedno zapytanie SQL liczy wagę każdego słowa (rzadkość w dokumencie), pokrycie każdego punktu i podobieństwo trygramowe. Zwraca najwyżej 5 punktów z pokryciem ≥ 0,45.
 4. Model dostaje wersję dokumentu i fragmenty jako dane. Pusta lista (`no_match`) oznacza: regulamin tego nie opisuje; narzędzie samo dołącza propozycję konsultanta.
 
@@ -58,10 +58,10 @@ Rozszerzenie `pg_trgm` (migracja). Wiersze zapisuje tylko migracja; nowa wersja 
 
 | Plik | Co sprawdza |
 | --- | --- |
-| `apps/api.tests/ProgramRulesSearchTests.cs` | skrót `regulamin-v1`, podział na 32 punkty, baza = plik; 32 pytania (strojące, kontrolne i regresje z evali Gemini: karta lojalnościowa, krótkie zapytania o hot doga) trafiają właściwy punkt wśród wyników; 12 pytań spoza regulaminu (m.in. karta kredytowa) nic nie znajduje; odmiana („punktów/punkty”, „nagrody/nagrodę”) daje ten sam termin; do zapytania trafiają tylko litery i cyfry |
+| `apps/api.tests/ProgramRulesSearchTests.cs` | skrót `regulamin-v1`, podział na 32 punkty, baza = plik; 40 pytań (strojące, kontrolne i regresje z evali Gemini: karta lojalnościowa, krótkie zapytania o hot doga, „zbieranie / zdobyć / zarobić punkty” z `gemini-1`) trafiają właściwy punkt wśród wyników; 17 pytań spoza regulaminu (m.in. karta kredytowa, „Jak zdobyć kupon?”, „Jak działa myjnia?” - reguły zbierania tylko dla pytań o punkty) nic nie znajduje; odmiana („punktów/punkty”, „nagrody/nagrodę”) daje ten sam termin; do zapytania trafiają tylko litery i cyfry |
 | `apps/api.tests/AssistantTests.cs` | demo cytuje §6.1 z wersją; brak odpowiedzi → zdarzenie `handoff` z pustego wyniku (raz na turę, nie gdy późniejsze wyszukiwanie coś znalazło); dopytanie o hot doga i odpowiedź na nie; złe argumenty odrzucone; model dostaje fragmenty jako dane |
 | `apps/api.tests/GeminiTests.cs` | fragmenty wracają do Gemini ze źródłem i wersją |
-| `apps/api.tests/Evals/assistant-cases.v2.json` | 9 przypadków regulaminu (kategorie `regulamin-*`) |
+| `apps/api.tests/Evals/assistant-cases.v2.json` | 10 przypadków regulaminu (kategorie `regulamin-*`) |
 | `apps/web/e2e/chat.spec.ts` | pytanie o zasady → odpowiedź z §6.1 i znacznik „Regulamin”; pytanie spoza regulaminu → przycisk konsultanta |
 
 Znane pudła i margines progu: [ADR 0016](/decyzje/0016-regulamin-w-czacie/#konsekwencje).

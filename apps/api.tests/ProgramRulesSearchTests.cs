@@ -106,6 +106,16 @@ public sealed class ProgramRulesSearchTests(ApiFactory factory)
     [InlineData("hot doga", "3.6")]
     [InlineData("Czy dostanę punkty, jeśli kupię hot doga?", "3.1")]
     [InlineData("Czy dostanę punkty za odebranie hot doga z kuponu?", "3.6")]
+    // Regression (Gemini run gemini-1, 2026-11-23): "collecting" points is "Naliczanie" and
+    // "dostaje" in the rules, and "how does it work" carries no topic. 0/3 before the fix.
+    [InlineData("Jak działa zbieranie punktów?", "3.1")]
+    [InlineData("zbieranie punktów", "3.1")]
+    [InlineData("Jak zbierać punkty?", "3.1")]
+    [InlineData("Jak zdobyć punkty?", "3.1")]
+    [InlineData("Jak mogę uzbierać punkty?", "3.1")]
+    [InlineData("Jak wygląda naliczanie punktów?", "3.1")]
+    [InlineData("Jak wyglądają zasady zbierania punktów?", "3.1")]
+    [InlineData("Ile punktów mogę zarobić?", "3.1")]
     public async Task A_question_finds_its_point_among_the_results(string question, string sections)
     {
         var found = await SearchAsync(question);
@@ -117,6 +127,12 @@ public sealed class ProgramRulesSearchTests(ApiFactory factory)
     }
 
     [Theory]
+    // The collecting and "how does it work" rules apply only to points (review 2026-11-24).
+    [InlineData("Jak zdobyć kupon?")]
+    [InlineData("Jak zbierać kupony?")]
+    [InlineData("Jak zdobyć nagrodę?")]
+    [InlineData("Jak działa myjnia?")]
+    [InlineData("Jak działa paliwo?")]
     [InlineData("karta kredytowa")]
     [InlineData("czy mogę płacić kartą kredytową")]
     [InlineData("Ile kosztuje benzyna?")]

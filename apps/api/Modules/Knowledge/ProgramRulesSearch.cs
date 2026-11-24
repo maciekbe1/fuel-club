@@ -38,6 +38,38 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
     ];
 
     /// <summary>
+    /// Collecting points: the rules say "Naliczanie", "dostaje", "przyznaje", and "how does it work /
+    /// look / the rules of" is only the form of the question. Applied only when the question is about points
+    /// (stem "punkt"): "Jak zdobyć kupon?" or "Jak działa myjnia?" must stay below the threshold.
+    /// Keyed by stem, so every inflected form matches.
+    /// </summary>
+    private const string PointsStem = "punkt";
+
+    private static readonly HashSet<string> PointsQuestionForm =
+    [
+        "dzial",
+        "wygla",
+        "funkc",
+        "zasad",
+    ];
+
+    private static readonly string[] Collecting = ["nalic", "dosta", "przyz"];
+
+    private static readonly HashSet<string> PointsCollectingVerbs =
+    [
+        .. new[]
+        {
+            "zbierac",
+            "zdobyc",
+            "uzbierac",
+            "nazbierac",
+            "gromadzic",
+            "zarabiac",
+            "zarobic",
+        }.Select(Stem),
+    ];
+
+    /// <summary>
     /// Program terms the rules phrase differently: a question word (keyed by its Stem, so the key
     /// always matches) and the prefixes the rules use instead.
     /// </summary>
@@ -65,6 +97,7 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
         ("dwoch", ["jedne"]),
         ("lojalnosciowa", ["uczes", "progr"]),
         ("karcie", ["kart"]),
+        ("naliczanie", ["dosta", "przyz"]),
     }.ToDictionary(s => Stem(s.Word), s => s.Rules);
 
     /// <summary>
@@ -79,17 +112,24 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
             .Where(w => w.Length > 1 && !StopWords.Contains(w))
             .Select(Stem)
             .Distinct()
-            .Order(StringComparer.Ordinal);
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        var points = stems.Contains(PointsStem);
         return
         [
-            .. stems.Select(stem =>
-                string.Join(
-                    " | ",
-                    new[] { stem }
-                        .Concat(Synonyms.GetValueOrDefault(stem, []))
-                        .Select(s => $"{s}:*")
-                )
-            ),
+            .. stems
+                .Where(stem => !(points && PointsQuestionForm.Contains(stem)))
+                .Select(stem =>
+                    string.Join(
+                        " | ",
+                        new[] { stem }
+                            .Concat(Synonyms.GetValueOrDefault(stem, []))
+                            .Concat(
+                                points && PointsCollectingVerbs.Contains(stem) ? Collecting : []
+                            )
+                            .Select(s => $"{s}:*")
+                    )
+                ),
         ];
     }
 

@@ -282,6 +282,23 @@
       }
     },
     {
+      "id": "rules-collecting-points",
+      "category": "regulamin-zbieranie-punktow",
+      "message": "Jak działa zbieranie punktów?",
+      "expect": {
+        "tools": [
+          "search_program_rules:ok"
+        ],
+        "end": "done",
+        "answerContains": [
+          "regulamin-v1"
+        ],
+        "answerPatterns": [
+          "§\\s?3\\.1"
+        ]
+      }
+    },
+    {
       "id": "rules-activation-is-final",
       "category": "regulamin-aktywacja-odbior",
       "message": "Czy mogę cofnąć aktywację kuponu?",
