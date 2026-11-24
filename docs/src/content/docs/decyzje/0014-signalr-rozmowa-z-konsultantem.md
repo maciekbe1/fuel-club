@@ -65,6 +65,8 @@ Zdarzenia wysyła serwer po zatwierdzeniu transakcji: endpointy przez `Response.
 
 ## Konsekwencje
 
+- Wdrożenie nowej rewizji api (zmierzone 2026-11-24 na Cloud Run): WebSocket zostaje na starej instancji, która nie obsługuje już nowych wiadomości. Hub milczy, ale się nie rozłącza, więc sam „polling bez połączenia” nie wystarczał - rozmowa stała do zamknięcia połączenia (do 300 s). Dlatego odczyt z kursora co 10 s także przy połączonym hubie. Szczegóły i wyniki: [instrukcja](/instrukcje/obrazy-i-hosting/#rozmowa-w-trakcie-wdrożenia).
+
 - Web: zależność `@microsoft/signalr`.
 - Konfiguracja: `Support:HubAllowedOrigins`.
 - Testy:

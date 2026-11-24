@@ -135,6 +135,33 @@ Po zmianie, w jednym oknie: pierwszy adres `429`, drugi `401`. Własny `X-Forwar
 
 Gwarancja dotyczy ruchu przez publiczny brzeg web. Inna usługa w tym projekcie, która woła api bezpośrednio (ingress `internal`), też przychodzi z `169.254.x` i jej `X-Forwarded-For` byłby zaufany. Dziś takich usług nie ma; nowa wymaga zawężenia zaufania.
 
+### Rozmowa w trakcie wdrożenia
+
+Pytanie: klient rozmawia z konsultantem albo z asystentem, a w tym czasie wchodzi nowa wersja api. Czy rozmowa się przerwie?
+
+Jak to działa przy wdrożeniu:
+
+- Cloud Run uruchamia nową rewizję i przełącza na nią **nowe** żądania. Stara instancja dokańcza trwające żądania i trzyma otwarte WebSockety.
+- Zapis wiadomości i operacje na punktach mają `Idempotency-Key`: ponowienie po urwanym żądaniu nie zapisze niczego drugi raz.
+- Treść rozmowy z konsultantem jest zawsze czytana z bazy kursorem (`after=seq`); hub tylko mówi „jest coś nowego”.
+
+Pomiar na Cloud Run (2026-11-24, nowa rewizja api w trakcie rozmowy; skrypty: konsultant wysyła wiadomość co 2 s, klient słucha huba):
+
+| Przypadek | Wynik |
+| --- | --- |
+| Zapis wiadomości konsultanta (45 w ~100 s, wdrożenie w środku) | 45/45 zapisanych, 0 błędów, 0 duplikatów, 0 braków |
+| Powiadomienia huba u klienta przed poprawką | 12/45 - po przełączeniu żadnego; hub **nie** rozłączył się (stara instancja trzyma WebSocket), więc UI nie przechodziło na odczyt co 3 s. Rozmowa stała dla klienta do zamknięcia połączenia (do 300 s) |
+| Po poprawce (odczyt kursorem co 10 s także przy połączonym hubie) | 45/45 widocznych u klienta; mediana 3,4 s, maks. 9,8 s od wysłania |
+| Czat z asystentem (SSE, 40 tur co 2 s, wdrożenie w środku) | 40/40 tur zakończonych `done`, żadna nie przerwana |
+
+Wnioski:
+
+- Rozmowa nie jest przerywana i nic nie ginie. Najgorszy przypadek przy wdrożeniu: wiadomości konsultanta dochodzą z opóźnieniem do 10 s zamiast natychmiast.
+- Wskaźnik „… pisze” i toast o punktach (hub lojalności) w tym oknie mogą nie przyjść - to sygnały pomocnicze, saldo i historia są czytane z API.
+- Tura czatu dłuższa niż okno wygaszania starej instancji (ok. 10 s po `SIGTERM` według dokumentacji Cloud Run) mogłaby się urwać; klient widzi wtedy „Połączenie zostało przerwane - odpowiedź jest niepełna” i może ponowić. Typowa tura trwa 1,5-3 s.
+
+Lepsze rozwiązania (nie wdrożone): backplane SignalR (Redis albo PostgreSQL `LISTEN/NOTIFY`), żeby nowa instancja mogła wysyłać do połączeń na starej; zamykanie połączeń starej rewizji zaraz po przełączeniu ruchu.
+
 ### Sprawdzone po wdrożeniu (2026-11-24)
 
 - rejestracja `201`, logowanie `204`, ciasteczka sesji i CSRF z `Secure` i `HttpOnly`;

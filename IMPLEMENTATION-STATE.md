@@ -207,6 +207,12 @@ Stabilność E2E:
 
 Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane przez `proxy.ts` na `/api`.
 
+## Rozmowa w trakcie wdrożenia (2026-11-24)
+
+- Pomiar na Cloud Run: przy nowej rewizji api WebSocket klienta zostaje na starej instancji - hub milczy bez rozłączenia, rozmowa z konsultantem stała u klienta do 300 s (12/45 powiadomień). Zapis 45/45 bez strat i duplikatów.
+- Poprawka: odczyt kursorem co 10 s także przy połączonym hubie (`CONNECTED_POLL_MS`); pomiar po: 45/45, maks. 9,8 s. Czat z asystentem w trakcie wdrożenia: 40/40 tur `done`.
+- Opis: instrukcja „Rozmowa w trakcie wdrożenia”, ADR 0014.
+
 ## CD na Cloud Run (2026-11-24)
 
 - ADR 0022: `.github/workflows/deploy.yml` po zielonym CI na `main` (commit z CI): obrazy → Artifact Registry → migracja → api → web → smoke test. WIF (pula `github`, tylko `maciekbe1/fuel-club` + `main`), konto `github-deployer` z minimalnymi rolami, bez sekretów.

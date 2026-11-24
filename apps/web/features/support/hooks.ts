@@ -21,6 +21,12 @@ import {
 
 /** Without a hub connection the screens read again this often (ADR 0014 fallback). */
 const POLL_MS = 3000;
+/**
+ * With a connected hub, still read this often (ADR 0014, measured 2026-11-24): during a deploy the
+ * WebSocket stays open on the old api instance, which no longer handles the new messages, so the
+ * hub is silent without being disconnected. The read through the cursor bounds that silence.
+ */
+const CONNECTED_POLL_MS = 10_000;
 /** "… pisze" is shown this long after the last signal. */
 const TYPING_SHOWN_MS = 5000;
 /** A typing signal is sent at most this often. */
@@ -186,10 +192,11 @@ export function useConversation(
       return { status, lastSeq: after, items };
     },
     refetchInterval: (query) =>
-      hubConnected ||
-      (query.state.data && !OPEN_STATUSES.has(query.state.data.status))
+      query.state.data && !OPEN_STATUSES.has(query.state.data.status)
         ? false
-        : POLL_MS,
+        : hubConnected
+          ? CONNECTED_POLL_MS
+          : POLL_MS,
     retry: (count, error) =>
       !(error instanceof ApiError && error.status < 500) && count < 2,
   });
@@ -253,7 +260,7 @@ export function useSupportQueue(hubConnected: boolean) {
   return useQuery({
     queryKey: queryKeys.support.queue,
     queryFn: supportService.queue,
-    refetchInterval: hubConnected ? false : POLL_MS,
+    refetchInterval: hubConnected ? CONNECTED_POLL_MS : POLL_MS,
     retry: (count, error) =>
       !(error instanceof ApiError && error.status < 500) && count < 2,
   });
