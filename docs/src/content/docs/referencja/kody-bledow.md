@@ -103,6 +103,7 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `support.case_taken` | - | `409`: zgłoszenie przejął inny konsultant |
 | `support.case_closed` | - | `409`: zgłoszenie zamknięte albo wygasłe (wiadomość, oddanie, przejęcie) |
 | `support.origin_not_allowed` | - | `403`: połączenie z hubem SignalR z originu spoza `Support:HubAllowedOrigins` albo bez originu |
+| `loyalty.origin_not_allowed` | - | `403`: połączenie z hubem lojalności (`/api/loyalty/hub`) z originu spoza `Support:HubAllowedOrigins` albo bez originu |
 | `support.not_assignee` | - | `403`: konsultant nie jest opiekunem otwartego zgłoszenia - inny je przejął, oddał je, wróciło do kolejki po bezczynności albo nie zostało przejęte |
 | `loyalty.card_not_found` | - | `404`: kod karty nieznany albo unieważniony - celowo bez rozróżnienia |
 | `loyalty.receipt_already_registered` | - | `409`: paragon (stacja, kasa, data, numer) już zapisany; bez informacji o właścicielu |

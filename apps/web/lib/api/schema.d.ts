@@ -2713,6 +2713,25 @@ export interface components {
             /** Format: date-time */
             issuedAt: string;
         };
+        LoyaltyHubContract: {
+            pointsAwarded: {
+                /** Format: uuid */
+                purchaseId: string;
+                /** Format: int32 */
+                points: number;
+                /** Format: double */
+                grossAmount: number;
+                /** Format: double */
+                discount: number;
+                /** Format: double */
+                paidAmount: number;
+                /** Format: double */
+                liters: number;
+                /** Format: date */
+                saleDate: string;
+                stationCode: string;
+            };
+        };
         MeResponse: {
             id: string;
             email: null | string;

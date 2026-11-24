@@ -33,6 +33,7 @@ builder.Services.AddOpenApi(options =>
 {
     options.AddIdempotencyHeader();
     options.AddSupportHubContract();
+    options.AddHubContract<FuelClub.Api.Modules.Loyalty.Notifications.LoyaltyHubContract>();
 });
 builder.Services.AddAccounts();
 builder.Services.AddLoyalty(builder.Configuration);
@@ -70,7 +71,7 @@ if (args is [SimulationPasswordReset.Command])
 app.UseForwardedHeaders();
 app.UseSecurityEvents();
 app.UseHttpsRedirection();
-app.UseMiddleware<SupportHubOriginGuard>();
+app.UseMiddleware<HubOriginGuard>();
 app.UseAuthentication();
 app.UseAuthorization();
 

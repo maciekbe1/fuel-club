@@ -28,11 +28,21 @@ public static class LoyaltyModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<StationClock>();
         services.AddHostedService<CashierAccountProvisioner>();
+        services.AddSignalR();
+        services.AddSingleton<Notifications.LoyaltyNotifier>();
+        services.AddSingleton(
+            new GuardedHub(Notifications.LoyaltyHub.Path, "loyalty.origin_not_allowed")
+        );
         return services;
     }
 
     public static IEndpointRouteBuilder MapLoyaltyEndpoints(this IEndpointRouteBuilder app)
     {
+        // The connection ends when the session cookie expires (as the support hub, ADR 0014).
+        app.MapHub<Notifications.LoyaltyHub>(
+            Notifications.LoyaltyHub.Path,
+            options => options.CloseOnAuthenticationExpiration = true
+        );
         // Admin does not inherit Cashier: only accounts with the Cashier role reach this group.
         var cashier = app.MapGroup("/api/cashier")
             .WithTags("Cashier")

@@ -72,6 +72,15 @@ test("customer shows the card, cashier registers the purchase, customer sees bal
   // Form ready for the next customer.
   await expect(register.page.getByLabel("Kod karty klienta")).toHaveValue("");
 
+  // The customer, still on the card screen, gets a toast over the loyalty hub (ADR 0021).
+  const toast = page.locator("[data-sonner-toast]");
+  await expect(toast).toContainText("+123 pkt za tankowanie");
+  await expect(toast).toContainText("Tankowanie 40,5 l");
+  await expect(toast).toContainText("123,45 zł");
+  await expect(toast).toContainText(`stacja ${CASHIER.station}`);
+  await toast.getByRole("button", { name: "Zamknij powiadomienie" }).click();
+  await expect(toast).toHaveCount(0);
+
   await page.goto("/");
   await expect(page.getByRole("region", { name: "Twoje saldo" })).toContainText(
     "123 pkt",

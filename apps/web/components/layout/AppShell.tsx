@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useLogout, useMe } from "@/features/auth/hooks";
 import type { Me } from "@/features/auth/services";
+import { PointsAwardedToasts } from "@/features/points-notifications/components/PointsAwardedToasts";
 
 export function AppShell({
   me: initialMe,
@@ -17,6 +18,7 @@ export function AppShell({
 
   return (
     <div className="flex flex-1 flex-col">
+      {me?.roles.includes("User") && <PointsAwardedToasts />}
       <header className="flex items-center justify-between border-b px-4 py-3">
         <span className="font-semibold">Fuel Club</span>
         <div className="flex items-center gap-3">

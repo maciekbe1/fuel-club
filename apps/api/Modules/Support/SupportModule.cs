@@ -24,6 +24,7 @@ public static class SupportModule
         services.AddScoped<SupportHousekeeping>();
         services.AddSignalR();
         services.AddSingleton<SupportNotifier>();
+        services.AddSingleton(new GuardedHub(SupportHub.Path, "support.origin_not_allowed"));
         services.AddHostedService<SupportWorker>();
         services.AddRateLimiter(options =>
             options.AddPolicy(

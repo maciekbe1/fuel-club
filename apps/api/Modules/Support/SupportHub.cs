@@ -37,19 +37,24 @@ public static class SupportHubOpenApi
     /// </summary>
     public static void AddSupportHubContract(
         this Microsoft.AspNetCore.OpenApi.OpenApiOptions options
+    ) => options.AddHubContract<SupportHubContract>();
+
+    /// <summary>Adds a hub's event contract record as a named schema (any module's hub).</summary>
+    public static void AddHubContract<TContract>(
+        this Microsoft.AspNetCore.OpenApi.OpenApiOptions options
     ) =>
         options.AddDocumentTransformer(
             async (document, context, cancellationToken) =>
             {
                 var schema = await context.GetOrCreateSchemaAsync(
-                    typeof(SupportHubContract),
+                    typeof(TContract),
                     null,
                     cancellationToken
                 );
                 document.Components ??= new();
                 document.Components.Schemas ??=
                     new Dictionary<string, Microsoft.OpenApi.IOpenApiSchema>();
-                document.Components.Schemas[nameof(SupportHubContract)] = schema;
+                document.Components.Schemas[typeof(TContract).Name] = schema;
             }
         );
 }
@@ -246,22 +251,30 @@ public sealed class SupportNotifier(
 }
 
 /// <summary>
-/// The hub accepts browsers only from the app's own origins (ADR 0014): a browser sends no CSRF
+/// The hubs (each module registers a GuardedHub: support, ADR 0014; loyalty, ADR 0021) accept
+/// browsers only from the app's own origins (Support:HubAllowedOrigins): a browser sends no CSRF
 /// header over a WebSocket, so the Origin check stops a foreign page from using the session cookie.
 /// Required on negotiation (POST) and the WebSocket upgrade, where browsers always send Origin.
 /// The transport requests after it (SSE and long-polling GETs, which a same-origin browser sends
 /// without Origin) need the connection token from that guarded negotiation; a foreign Origin on
 /// them is still refused.
 /// </summary>
-public sealed class SupportHubOriginGuard(RequestDelegate next, IOptions<SupportOptions> options)
+public sealed class HubOriginGuard(
+    RequestDelegate next,
+    IOptions<SupportOptions> options,
+    IEnumerable<GuardedHub> hubs
+)
 {
+    private readonly GuardedHub[] _hubs = [.. hubs];
+
     public async Task InvokeAsync(HttpContext http)
     {
-        if (http.Request.Path.StartsWithSegments(SupportHub.Path))
+        var hub = _hubs.FirstOrDefault(h => http.Request.Path.StartsWithSegments(h.Path));
+        if (hub is not null)
         {
             var origin = http.Request.Headers.Origin.ToString();
             var required =
-                http.Request.Path.StartsWithSegments($"{SupportHub.Path}/negotiate")
+                http.Request.Path.StartsWithSegments($"{hub.Path}/negotiate")
                 || http.WebSockets.IsWebSocketRequest;
             var allowed = string.IsNullOrEmpty(origin)
                 ? !required
@@ -272,11 +285,7 @@ public sealed class SupportHubOriginGuard(RequestDelegate next, IOptions<Support
             if (!allowed)
             {
                 await ApiProblems
-                    .Problem(
-                        StatusCodes.Status403Forbidden,
-                        "Origin not allowed",
-                        "support.origin_not_allowed"
-                    )
+                    .Problem(StatusCodes.Status403Forbidden, "Origin not allowed", hub.ErrorCode)
                     .ExecuteAsync(http);
                 return;
             }

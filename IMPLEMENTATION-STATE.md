@@ -207,6 +207,12 @@ Stabilność E2E:
 
 Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane przez `proxy.ts` na `/api`.
 
+## Kasa - numer paragonu i toast o punktach (2026-11-24)
+
+- Przycisk w pustym polu „Numer paragonu” wpisuje `PAR/<data>/<6 znaków>`; po nieznanym wyniku przycisku nie ma (review: inaczej drugi paragon dla tego samego zakupu).
+- ADR 0021: hub `/api/loyalty/hub` (rola `User`), `pointsAwarded` po commicie zakupu do właściciela karty; ochrona originu wspólna z hubem konsultanta (`GuardedHub`, `HubOriginGuard`). Front: sonner, toast 10 s z zamknięciem, odświeża saldo i historię.
+- Testy: `LoyaltyHubTests` (tylko właściciel, raz, nie po odtworzeniu i `409`; obcy origin, zła rola; próba negatywna bez rejestracji huba w ochronie originu pada), E2E kasy z toastem.
+
 ## Wyszukiwanie regulaminu - „zbieranie punktów” (2026-11-24)
 
 - `gemini-1`: „Jak działa zbieranie punktów?” 0/3 - słowa „zbieranie” i „działa” nie występują w regulaminie, mają największą wagę i pokrycie spada pod próg.

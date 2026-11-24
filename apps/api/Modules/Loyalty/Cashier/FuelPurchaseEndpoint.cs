@@ -218,6 +218,20 @@ public static class FuelPurchaseEndpoint
             await db.SaveChangesAsync(cancellationToken);
         }
 
+        Notifications.LoyaltyNotifier.AfterResponse(
+            http,
+            card.UserId,
+            new Notifications.PointsAwardedEvent(
+                purchase.Id,
+                points,
+                purchase.GrossAmount,
+                discount,
+                paidAmount,
+                purchase.Liters,
+                purchase.SaleDate,
+                purchase.StationCode
+            )
+        );
         return TypedResults.Created(
             (string?)null,
             new FuelPurchaseResponse(purchase.Id, points, discount, paidAmount)
