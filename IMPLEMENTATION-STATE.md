@@ -579,7 +579,9 @@ P14 - regulamin i FAQ w czacie: dopisany do `specs/PLAN.md`. Regulamin `apps/api
 - Rubryka `judge-rubric-v3` (dopytanie tylko przy różnych wnioskach, skarga z krokiem, spoza tematu = odpowiedź): ocena człowieka `demo-1` 29/30, kappa 0,93 (dane uczące rubrykę; 1 tura niestabilna).
 - `demo-rules-v10`: „jakie nagrody mogę wybrać” → katalog. Przebiegi `demo-2` (v9) i `demo-3` (v10) na osobnych bazach; `demo-3` regresje 24/24, judge v3 0 fail.
 - Otwarte (sprzed v10, z review): odpowiedź „40 l za 250 zł” na pytanie demo o litry nie kontynuuje porównania (brak historii w gałęzi porównania).
-- Otwarte: kalibracja na odpowiedziach Gemini (przebieg symulacji z Gemini + ocena człowieka); wspólna baza `fuelclub_demo` nadal dla `demo-1`.
+- Ocena człowieka w Phoenix (ADR 0019, zgoda właściciela): `calibrate/agreement --phoenix`, projekt `fuelclub-ocena`, tylko loopback, werdykty judge'a dopiero po ocenie wszystkich wierszy; wolumen Phoenix.
+- `gemini-1` (Gemini, osobna baza, 30 rozmów, 0,046 USD + judge 0,028 USD): zwykłe 20/22, regresje 8/12; „zbieranie punktów” 0/3 na Gemini (do diagnozy). 30 tur w Phoenix czeka na ocenę człowieka.
+- Otwarte: ocena człowieka `gemini-1` w Phoenix, potem `agreement --phoenix`; limit kosztu w `converse` na Gemini; wspólna baza `fuelclub_demo` nadal dla `demo-1`.
 
 ## Następny krok
 

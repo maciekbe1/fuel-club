@@ -42,7 +42,7 @@ Trzeba wiedzieć, co asystent zrobił w każdej turze: które narzędzia, z jaki
   - Nagłówki eksportera (klucz API) tylko z `OTEL_EXPORTER_OTLP_HEADERS`.
 - Span tury jest **korzeniem śladu** z linkiem (`ActivityLink`) do aktywności żądania HTTP. Aktywność żądania z ASP.NET Core nie jest próbkowana, a domyślny sampler (`ParentBased`) odrzucał przez to całą turę. Wyszło to przy pierwszym teście eksportu. Logi z tury mają `TraceId` tury; link wskazuje ślad żądania.
 - Lokalny odbiorca: Phoenix w `compose.yml`, profil `observability`.
-  - Obraz przypięty digestem, bez wolumenu.
+  - Obraz przypięty digestem. Wolumen od ADR 0019 (oceny człowieka przeżywają restart).
   - Port tylko `127.0.0.1`, auth wyłączone - to lokalna przeglądarka śladów.
   - Langfuse byłby alternatywą przez ten sam OTLP, nie drugą integracją.
 

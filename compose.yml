@@ -48,13 +48,17 @@ services:
       retries: 10
   # Optional local trace viewer (OTLP/HTTP on :6006/v1/traces, UI on :6006; PHOENIX_PORT changes it).
   # Not started by default:
-  # docker compose --profile observability up -d phoenix. No volume: traces live as long as the container.
+  # docker compose --profile observability up -d phoenix. A volume keeps traces and human grades
+  # (calibration, ADR 0019) across restarts; docker compose down -v removes them.
   phoenix:
     image: arizephoenix/phoenix@sha256:cc8c5e545389a6aae9523beaf92eb067fdaeae59d2166093d60856f89bf7ee34 # arize-phoenix-v22.0.1
     profiles: ["observability"]
     environment:
       # Local viewer bound to 127.0.0.1 only; with auth on, export would also need an API key.
       PHOENIX_ENABLE_AUTH: "false"
+      PHOENIX_WORKING_DIR: /mnt/data
+    volumes:
+      - phoenix_data:/mnt/data
     ports:
       - "127.0.0.1:${PHOENIX_PORT:-6006}:6006"
 
@@ -62,3 +66,4 @@ volumes:
   postgres_data:
   postgres_test_data:
   postgres_demo_data:
+  phoenix_data:

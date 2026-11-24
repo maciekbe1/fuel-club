@@ -102,6 +102,13 @@ internal static class JudgeCommand
             );
             try
             {
+                // Phoenix: the URL is checked first, and an existing sheet without a Phoenix
+                // export is reused (a failed export can be retried; a TSV-only run can move).
+                var phoenix = options.Get("phoenix") is { } url
+                    ? PhoenixReview.Loopback(url)
+                    : null;
+                if (phoenix is not null && File.Exists(Calibration.SheetPath(runFolder, model)))
+                    return await ToPhoenixAsync(phoenix, run, runFolder, model, all, ct);
                 var rows = Calibration.Export(
                     runFolder,
                     run,
@@ -110,12 +117,15 @@ internal static class JudgeCommand
                     results,
                     options.Int("size", 30)
                 );
+                if (phoenix is not null)
+                    return await ToPhoenixAsync(phoenix, run, runFolder, model, all, ct);
                 Console.WriteLine(
                     $"{rows} rows: {Calibration.SheetPath(runFolder, model)} - fill human_verdict (pass/fail), then run agreement."
                 );
                 return 0;
             }
-            catch (InvalidOperationException e)
+            catch (Exception e)
+                when (e is InvalidOperationException or ArgumentException or HttpRequestException)
             {
                 Console.WriteLine(e.Message);
                 return 2;
@@ -127,10 +137,115 @@ internal static class JudgeCommand
             Console.WriteLine($"No calibration sheet for {model}: run calibrate first.");
             return 2;
         }
-        var result = Calibration.Compare(await File.ReadAllTextAsync(sheet, ct), results, model);
+        var text = await File.ReadAllTextAsync(sheet, ct);
+        var pending = "";
+        if (options.Get("phoenix") is { } phoenixUrl)
+            try
+            {
+                pending = await FromPhoenixAsync(phoenixUrl, runFolder, model, sheet, results, ct);
+                text = await File.ReadAllTextAsync(sheet, ct);
+            }
+            catch (Exception e)
+                when (e is InvalidOperationException or ArgumentException or HttpRequestException)
+            {
+                Console.WriteLine(e.Message);
+                return 2;
+            }
+        var result = Calibration.Compare(text, results, model);
         var report = Path.Combine(JudgeRun.Folder(runFolder), $"report-calibration-{model}.md");
         await File.WriteAllTextAsync(report, AgreementReport(run, model, result), ct);
-        Console.WriteLine($"graded {result.Graded}, agree {result.Agree}: {report}");
+        Console.WriteLine($"graded {result.Graded}, agree {result.Agree}{pending}: {report}");
+        return 0;
+    }
+
+    /// <summary>Human grades from Phoenix into the sheet; the judge's verdicts after the last one.</summary>
+    private static async Task<string> FromPhoenixAsync(
+        string phoenixUrl,
+        string runFolder,
+        string model,
+        string sheet,
+        IReadOnlyList<JudgeResult> results,
+        CancellationToken ct
+    )
+    {
+        var text = await File.ReadAllTextAsync(sheet, ct);
+        {
+            var map = PhoenixReview.MapPath(runFolder, model);
+            if (!File.Exists(map))
+                throw new InvalidOperationException(
+                    $"No Phoenix export for {model}: run calibrate --phoenix first."
+                );
+            var file = JsonSerializer.Deserialize<PhoenixReview.ExportFile>(
+                await File.ReadAllTextAsync(map, ct),
+                Manifest.Json
+            )!;
+            using var http = new HttpClient { BaseAddress = PhoenixReview.Loopback(phoenixUrl) };
+            var grades = await PhoenixReview.HumanGradesAsync(file, http, ct);
+            var note = "";
+            // After the judge's verdicts were shown, edits would inflate agreement: the grades
+            // from that moment count, a later change is only reported.
+            if (file.Frozen is { } frozen)
+            {
+                var changed = grades.Except(frozen).Count() + frozen.Except(grades).Count();
+                note =
+                    changed > 0
+                        ? $"; {changed} grade change(s) after the judge's verdicts were shown - not counted"
+                        : "";
+                grades = frozen;
+            }
+            await File.WriteAllTextAsync(sheet, PhoenixReview.Fill(text, file, grades), ct);
+            var graded = grades.Select(g => g.SpanId).Distinct().Count();
+            if (graded < file.Spans.Count)
+                return $"; {file.Spans.Count - graded} of {file.Spans.Count} rows still ungraded in Phoenix";
+            // Blind until the last row: the judge's verdicts go to Phoenix only then.
+            if (!file.JudgeSent)
+            {
+                await PhoenixReview.SendJudgeAsync(file, results, http, ct);
+                await File.WriteAllTextAsync(
+                    map,
+                    JsonSerializer.Serialize(
+                        file with
+                        {
+                            JudgeSent = true,
+                            Frozen = grades,
+                        },
+                        Manifest.Json
+                    ),
+                    ct
+                );
+            }
+            return "; judge verdicts in Phoenix" + note;
+        }
+    }
+
+    private static async Task<int> ToPhoenixAsync(
+        Uri phoenix,
+        string run,
+        string runFolder,
+        string model,
+        IReadOnlyList<JudgeItem> all,
+        CancellationToken ct
+    )
+    {
+        var map = PhoenixReview.MapPath(runFolder, model);
+        if (File.Exists(map))
+        {
+            Console.WriteLine($"{map} exists: the rows are already in Phoenix.");
+            return 2;
+        }
+        var ids = (await File.ReadAllLinesAsync(Calibration.SheetPath(runFolder, model), ct))
+            .Skip(1)
+            .Where(l => l.Length > 0)
+            .Select(l => l.Split('\t')[0])
+            .ToList();
+        var byId = all.ToDictionary(i => i.Id);
+        var rows = ids.Select(id => byId[id]).ToList();
+        using var http = new HttpClient { BaseAddress = phoenix };
+        var file = await PhoenixReview.ExportAsync(phoenix, run, model, rows, http, ct);
+        await File.WriteAllTextAsync(map, JsonSerializer.Serialize(file, Manifest.Json), ct);
+        Console.WriteLine(
+            $"{rows.Count} rows in Phoenix project {PhoenixReview.Project} ({http.BaseAddress}): grade {PhoenixReview.HumanAnnotation} (pass/fail, note in the explanation), then run agreement --phoenix."
+        );
         return 0;
     }
 

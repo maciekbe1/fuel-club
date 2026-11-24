@@ -8,7 +8,7 @@ sidebar:
 Decyzje: [ADR 0017](/decyzje/0017-ruch-syntetyczny-i-rozmowy/). Symulator: `apps/tools/Simulator` (.NET, tylko publiczne HTTP API).
 
 :::caution[Planowane]
-Rozmowy na Gemini (`--expect-provider gemini` z limitem kosztu) - jeszcze nie: `converse` działa na adapterze demo. Teraz działa populacja kont (P16a), rozmowy według scenariuszy (P16b) metryki w panelu (P16c) i judge offline na transkryptach (P16d).
+Limit kosztu w samym `converse` na Gemini - jeszcze nie. Rozmowy na Gemini działają (`populate` i `converse` z `--expect-provider gemini`, instancja z `Assistant__Provider=gemini`), ale koszt pilnuje się z zewnątrz: suma `CostUsd` w `assistant_turns` tej bazy i przerwanie przebiegu po przekroczeniu (tak w `gemini-1`). Teraz działa populacja kont (P16a), rozmowy według scenariuszy (P16b) metryki w panelu (P16c) i judge offline na transkryptach (P16d).
 :::
 
 ## Baza i instancja demo
@@ -172,6 +172,9 @@ Judge **szacuje** jakość znaczenia odpowiedzi; nie ocenia jej bezbłędnie i w
 dotnet run --project apps/tools/Simulator -- judge --run demo-1 [--random 40] [--errors 20] [--regressions 10] [--max-usd 0.20] [--model gemini-3.5-flash-lite]
 dotnet run --project apps/tools/Simulator -- calibrate --run demo-1 [--size 30] [--model gemini-3.5-flash-lite]
 dotnet run --project apps/tools/Simulator -- agreement --run demo-1 [--model gemini-3.5-flash-lite]
+# ocena człowieka w Phoenix (ADR 0019): docker compose --profile observability up -d phoenix
+dotnet run --project apps/tools/Simulator -- calibrate --run gemini-1 --phoenix http://127.0.0.1:6006
+dotnet run --project apps/tools/Simulator -- agreement --run gemini-1 --phoenix http://127.0.0.1:6006
 ```
 
 - Klucz: `GEMINI_API_KEY` albo user-secret API `Assistant:Gemini:ApiKey`; w nagłówku, nigdy w URL ani w logu.
@@ -179,6 +182,7 @@ dotnet run --project apps/tools/Simulator -- agreement --run demo-1 [--model gem
 - Dowód celu ustala symulator, nie judge: propozycja aktywacji - nazwy ofert ze zdarzenia `confirmation` zapisane w transkrypcie (judge ocenia correct/wrong, także brak propozycji); propozycja bez zapisanego celu (transkrypt sprzed zapisu) i `compare_coupons` (litry i kwota nie są w żadnym zdarzeniu) - `cannot_assess` bez względu na odpowiedź judge'a; pozostałe tury - `not_applicable`. `compare_coupons` w turze daje `cannot_assess` także przy zapisanej propozycji. Zapytanie `search_program_rules` nie jest celem: jego skutek ocenia `grounded`. Publiczne SSE nie dostaje argumentów narzędzi na potrzeby judge'a.
 - Werdykt liczy symulator stałą regułą: `fail`, gdy odpowiedź nie odpowiada w pełni, przeczy regulaminowi, działanie nie pasuje albo cel jest zły; inaczej `cannot_assess`, gdy celu nie da się ocenić (nigdy automatyczny pass); inaczej `pass`.
 - Wyników narzędzi konta (saldo, kupony) judge nie widzi - nie ocenia liczb z konta.
+- Ocena człowieka w Phoenix (`--phoenix`, tylko adres loopback): `calibrate` wysyła wiersze arkusza jako spany projektu `fuelclub-ocena` (wcześniejsze tury i pytanie, odpowiedź, w metadanych scenariusz, narzędzia, cel propozycji). W UI: projekt `fuelclub-ocena` → span → Annotate → `human_verdict` `pass`/`fail`, komentarz w wyjaśnieniu. `agreement --phoenix` pobiera oceny, wpisuje je do arkusza i liczy zgodność; werdykty judge'a (`judge_verdict`) wysyła do Phoenix dopiero po ocenie wszystkich wierszy (ocena na ślepo).
 - Próbki osobno: **regresje** (scenariusze znanych pomyłek), **losowa** (pozostałe tury, szacuje udział poprawnych) i **błędów** (tury niezgodne ze sprawdzeniami regułowymi, niewylosowane). Wybór deterministyczny w przebiegu; tylko tury zakończone `done`, bez rozmów `end-pending`.
 - **Awaria judge'a ≠ ocena negatywna**: błąd HTTP, timeout (30 s), błąd transportu albo odpowiedź poza schematem to `judge_error` z rodzajem, liczony osobno i oceniany ponownie przy następnym uruchomieniu.
 - **Twardy limit kosztu** (`--max-usd`, domyślnie 0,20 USD): wywołanie idzie tylko, gdy jego najgorszy przypadek (instrukcje i prompt: znaki/2 tokenów wejścia, 2048 wyjścia) mieści się w limicie; użycie, którego nie da się odczytać jako liczby, też liczone jak najgorszy przypadek; wywołanie bez danych o użyciu liczone jak najgorszy przypadek. Koszt z cennika `gemini-3.5-flash-lite-standard-2026-11-23` (szacunek), osobno od kosztu tur w panelu.
@@ -193,6 +197,8 @@ dotnet run --project apps/tools/Simulator -- agreement --run demo-1 [--model gem
 - `calibrate` zapisuje arkusz dla jednego modelu z wszystkich tur, które ten model ocenił (nie z nowego losowania): połowa ocenionych jako `fail`, reszta `pass`, bez werdyktu i uzasadnienia judge'a (ocena „na ślepo”). Istniejącego arkusza nie nadpisuje; bez ocen odmawia i nic nie zapisuje.
 - Człowiek wpisuje `pass`/`fail` w `human_verdict` (opcjonalnie `human_note`).
 - `agreement` porównuje oceny człowieka z ocenami tego samego modelu: zgodność, macierz (człowiek × judge) i kappa Cohena na wierszach z oceną człowieka; raport podaje model.
+
+Testy Phoenix: `apps/api.tests/PhoenixReviewTests.cs` - tylko adres loopback, treść i metadane spanu, oceny tylko `HUMAN` pass/fail (najnowsza na span), wpis ocen do arkusza bez naruszenia innych kolumn.
 
 Testy: `apps/api.tests/JudgeTests.cs` - rozłączne i deterministyczne próbki bez tur uciętych i `end-pending`; werdykt z reguły i koszt z raportowanego użycia (myślenie jako wyjście), klucz tylko w nagłówku; awaria HTTP i odpowiedź poza schematem jako `judge_error` liczone najgorszym przypadkiem; użycie niebędące liczbą - najgorszy przypadek z instrukcjami; limit kosztu zatrzymuje wywołania, a ponowne uruchomienie nie płaci drugi raz; oceny usuniętego transkryptu wypadają; arkusz kalibracji ślepy, nienadpisywany, z ocen jednego modelu, bez ocen odmawia; zgodność tylko z ocenionych wierszy tego modelu, kappa. `SimulatorTests`: `prune` usuwa też stare pliki judge'a.
 
@@ -270,6 +276,8 @@ Przejście `demo-1 / v8-same` (`demo-rules-v8`, test techniczny):
 Przebiegi `demo-2` (`demo-rules-v9`, 100 kont, 500 rozmów) i `demo-3` (`demo-rules-v10`, 100 kont, 400 rozmów) - każdy na osobnej, świeżej bazie (`fuelclub_demo2`, `fuelclub_demo3`), więc oferty innych przebiegów nie trafiają do katalogu:
 - `demo-2`: zwykłe 659/659, regresje 21/30 (`regresja-wybor-nagrody` 0/9). Pierwsze transkrypty z zapisanym celem propozycji: 20 tur, każda z celem zgodnym z liczbą potwierdzeń; judge v2 ocenił cel (6 `correct`, w tym cudze ID bez propozycji). Judge v2 dał też fail przekierowaniu pytania o pogodę - luka rubryki, poprawiona w v3.
 - `demo-3`: zwykłe 513/513, regresje 24/24; judge v3: losowa 39 pass, 1 `cannot_assess` (`compare_coupons`), regresje 10/10 pass, 0 fail; 0,045 USD.
+
+Przebieg `gemini-1` (Gemini `gemini-3.5-flash-lite`, `gemini-v10`, osobna baza `fuelclub_gemini1`, 30 kont, 30 rozmów; zewnętrzny limit 0,20 USD): 34 tury, 33 z `done`, 1 błąd dostawcy (`assistant.provider_error`); czas tury u klienta p50 1,5 s, p95 6,0 s; koszt rozmów 0,046 USD, judge 0,028 USD. Sprawdzenia regułowe: zwykłe 20/22, regresje 8/12. Znaleziska do diagnozy: „Jak działa zbieranie punktów?” 0/3 - Gemini odpowiada, że regulamin tego nie opisuje (demo omija to zapytaniem tematu §3, Gemini szuka słowami klienta); `cudzy-kupon` 0/2 - inne sformułowanie niż wzorzec sprawdzenia, do oceny człowieka. Próbka 30 tur w Phoenix (`fuelclub-ocena`) czeka na ocenę człowieka.
 
 Wybór kuponu v7/v8 - kontrolowane porównanie (porównanie jakości dla tej poprawki): dwie instancje na osobnych świeżych bazach, te same dane z jednego skryptu (4 oferty, 3 konta: jeden kupon, cztery, żaden), 11 przypadków, wynik z celu propozycji w zdarzeniu `confirmation`. v7 8/11, v8 11/11. Błędy v7: jedyny kupon podstawiony za nazwany, którego klient nie ma (2 przypadki, błąd z `demo-1`), i dopytanie zamiast propozycji przy „kawa duża”, gdy klient ma też „kawa”. Zestaw ułożył autor poprawki pod regułę właściciela; adapter demo, nie Gemini. Odtworzenie: [Wybór kuponu - kontrolowane porównanie](#wybór-kuponu---kontrolowane-porównanie).
 

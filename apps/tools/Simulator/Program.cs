@@ -10,8 +10,8 @@ using FuelClub.Simulator;
 //   cleanup  --run <id> [--manifest path]     (SIM_DEMO_DATABASE: connection string)
 //   prune    [--days 14]                      (deletes transcripts and judge files past the retention)
 //   judge    --run <id> [--random 40] [--errors 20] [--regressions 10] [--max-usd 0.20] [--model M]
-//   calibrate --run <id> [--size 30]           (blind sheet for human grades)
-//   agreement --run <id>                       (human vs judge on the filled sheet)
+//   calibrate --run <id> [--size 30] [--phoenix http://127.0.0.1:6006]  (blind sheet / Phoenix spans)
+//   agreement --run <id> [--phoenix http://127.0.0.1:6006]  (human vs judge: sheet or Phoenix grades)
 //   compare  --run <id> --pass <name>          (the same turns before and after, today's checks)
 //   coupon-cases --run <id> [--api]            (11 coupon-selection cases on a fresh instance)
 //   coupon-cases-report --run <id> --base <id> (the same cases from two runs side by side)

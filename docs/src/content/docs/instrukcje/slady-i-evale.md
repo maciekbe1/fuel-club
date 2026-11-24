@@ -59,5 +59,5 @@ Telemetry__OtlpEndpoint=http://localhost:6006/v1/traces dotnet run --project app
 ```
 
 - Po kilku pytaniach w czacie ślady pojawiają się w Phoenix, w projekcie `fuel-club`, z opóźnieniem do ~5 s (eksport wsadowy). Widać `chat.turn` z potomnymi `chat.tool` i atrybuty `fuelclub.*`, bez treści rozmowy.
-- Phoenix nie ma wolumenu: `docker compose rm -sf phoenix` usuwa ślady.
+- Phoenix ma wolumen `phoenix_data` (ślady i oceny człowieka z kalibracji, [ADR 0019](/decyzje/0019-ocena-czlowieka-w-phoenix/)): `docker compose down -v` je usuwa.
 - Bez `Telemetry:OtlpEndpoint` nic nie jest eksportowane. Wiersze `assistant_turns` w bazie powstają zawsze.

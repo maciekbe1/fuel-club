@@ -11,5 +11,8 @@
   <!-- Public HTTP API only: no reference to the API project. Npgsql only for cleanup. -->
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="10.*" />
+    <!-- Calibration review in a local Phoenix only (ADR 0019): synthetic turns, loopback host. -->
+    <PackageReference Include="OpenTelemetry" Version="1.21.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
   </ItemGroup>
 </Project>
