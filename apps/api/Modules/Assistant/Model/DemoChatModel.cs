@@ -606,9 +606,10 @@ public sealed partial class DemoChatModel : IChatModel
     )]
     private static partial Regex Forbidden();
 
-    // Wording of questions about how the program works, not about the user's own data.
+    // Wording of questions about how the program works, not about the user's own data. "Ile punktów
+    // za litr / za 100 zł" asks for the accrual rule, not for the balance.
     [GeneratedRegex(
-        @"regulamin|zasad|wygasa|termin|waznos|zwrot|anulow|cofn|limit|maksymal|najwiecej|jednorazow|dwoch\s+kupon|licza?\s+sie|liczon|czy\s+(dostane|dostaje)\s+punkt|jak\s+(dziala|odebrac)|do\s+czego\s+sluz\w*\s+(karta|kod|program|punkt)"
+        @"regulamin|zasad|wygasa|termin|waznos|zwrot|anulow|cofn|limit|maksymal|najwiecej|jednorazow|dwoch\s+kupon|licza?\s+sie|liczon|czy\s+(dostane|dostaje)\s+punkt|jak\s+(dziala|odebrac)|do\s+czego\s+sluz\w*\s+(karta|kod|program|punkt)|punkt\w*\s+(\w+\s+)?za\s+(litr|zlot|\d)"
     )]
     private static partial Regex RulesQuestion();
 

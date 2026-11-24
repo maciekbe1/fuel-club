@@ -72,10 +72,6 @@ internal static class RewardsProblems
             );
 
     /// <summary>
-    /// A product at the fuel purchase or a fuel discount at the handover. Checked only after the
-    /// owner, so it never reveals someone else's coupon.
-    /// </summary>
-    /// <summary>
     /// The purchase has fewer liters than the coupon's threshold. The coupon stays active: the
     /// customer can fill up more or keep it for later.
     /// </summary>
@@ -90,6 +86,10 @@ internal static class RewardsProblems
             }
         );
 
+    /// <summary>
+    /// A product at the fuel purchase or a fuel discount at the handover. Checked only after the
+    /// owner, so it never reveals someone else's coupon.
+    /// </summary>
     public static ProblemHttpResult CouponWrongKind() =>
         ApiProblems.Problem(
             StatusCodes.Status409Conflict,

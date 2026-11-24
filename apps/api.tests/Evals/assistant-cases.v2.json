@@ -299,6 +299,23 @@
       }
     },
     {
+      "id": "rules-points-per-liter",
+      "category": "regulamin-zbieranie-punktow",
+      "message": "ile punktow jest za litr?",
+      "expect": {
+        "tools": [
+          "search_program_rules:ok"
+        ],
+        "end": "done",
+        "answerPatterns": [
+          "§\\s?3\\.1"
+        ],
+        "answerForbiddenPatterns": [
+          "\\bnie\\s+(opisuje|zawiera|podaje|określa|reguluje)\\b"
+        ]
+      }
+    },
+    {
       "id": "rules-activation-is-final",
       "category": "regulamin-aktywacja-odbior",
       "message": "Czy mogę cofnąć aktywację kuponu?",

@@ -643,7 +643,7 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Minimum_liters_are_stored_shown_in_the_catalog_and_removed_by_a_form_without_them()
+    public async Task Minimum_liters_are_stored_shown_in_the_catalog_kept_without_the_field_and_removed_by_null()
     {
         var admin = await AccountAsync(RoleNames.Admin);
         var customer = await AccountAsync(RoleNames.User);
@@ -655,7 +655,18 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         )!.Items.Single(i => i.Id == offer.Id);
         Assert.Equal(30m, catalog.MinLiters);
 
-        var response = await PutAsync(admin, offer.Id, Form(liters: 20m), offer.Version);
+        // A client from before the field (no minLiters key) keeps the stored threshold.
+        var withoutField = System
+            .Text.Json.JsonSerializer.SerializeToNode(Form(liters: 20m))!
+            .AsObject();
+        withoutField.Remove("minLiters");
+        var kept = await PutAsync(admin, offer.Id, withoutField, offer.Version);
+        Assert.Equal(HttpStatusCode.OK, kept.StatusCode);
+        var keptBody = (await kept.Content.ReadFromJsonAsync<Offer>())!;
+        Assert.Equal(30m, keptBody.MinLiters);
+
+        // An explicit null removes it.
+        var response = await PutAsync(admin, offer.Id, Form(liters: 20m), keptBody.Version);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Null((await response.Content.ReadFromJsonAsync<Offer>())!.MinLiters);
         Assert.Null((await StoredAsync(offer.Id)).MinLiters);

@@ -362,7 +362,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                        "application/problem+json": components["schemas"]["RewardsConflictProblem"];
                     };
                 };
                 /** @description Too Many Requests */

@@ -42,7 +42,8 @@ public sealed record CreateRewardRequest(
 /// <summary>
 /// The whole form plus the version it was loaded with (PUT, also for activate/deactivate).
 /// <c>Kind</c> may be sent but must match the offer: it never changes (400 rewards.kind_immutable).
-/// <c>MinLiters</c> is part of the whole form: absent or null removes the threshold.
+/// <c>minLiters</c>: a number sets the threshold, an explicit null removes it, an absent field keeps
+/// the stored one - a client from before the field (open during a deploy, ADR 0022) must not wipe it.
 /// </summary>
 public sealed record UpdateRewardRequest(
     string? Name,
@@ -52,9 +53,25 @@ public sealed record UpdateRewardRequest(
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
     bool? IsActive,
-    int? Version,
-    decimal? MinLiters = null
-);
+    int? Version
+)
+{
+    private readonly decimal? _minLiters;
+
+    /// <summary>Set by the JSON reader only when the field is in the body (also when it is null).</summary>
+    public decimal? MinLiters
+    {
+        get => _minLiters;
+        init
+        {
+            _minLiters = value;
+            MinLitersSent = true;
+        }
+    }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool MinLitersSent { get; private init; }
+}
 
 /// <summary>
 /// Offer management for admins. Edits are guarded by an explicit version: one conditional
@@ -168,6 +185,8 @@ public static class AdminRewardEndpoints
             .SingleOrDefaultAsync(cancellationToken);
         if (stored is not { } offerKind)
             return RewardsProblems.OfferNotFound();
+        // Absent: validated as no threshold, and the UPDATE keeps the stored value.
+        var keepMinLiters = !request.MinLitersSent;
         var (input, errors) = ValidateForm(
             request.Name,
             request.Description,
@@ -200,7 +219,7 @@ public static class AdminRewardEndpoints
                 UPDATE "RewardOffers"
                 SET "Name" = {input.Name}, "Description" = {input.Description}, "PointsCost" = {input.PointsCost},
                     "DiscountPerLiter" = {input.DiscountPerLiter}, "MaxLiters" = {input.MaxLiters},
-                    "MinLiters" = {input.MinLiters},
+                    "MinLiters" = CASE WHEN {keepMinLiters} THEN "MinLiters" ELSE {input.MinLiters} END,
                     "IsActive" = {request.IsActive!.Value}, "Version" = "Version" + 1, "UpdatedAt" = now()
                 WHERE "Id" = {id} AND "Version" = {request.Version!.Value}
                 RETURNING "Id", "Name", "Description", "PointsCost", "Kind", "DiscountPerLiter", "MaxLiters",

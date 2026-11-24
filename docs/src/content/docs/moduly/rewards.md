@@ -67,7 +67,7 @@ Zaokrąglenie połówek od zera, nie bankierskie (0,045 → 0,05, a nie 0,04).
 | `Kind` | `varchar(16)` | `FuelDiscount` albo `Product` (`CK_*_Kind`); niezmienny po utworzeniu |
 | `DiscountPerLiter` | `numeric(4,2)` NULL | `CHECK (> 0 AND <= 10)`; `CK_*_KindTerms`: wymagane przy `FuelDiscount`, puste przy `Product` |
 | `MaxLiters` | `numeric(7,3)` NULL | `CHECK (> 0 AND <= 1000)`; jak wyżej |
-| `MinLiters` | `numeric(7,3)` NULL | opcjonalny próg rabatu: działa od tylu litrów jednego tankowania (`NULL` = od pierwszego litra); `CHECK (> 0 AND <= 1000)`, pusty przy `Product`; może być większy niż `MaxLiters` („od 30 l, rabat na 20 l”) |
+| `MinLiters` | `numeric(7,3)` NULL | opcjonalny próg rabatu (w `PUT` brak pola zostawia zapisany próg - klient sprzed tego pola nie kasuje go; `null` usuwa): działa od tylu litrów jednego tankowania (`NULL` = od pierwszego litra); `CHECK (> 0 AND <= 1000)`, pusty przy `Product`; może być większy niż `MaxLiters` („od 30 l, rabat na 20 l”) |
 | `IsActive` | `boolean` | wyłączona: brak nowych wymian, wydane kupony działają |
 | `CreatedAt`, `UpdatedAt` | `timestamptz` | |
 | `Version` | `integer` | `CHECK (>= 1)`; wersja edycji, start od 1 |
@@ -292,6 +292,10 @@ Decyzja: [ADR 0013](/decyzje/0013-nagrody-produktowe/).
 - Aktywacja tylko własnego kuponu: `UserId` jest w warunku `UPDATE`.
 - Podgląd: kupon musi należeć do właściciela zeskanowanej karty; limit prób na kasjera; kody nie trafiają do logów (test do poziomu Trace).
 - Odbiór: kupon właściciela karty w zapytaniu i w warunku `UPDATE`, a w bazie złożony FK właściciela; jednorazowość przez warunek `Status = 'Active'` i `UNIQUE (RedeemedPurchaseId)`; kody nie trafiają do logów.
+
+:::note[Wycofanie wersji api]
+Rollback rewizji api do wersji sprzed `MinLiters` nie cofa migracji, ale stary kod pomija kolumnę: wymiana wyda kupon bez progu, a kasa nie sprawdzi progu. Kupon zachowuje snapshot na stałe. Po rollbacku nie ustawiaj progów, dopóki nowa wersja nie wróci.
+:::
 
 ## Testy
 

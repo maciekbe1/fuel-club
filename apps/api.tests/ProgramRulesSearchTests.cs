@@ -93,6 +93,9 @@ public sealed class ProgramRulesSearchTests(ApiFactory factory)
     [InlineData("Czy kod karty służy do płacenia?", "2.3")]
     [InlineData("Czy konsultant widzi moje saldo?", "8.3")]
     [InlineData("Jak liczony jest rabat na litr?", "5.4")]
+    // Regression (production 2026-11-24): points are per zloty, not per liter - §3.1 answers it.
+    [InlineData("ile punktow jest za litr?", "3.1")]
+    [InlineData("Ile punktów dostanę za litr paliwa?", "3.1")]
     [InlineData("Czy asystent może mi dopisać punkty?", "7.2")]
     // Regression (Gemini pilot 2026-11-23): the program card, not a payment card.
     [InlineData("karta lojalnościowa", "2.1|2.2|2.3")]

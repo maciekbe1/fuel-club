@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { ApiError } from "@/lib/api/problem";
 import { litersFormat } from "@/lib/format";
-import type { FuelPurchaseBody } from "./services";
+import type { FuelPurchaseBody, RewardsConflictProblem } from "./services";
 
 /** 409 rewards.min_liters_not_reached: the coupon works from minLiters; it stays active. */
 export function minLitersMessage(error: ApiError) {
-  const min = (error.problem as { minLiters?: number }).minLiters;
+  const min = (error.problem as RewardsConflictProblem).minLiters;
   const from =
     typeof min === "number"
       ? `od ${litersFormat.format(min)} l`

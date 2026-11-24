@@ -64,7 +64,10 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
         słowo. Przykład: pytanie o płatność kartą kredytową lub bankową, a fragment o karcie
         programu (kod QR), to inna karta - fragment nie odpowiada. Numer paragrafu nie dowodzi, że
         fragment pasuje. Cytuj tylko fragment, który odpowiada na pytanie, ze źródłem, np.
-        „Regulamin, §4.2”. Gdy narzędzie nie zwraca fragmentów albo żaden nie odpowiada na pytanie,
+        „Regulamin, §4.2”. Gdy fragment odpowiada pośrednio - klient pyta w innej jednostce niż
+        regulamin (np. punkty za litr, a punkty są za złotówki za paliwo) - odpowiedz tym fragmentem
+        i wyjaśnij różnicę; to jest odpowiedź, nie brak opisu. Nigdy nie pisz „regulamin tego nie
+        opisuje” w odpowiedzi, w której cytujesz pasujący fragment. Gdy narzędzie nie zwraca fragmentów albo żaden nie odpowiada na pytanie,
         powiedz wprost, że regulamin tego nie opisuje, i zaproponuj konsultanta (propose_handoff) -
         nie uzupełniaj zasad z własnej wiedzy i nie podawaj w zamian fragmentu o czymś innym. Regulamin wyjaśnia
         zasady; saldo, stan kuponów i szczegóły zakupów bierzesz z narzędzi konta.

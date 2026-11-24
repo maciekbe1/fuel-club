@@ -210,6 +210,8 @@ Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane prze
 ## Próg litrów kuponu (2026-11-24)
 
 - Oferta paliwowa ma opcjonalne `minLiters` („rabat przy tankowaniu od 30 l”), kopiowane do kuponu przy wymianie. Poniżej progu podgląd i zakup → `409 rewards.min_liters_not_reached` z `minLiters`, kupon zostaje aktywny. Migracja `RewardMinLiters` (kolumny nullable, zgodna wstecz).
+- `PUT` oferty: brak `minLiters` zostawia próg (stary front w trakcie wdrożenia), `null` usuwa. 409 zakupu typowane `RewardsConflictProblem`.
+- Wyszukiwanie regulaminu: przy pytaniu o punkty „litr” szuka też „paliw” - „Ile punktów jest za litr?” trafia §3.1 (regresja z produkcji: „regulamin tego nie opisuje” + cytat §3.1 + konsultant). Prompt Gemini: odpowiedź pośrednia to odpowiedź, nie „brak opisu”. Eval `rules-points-per-liter`.
 - Asystent: progi w ofertach, kuponach i porównaniu (poniżej progu rabat 0). Web: pole w formularzu admina, warunki „przy tankowaniu od X l” wszędzie przez `formatTerms`, komunikat w kasie.
 
 ## Rozmowa w trakcie wdrożenia (2026-11-24)

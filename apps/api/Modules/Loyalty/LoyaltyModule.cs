@@ -61,7 +61,11 @@ public static class LoyaltyModule
             .WithDescription(FuelPurchaseEndpoint.Description)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict)
+            // rewards.min_liters_not_reached carries minLiters (same record as the coupon preview).
+            .Produces<FuelClub.Api.Modules.Rewards.RewardsConflictProblem>(
+                StatusCodes.Status409Conflict,
+                "application/problem+json"
+            )
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         // Customer data requires the User role; an account that also has Cashier or Admin still reads

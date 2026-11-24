@@ -55,6 +55,15 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
 
     private static readonly string[] Collecting = ["nalic", "dosta", "przyz"];
 
+    /// <summary>
+    /// "Ile punktów za litr?": points are earned per zloty paid for fuel (§3.1 says "za paliwo"), so
+    /// with points a liter also matches fuel. Without points "litr" stays as it is (discount rules).
+    /// </summary>
+    private static readonly Dictionary<string, string[]> PointsSynonyms = new()
+    {
+        [Stem("litr")] = ["paliw"],
+    };
+
     private static readonly HashSet<string> PointsCollectingVerbs =
     [
         .. new[]
@@ -127,6 +136,7 @@ public sealed partial class ProgramRulesSearch(AppDbContext db)
                             .Concat(
                                 points && PointsCollectingVerbs.Contains(stem) ? Collecting : []
                             )
+                            .Concat(points ? PointsSynonyms.GetValueOrDefault(stem, []) : [])
                             .Select(s => $"{s}:*")
                     )
                 ),
