@@ -1,12 +1,13 @@
 "use client";
 
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, Dices } from "lucide-react";
 import { FormAlert } from "@/components/form/FormAlert";
 import { fieldA11y, fieldClass, FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { moneyFormat as money, numberFormat as plain } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { newReceiptNumber } from "../receipt-number";
 import { looksLikeCardCode, warsawToday } from "../schemas";
 import { CouponSection } from "./CouponSection";
 import { QrScanner } from "./QrScanner";
@@ -144,13 +145,33 @@ export function PurchaseForm({ flow }: { flow: PurchaseFlow }) {
               label="Numer paragonu"
               error={errors.receiptNumber}
             >
-              <Input
-                autoComplete="off"
-                autoCapitalize="characters"
-                className={cn(fieldClass, "font-mono")}
-                {...fieldA11y("receiptNumber", errors.receiptNumber)}
-                {...form.register("receiptNumber")}
-              />
+              <div className="relative">
+                <Input
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  className={cn(fieldClass, "pr-12 font-mono")}
+                  {...fieldA11y("receiptNumber", errors.receiptNumber)}
+                  {...form.register("receiptNumber")}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-1/2 right-1 -translate-y-1/2"
+                  aria-label="Wygeneruj losowy numer"
+                  title="Wygeneruj losowy numer"
+                  disabled={locked}
+                  onClick={() =>
+                    form.setValue(
+                      "receiptNumber",
+                      newReceiptNumber(form.getValues("saleDate")),
+                      { shouldValidate: true, shouldDirty: true },
+                    )
+                  }
+                >
+                  <Dices className="size-4" aria-hidden />
+                </Button>
+              </div>
             </FormField>
           </div>
 

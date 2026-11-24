@@ -22,9 +22,11 @@ async function fillPurchase(page: Page, code: string) {
   await page.getByLabel("Kod karty klienta").fill(code);
   await page.getByLabel("Kwota (zł)").fill("123,45");
   await page.getByLabel("Litry").fill("40,5");
-  await page
-    .getByLabel("Numer paragonu")
-    .fill(`E2E/${crypto.randomUUID().slice(0, 8)}`.toUpperCase());
+  // The POS simulator generates the receipt number (format within the API rule).
+  await page.getByRole("button", { name: "Wygeneruj losowy numer" }).click();
+  await expect(page.getByLabel("Numer paragonu")).toHaveValue(
+    /^PAR\/\d{8}\/[0-9A-Z]{6}$/,
+  );
 }
 
 test("customer shows the card, cashier registers the purchase, customer sees balance and history", async ({

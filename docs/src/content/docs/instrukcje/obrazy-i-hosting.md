@@ -91,11 +91,15 @@ Cloud Run to tylko hosting aplikacji. Model nadal idzie przez Gemini API z klucz
 | Usługa `fuelclub-api` | ingress `internal`, Direct VPC egress (podsieć `default`, tylko zakresy prywatne), `min=max=1` instancja (SignalR, workery), CPU naliczane w trakcie żądań, timeout 300 s |
 | Usługa `fuelclub-web` | publiczna, Direct VPC egress `all-traffic` (żądania do `*.run.app` api liczą się jako wewnętrzne), `min=0`, `max=2`, `TRUST_FORWARDED_FOR=true` |
 
-Konta startowe: `admin@`, `kasjer@` (stanowisko `DEMO-01`, kasa `K1`), `konsultant@demo.fuelclub.test`. Hasła są tylko w Secret Managerze:
+Konta startowe (hasła tylko w Secret Managerze, odczyt wymaga dostępu do projektu):
 
-```sh
-gcloud secrets versions access latest --secret admin-password --project fuelclub-demo-a0999e
-```
+| Konto | Rola | Hasło |
+| --- | --- | --- |
+| `admin@demo.fuelclub.test` | `Admin` | `gcloud secrets versions access latest --secret admin-password --project fuelclub-demo-a0999e` |
+| `kasjer@demo.fuelclub.test` | `Cashier`, stanowisko `DEMO-01`, kasa `K1` | `gcloud secrets versions access latest --secret cashier-password --project fuelclub-demo-a0999e` |
+| `konsultant@demo.fuelclub.test` | `Support` | `gcloud secrets versions access latest --secret support-password --project fuelclub-demo-a0999e` |
+
+Klient: zwykła rejestracja w aplikacji.
 
 ### Wdrożenie nowej wersji
 
