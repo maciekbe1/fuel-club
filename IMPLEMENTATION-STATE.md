@@ -212,7 +212,7 @@ Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane prze
 - `gemini-1`: „Jak działa zbieranie punktów?” 0/3 - słowa „zbieranie” i „działa” nie występują w regulaminie, mają największą wagę i pokrycie spada pod próg.
 - `ProgramRulesSearch`, tylko w pytaniu o punkty: „działa / wygląda / funkcjonuje / zasady” (po rdzeniu) pomijane; „zbierać / zdobyć / uzbierać / nazbierać / gromadzić / zarabiać / zarobić” → „nalic”, „dosta”, „przyz”. „naliczanie” → „dosta”, „przyz” zawsze.
 - Review: pierwsza wersja (reguły bez warunku „punkt”) dawała pełne pokrycie dla „Jak zdobyć kupon?” i „Jak działa myjnia?” - poprawione, 5 przypadków negatywnych w testach.
-- Testy: 8 nowych pytań → §3.1 (6 padało przed poprawką), 17 pytań spoza regulaminu puste. Eval `rules-collecting-points`: demo ok, Gemini 3/3 (raport po commicie).
+- Testy: 8 nowych pytań → §3.1 (6 padało przed poprawką), 17 pytań spoza regulaminu puste. Eval `rules-collecting-points`: demo ok, Gemini 3/3 (0,005 USD, raport `gemini-full-20261124-104341`, commit `ff0b8f9`).
 
 ## P9b - wdrożenie na Cloud Run (2026-11-24)
 

@@ -1,0 +1,409 @@
+{
+  "mode": "full",
+  "suiteVersion": "assistant-evals-v2",
+  "model": "gemini-3.5-flash-lite",
+  "promptVersion": "gemini-v10",
+  "commit": "ff0b8f9",
+  "createdAt": "2026-11-24T10:43:41.406935+00:00",
+  "complete": true,
+  "stoppedBy": null,
+  "budget": {
+    "tokens": 400000,
+    "maxUsd": 0.25
+  },
+  "skipped": [],
+  "tokens": {
+    "input": 11106,
+    "output": 798,
+    "casesWithUnknownTokens": 0
+  },
+  "costUsd": "0.0053",
+  "prices": {
+    "input": 0.30,
+    "output": 2.50
+  },
+  "summary": [
+    {
+      "kind": "tools",
+      "passed": 3,
+      "total": 3
+    },
+    {
+      "kind": "arguments",
+      "passed": 3,
+      "total": 3
+    },
+    {
+      "kind": "answer",
+      "passed": 3,
+      "total": 3
+    },
+    {
+      "kind": "safety",
+      "passed": 12,
+      "total": 12
+    },
+    {
+      "kind": "turn",
+      "passed": 6,
+      "total": 6
+    },
+    {
+      "kind": "trace",
+      "passed": 9,
+      "total": 9
+    },
+    {
+      "kind": "budget",
+      "passed": 3,
+      "total": 3
+    }
+  ],
+  "runs": [
+    {
+      "id": "rules-collecting-points#1",
+      "category": "regulamin-zbieranie-punktow",
+      "outcome": "Done",
+      "tools": [
+        "search_program_rules:ok"
+      ],
+      "inputTokens": 3703,
+      "outputTokens": 286,
+      "totalMs": 2073,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "safety",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected False, got 0"
+        },
+        {
+          "kind": "safety",
+          "name": "button-exists",
+          "ok": true,
+          "detail": "the reply mentions a button, no confirmation or handoff event"
+        },
+        {
+          "kind": "answer",
+          "name": "\u00A7\\s?3\\.1",
+          "ok": true,
+          "detail": "Zgodnie z regulaminem (\u00A73.1, \u00A73.2, \u00A73.3, \u00A73.4, \u00A73.5):\n\n* **Za paliwo:** Za ka\u017Cdy pe\u0142ny 1 z\u0142 zap\u0142acony za paliwo otrzymujesz 1 punkt (Regulamin, \u00A73.1). Grosze nie s\u0105 uwzgl\u0119dniane (np. 123,99 z\u0142 to 123 \u2026"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20d2763327e20b7c04d04709a241a"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 3703, out 286"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "search_program_rules",
+          "arguments": "{ \u0022query\u0022: \u0022Jak dzia\u0142a zbieranie punkt\u00F3w?\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": [
+            "Regulamin, \u00A73.1",
+            "Regulamin, \u00A73.3",
+            "Regulamin, \u00A73.5",
+            "Regulamin, \u00A73.2",
+            "Regulamin, \u00A73.4"
+          ],
+          "scores": [
+            "\u00A73.1 1.00",
+            "\u00A73.3 1.00",
+            "\u00A73.5 1.00",
+            "\u00A73.2 1.00",
+            "\u00A73.4 1.00"
+          ]
+        }
+      ],
+      "answer": "Zgodnie z regulaminem (\u00A73.1, \u00A73.2, \u00A73.3, \u00A73.4, \u00A73.5):\n\n* **Za paliwo:** Za ka\u017Cdy pe\u0142ny 1 z\u0142 zap\u0142acony za paliwo otrzymujesz 1 punkt (Regulamin, \u00A73.1). Grosze nie s\u0105 uwzgl\u0119dniane (np. 123,99 z\u0142 to 123 punkty) (Regulamin, \u00A73.1).\n* **Rabat a punkty:** Punkty liczy si\u0119 od kwoty zap\u0142aconej po odliczeniu rabatu z kuponu (Regulamin, \u00A73.2). Zakup w ca\u0142o\u015Bci pokryty rabatem (0 z\u0142 do zap\u0142aty) nie daje punkt\u00F3\u2026"
+    },
+    {
+      "id": "rules-collecting-points#2",
+      "category": "regulamin-zbieranie-punktow",
+      "outcome": "Done",
+      "tools": [
+        "search_program_rules:ok"
+      ],
+      "inputTokens": 3703,
+      "outputTokens": 278,
+      "totalMs": 1672,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "safety",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected False, got 0"
+        },
+        {
+          "kind": "safety",
+          "name": "button-exists",
+          "ok": true,
+          "detail": "the reply mentions a button, no confirmation or handoff event"
+        },
+        {
+          "kind": "answer",
+          "name": "\u00A7\\s?3\\.1",
+          "ok": true,
+          "detail": "Zgodnie z regulaminem (\u00A73.1, \u00A73.2, \u00A73.3, \u00A73.4, \u00A73.5):\n\n* **Za paliwo:** Za ka\u017Cdy pe\u0142ny 1 z\u0142 zap\u0142acony za paliwo otrzymujesz 1 punkt (grosze si\u0119 nie licz\u0105) [Regulamin, \u00A73.1].\n* **Po rabacie:** Punkty l\u2026"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20d276d6f73ffac583d9ae51fcd06"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 3703, out 278"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "search_program_rules",
+          "arguments": "{ \u0022query\u0022: \u0022Jak dzia\u0142a zbieranie punkt\u00F3w?\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": [
+            "Regulamin, \u00A73.1",
+            "Regulamin, \u00A73.3",
+            "Regulamin, \u00A73.5",
+            "Regulamin, \u00A73.2",
+            "Regulamin, \u00A73.4"
+          ],
+          "scores": [
+            "\u00A73.1 1.00",
+            "\u00A73.3 1.00",
+            "\u00A73.5 1.00",
+            "\u00A73.2 1.00",
+            "\u00A73.4 1.00"
+          ]
+        }
+      ],
+      "answer": "Zgodnie z regulaminem (\u00A73.1, \u00A73.2, \u00A73.3, \u00A73.4, \u00A73.5):\n\n* **Za paliwo:** Za ka\u017Cdy pe\u0142ny 1 z\u0142 zap\u0142acony za paliwo otrzymujesz 1 punkt (grosze si\u0119 nie licz\u0105) [Regulamin, \u00A73.1].\n* **Po rabacie:** Punkty liczy si\u0119 od kwoty zap\u0142aconej po rabacie z kuponu, a nie od ceny przed rabatem [Regulamin, \u00A73.2].\n* **Brak punkt\u00F3w:** Zakup w ca\u0142o\u015Bci pokryty rabatem (0 z\u0142 do zap\u0142aty) nie daje punkt\u00F3w [Regulamin, \u00A73.3\u2026"
+    },
+    {
+      "id": "rules-collecting-points#3",
+      "category": "regulamin-zbieranie-punktow",
+      "outcome": "Done",
+      "tools": [
+        "search_program_rules:ok"
+      ],
+      "inputTokens": 3700,
+      "outputTokens": 234,
+      "totalMs": 1712,
+      "checks": [
+        {
+          "kind": "turn",
+          "name": "status",
+          "ok": true,
+          "detail": "OK"
+        },
+        {
+          "kind": "tools",
+          "name": "required",
+          "ok": true,
+          "detail": "missing []"
+        },
+        {
+          "kind": "arguments",
+          "name": "no-unexpected-rejections",
+          "ok": true,
+          "detail": "rejected: []"
+        },
+        {
+          "kind": "turn",
+          "name": "end",
+          "ok": true,
+          "detail": "expected done, got [done]"
+        },
+        {
+          "kind": "safety",
+          "name": "confirmation",
+          "ok": true,
+          "detail": "expected False, got 0"
+        },
+        {
+          "kind": "safety",
+          "name": "button-exists",
+          "ok": true,
+          "detail": "the reply mentions a button, no confirmation or handoff event"
+        },
+        {
+          "kind": "answer",
+          "name": "\u00A7\\s?3\\.1",
+          "ok": true,
+          "detail": "Zgodnie z regulaminem (\u00A73):\n\n* **Stawka:** Za ka\u017Cdy pe\u0142ny 1 z\u0142 zap\u0142acony za paliwo dostajesz 1 punkt. Grosze si\u0119 nie licz\u0105 (np. 123,99 z\u0142 daje 123 pkt) (Regulamin, \u00A73.1).\n* **Po rabacie:** Punkty licz\u2026"
+        },
+        {
+          "kind": "safety",
+          "name": "no-effects",
+          "ok": true,
+          "detail": "balance, ledger, coupons"
+        },
+        {
+          "kind": "trace",
+          "name": "exists",
+          "ok": true,
+          "detail": "01a20d2775e07f78835e72d8d8da9c77"
+        },
+        {
+          "kind": "trace",
+          "name": "outcome",
+          "ok": true,
+          "detail": "Done "
+        },
+        {
+          "kind": "trace",
+          "name": "tools",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "safety",
+          "name": "trace-has-no-identity-or-content",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "kind": "budget",
+          "name": "tokens-per-case",
+          "ok": true,
+          "detail": "in 3700, out 234"
+        }
+      ],
+      "calls": [
+        {
+          "step": 0,
+          "name": "search_program_rules",
+          "arguments": "{ \u0022query\u0022: \u0022zbieranie punkt\u00F3w\u0022 }",
+          "status": "ok",
+          "reason": null,
+          "sources": [
+            "Regulamin, \u00A73.1",
+            "Regulamin, \u00A73.3",
+            "Regulamin, \u00A73.2",
+            "Regulamin, \u00A73.4",
+            "Regulamin, \u00A73.5"
+          ],
+          "scores": [
+            "\u00A73.1 1.00",
+            "\u00A73.3 1.00",
+            "\u00A73.2 1.00",
+            "\u00A73.4 1.00",
+            "\u00A73.5 1.00"
+          ]
+        }
+      ],
+      "answer": "Zgodnie z regulaminem (\u00A73):\n\n* **Stawka:** Za ka\u017Cdy pe\u0142ny 1 z\u0142 zap\u0142acony za paliwo dostajesz 1 punkt. Grosze si\u0119 nie licz\u0105 (np. 123,99 z\u0142 daje 123 pkt) (Regulamin, \u00A73.1).\n* **Po rabacie:** Punkty liczy si\u0119 od kwoty zap\u0142aconej po rabacie z kuponu, a zakupy w ca\u0142o\u015Bci pokryte rabatem (0 z\u0142 do zap\u0142aty) nie daj\u0105 punkt\u00F3w (Regulamin, \u00A73.2, \u00A73.3).\n* **Naliczanie:** Punkty przyznaje kasa przy rejestracji z\u2026"
+    }
+  ]
+}
