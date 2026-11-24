@@ -85,7 +85,7 @@ Cloud Run to tylko hosting aplikacji. Model nadal idzie przez Gemini API z klucz
 | Zasób | Ustawienia |
 | --- | --- |
 | Cloud SQL `fuelclub-db` | PostgreSQL 17, `db-f1-micro`, 10 GB SSD, tylko prywatny IP (peering `google-managed-services-default`), kopie codziennie 02:00, 7 kopii. Połączenie z `SSL Mode=Require`. |
-| Artifact Registry `fuelclub` | obrazy `api:<sha>` i `web:<sha>`, budowane w Cloud Build |
+| Artifact Registry `fuelclub` | obrazy `api:<sha>` i `web:<sha>`, budowane w GitHub Actions (`deploy.yml`); ręcznie Cloud Build (`deploy/cloudbuild-*.yaml`) |
 | Secret Manager | `db-connection`, `pseudonym-key`, `gemini-api-key`, `dp-certificate`, `dp-certificate-password`, `admin-password`, `cashier-password`, `support-password`; dostęp tylko konto usługi `fuelclub-api` |
 | Job `fuelclub-migrate` | `./efbundle` z obrazu api, Direct VPC egress; uruchamiany przed nową rewizją api |
 | Usługa `fuelclub-api` | ingress `internal`, Direct VPC egress (podsieć `default`, tylko zakresy prywatne), `min=max=1` instancja (SignalR, workery), CPU naliczane w trakcie żądań, timeout 300 s |
@@ -105,7 +105,7 @@ Klient: zwykła rejestracja w aplikacji.
 
 Automatycznie po zielonym CI na `main` ([ADR 0022](/decyzje/0022-cd-na-cloud-run/), `.github/workflows/deploy.yml`): obrazy, migracja, api, web, smoke test. Ręcznie z GitHuba: Actions → Deploy → Run workflow.
 
-Rollback: `gcloud run services update-traffic fuelclub-api --project fuelclub-demo-a0999e --region europe-central2 --to-revisions <rewizja>=100` (lista: `gcloud run revisions list --service fuelclub-api`), tak samo `fuelclub-web`. Nie cofa migracji.
+Nieudany smoke test sam przełącza ruch na rewizje sprzed wdrożenia. Rollback ręczny: `gcloud run services update-traffic fuelclub-api --project fuelclub-demo-a0999e --region europe-central2 --to-revisions <rewizja>=100` (lista: `gcloud run revisions list --service fuelclub-api`), tak samo `fuelclub-web`. Rollback nie cofa migracji, a job `fuelclub-migrate` zostaje na nowym obrazie - przed ręcznym uruchomieniem joba ustaw obraz rewizji, która serwuje ruch. Kolejne wdrożenie przywraca ruch na najnowszą rewizję (`--to-latest`).
 
 Ręcznie z komputera (awaria Actions):
 

@@ -2,12 +2,13 @@ name: Deploy
 
 # Continuous delivery (ADR 0022): after a green CI run on main, the same commit goes to Cloud Run.
 # No stored keys: GitHub's OIDC token is exchanged through Workload Identity Federation, which
-# trusts only this repository on refs/heads/main.
+# trusts only this repository on refs/heads/main (provider condition on repository and ref).
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  # Manual: deploys main's head, only if CI passed for that commit.
   workflow_dispatch:
 
 # One deploy at a time, never cancelled half-way (a migration may be running).
@@ -17,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
   id-token: write
 
 env:
@@ -38,44 +40,95 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # The commit CI tested, not whatever main points to now.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
 
-      - name: Image tag
-        run: echo "TAG=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+      # Only main's current head: a re-run of an older CI run must not put old code over newer
+      # code, and a manual run must not skip CI.
+      - name: Gate - main's head, green CI
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          head=$(git rev-parse origin/main)
+          if [ "$sha" != "$head" ]; then
+            echo "Skip: $sha is not main's head ($head); the newer commit deploys itself."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            ci=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$sha" --branch main \
+              --event push --limit 1 --json conclusion --jq '.[0].conclusion')
+            if [ "$ci" != success ]; then
+              echo "::error::CI for $sha is '${ci:-missing}', not success."
+              exit 1
+            fi
+          fi
+          echo "TAG=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
       - uses: google-github-actions/auth@v2
+        if: steps.gate.outputs.skip != 'true'
         with:
           workload_identity_provider: projects/407499358574/locations/global/workloadIdentityPools/github/providers/github-oidc
           service_account: github-deployer@fuelclub-demo-a0999e.iam.gserviceaccount.com
 
       - uses: google-github-actions/setup-gcloud@v2
-
-      - run: gcloud auth configure-docker europe-central2-docker.pkg.dev --quiet
+        if: steps.gate.outputs.skip != 'true'
 
       - name: Build and push images
+        if: steps.gate.outputs.skip != 'true'
         run: |
+          gcloud auth configure-docker europe-central2-docker.pkg.dev --quiet
           docker build -f apps/api/Dockerfile -t "$REPO/api:$TAG" .
           docker build --build-arg API_INTERNAL_URL="$API_URL" -t "$REPO/web:$TAG" apps/web
           docker push "$REPO/api:$TAG"
           docker push "$REPO/web:$TAG"
 
+      # Remembered for the rollback below: the revisions serving traffic before this deploy.
+      - name: Current revisions
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          for s in api web; do
+            rev=$(gcloud run services describe "fuelclub-$s" --project "$PROJECT" --region "$REGION" \
+              --format 'value(status.latestReadyRevisionName)')
+            echo "PREVIOUS_${s^^}=$rev" >> "$GITHUB_ENV"
+          done
+
       # Before the new api revision: the API never migrates itself. A failed migration stops here.
       - name: Migrate the database
+        if: steps.gate.outputs.skip != 'true'
         run: |
           gcloud run jobs update fuelclub-migrate --project "$PROJECT" --region "$REGION" --image "$REPO/api:$TAG"
           gcloud run jobs execute fuelclub-migrate --project "$PROJECT" --region "$REGION" --wait
 
+      # api first, web second: HTTP changes must stay backward compatible for one release (the old
+      # web serves while the new api is live). --to-latest also undoes a pinned manual rollback.
       - name: Deploy api and web
+        id: deploy
+        if: steps.gate.outputs.skip != 'true'
         run: |
-          gcloud run deploy fuelclub-api --project "$PROJECT" --region "$REGION" --image "$REPO/api:$TAG"
-          gcloud run deploy fuelclub-web --project "$PROJECT" --region "$REGION" --image "$REPO/web:$TAG"
+          for s in api web; do
+            gcloud run deploy "fuelclub-$s" --project "$PROJECT" --region "$REGION" --image "$REPO/$s:$TAG"
+            gcloud run services update-traffic "fuelclub-$s" --project "$PROJECT" --region "$REGION" --to-latest
+          done
 
       - name: Smoke test
+        if: steps.gate.outputs.skip != 'true'
         run: |
-          test "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/login")" = 200
+          code() { curl -s -o /dev/null -w '%{http_code}' --max-time 30 --retry 5 --retry-all-errors "$1"; }
+          test "$(code "$WEB_URL/login")" = 200
           # 401 comes from the api: web reaches it over the VPC.
-          test "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/api/auth/me")" = 401
+          test "$(code "$WEB_URL/api/auth/me")" = 401
           # The api has no public address.
-          test "$(curl -s -o /dev/null -w '%{http_code}' "$API_URL/api/auth/me")" = 404
+          test "$(code "$API_URL/api/auth/me")" = 404
           echo "Deployed $TAG"
+
+      # Traffic back to the revisions from before this deploy. Migrations are not undone (they
+      # must be backward compatible), and the migration job keeps the new image.
+      - name: Roll back traffic
+        if: failure() && steps.deploy.conclusion != 'skipped' && env.PREVIOUS_API != ''
+        run: |
+          gcloud run services update-traffic fuelclub-api --project "$PROJECT" --region "$REGION" --to-revisions "$PREVIOUS_API=100"
+          gcloud run services update-traffic fuelclub-web --project "$PROJECT" --region "$REGION" --to-revisions "$PREVIOUS_WEB=100"
+          echo "::error::Deploy of $TAG failed; traffic back on $PREVIOUS_API and $PREVIOUS_WEB."
