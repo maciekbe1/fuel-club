@@ -39,6 +39,8 @@ export const rewardSchema = z
     // Checked below only for a fuel discount: a product has no per-liter terms.
     discountPerLiter: z.string(),
     maxLiters: z.string(),
+    /** Optional threshold: empty = the discount works from the first liter. */
+    minLiters: z.string(),
     isActive: z.boolean(),
   })
   .superRefine((values, ctx) => {
@@ -55,6 +57,14 @@ export const rewardSchema = z
           message: result.error.issues[0]?.message ?? "Niepoprawna wartość",
         });
     }
+    if (values.minLiters.trim() === "") return;
+    const min = decimal("minimum litrów", 3, 1000).safeParse(values.minLiters);
+    if (!min.success)
+      ctx.addIssue({
+        code: "custom",
+        path: ["minLiters"],
+        message: min.error.issues[0]?.message ?? "Niepoprawna wartość",
+      });
   });
 
 export type RewardValues = z.infer<typeof rewardSchema>;
@@ -70,6 +80,10 @@ export function toRewardBody(values: RewardValues): CreateRewardBody {
     discountPerLiter:
       values.kind === "Product" ? null : num(values.discountPerLiter),
     maxLiters: values.kind === "Product" ? null : num(values.maxLiters),
+    minLiters:
+      values.kind === "Product" || values.minLiters.trim() === ""
+        ? null
+        : num(values.minLiters),
     isActive: values.isActive,
   };
 }
@@ -90,6 +104,7 @@ export function toRewardValues(offer: AdminReward): RewardValues {
         ? ""
         : text.format(offer.discountPerLiter),
     maxLiters: offer.maxLiters === null ? "" : text.format(offer.maxLiters),
+    minLiters: offer.minLiters == null ? "" : text.format(offer.minLiters),
     isActive: offer.isActive,
   };
 }
@@ -101,6 +116,7 @@ export const emptyReward: RewardValues = {
   kind: "FuelDiscount",
   discountPerLiter: "",
   maxLiters: "",
+  minLiters: "",
   isActive: true,
 };
 
@@ -122,6 +138,10 @@ export const rewardMessages: Record<string, string> = {
     "Limit musi być większy od 0 i nie większy niż 1000 l.",
   "rewards.max_liters_precision":
     "Limit może mieć najwyżej 3 miejsca po przecinku.",
+  "rewards.min_liters_out_of_range":
+    "Minimum musi być większe od 0 i nie większe niż 1000 l.",
+  "rewards.min_liters_precision":
+    "Minimum może mieć najwyżej 3 miejsca po przecinku.",
   "rewards.not_for_product": "Nagroda nie ma rabatu ani limitu litrów.",
   "rewards.kind_immutable": "Rodzaju oferty nie można zmienić.",
   default: "Niepoprawna wartość.",

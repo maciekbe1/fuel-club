@@ -42,6 +42,7 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         int PointsCost,
         decimal DiscountPerLiter,
         decimal MaxLiters,
+        decimal? MinLiters,
         string Status,
         DateTimeOffset PurchasedAt,
         DateTimeOffset? ActivatedAt,
@@ -104,7 +105,8 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         int cost = 500,
         bool active = true,
         decimal rate = 0.20m,
-        decimal liters = 50m
+        decimal liters = 50m,
+        decimal? minLiters = null
     )
     {
         var offer = new RewardOffer
@@ -115,6 +117,7 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
             PointsCost = cost,
             DiscountPerLiter = rate,
             MaxLiters = liters,
+            MinLiters = minLiters,
             IsActive = active,
         };
         await DbAsync(async db =>
@@ -252,6 +255,29 @@ public sealed class RewardExchangeTests(ApiFactory factory) : IAsyncLifetime
         Assert.Equal(("CouponExchange", -500, 700), (entry.Type, entry.Delta, entry.BalanceAfter));
         Assert.Equal(new CouponExchangeBody(body.Coupon.Id, offer.Name), entry.CouponExchange);
         Assert.Null(entry.FuelPurchase);
+    }
+
+    [Fact]
+    public async Task The_coupon_keeps_the_minimum_liters_of_the_offer_after_an_edit()
+    {
+        var customer = await CustomerAsync(1200);
+        var offer = await OfferAsync(cost: 500, liters: 20m, minLiters: 30m);
+
+        var response = await ExchangeAsync(customer.Client, offer.Id, 1);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<ExchangeBody>())!;
+        Assert.Equal(30m, body.Coupon.MinLiters);
+        await DbAsync(db =>
+            db.RewardOffers.Where(o => o.Id == offer.Id)
+                .ExecuteUpdateAsync(set => set.SetProperty(o => o.MinLiters, (decimal?)null))
+        );
+        Assert.Equal(
+            30m,
+            await DbAsync(db =>
+                db.Coupons.Where(c => c.Id == body.Coupon.Id).Select(c => c.MinLiters).SingleAsync()
+            )
+        );
     }
 
     [Fact]

@@ -1,5 +1,17 @@
 import { z } from "zod";
+import { ApiError } from "@/lib/api/problem";
+import { litersFormat } from "@/lib/format";
 import type { FuelPurchaseBody } from "./services";
+
+/** 409 rewards.min_liters_not_reached: the coupon works from minLiters; it stays active. */
+export function minLitersMessage(error: ApiError) {
+  const min = (error.problem as { minLiters?: number }).minLiters;
+  const from =
+    typeof min === "number"
+      ? `od ${litersFormat.format(min)} l`
+      : "od wyższej liczby litrów";
+  return `Ten kupon działa przy tankowaniu ${from}. Kupon zostaje aktywny - zapisz tankowanie bez kodu albo zatankuj więcej.`;
+}
 
 /** Form fields are text; amounts accept a Polish decimal comma and are sent as JSON numbers. */
 const decimal = (label: string, places: number) =>

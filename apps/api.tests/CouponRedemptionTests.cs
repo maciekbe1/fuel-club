@@ -41,7 +41,11 @@ public sealed class CouponRedemptionTests(ApiFactory factory) : IAsyncLifetime
         decimal PaidAmount
     );
 
-    private sealed record ProblemBody(string? Code, Dictionary<string, FieldError[]>? Errors);
+    private sealed record ProblemBody(
+        string? Code,
+        Dictionary<string, FieldError[]>? Errors,
+        decimal? MinLiters = null
+    );
 
     private sealed record FieldError(string Field, string Code);
 
@@ -121,7 +125,8 @@ public sealed class CouponRedemptionTests(ApiFactory factory) : IAsyncLifetime
         Customer customer,
         CouponStatus status = CouponStatus.Active,
         decimal rate = 0.20m,
-        decimal liters = 50m
+        decimal liters = 50m,
+        decimal? minLiters = null
     )
     {
         var offer = new RewardOffer
@@ -132,6 +137,7 @@ public sealed class CouponRedemptionTests(ApiFactory factory) : IAsyncLifetime
             PointsCost = 500,
             DiscountPerLiter = rate,
             MaxLiters = liters,
+            MinLiters = minLiters,
             IsActive = true,
         };
         var now = DateTimeOffset.UtcNow;
@@ -145,6 +151,7 @@ public sealed class CouponRedemptionTests(ApiFactory factory) : IAsyncLifetime
             PointsCost = offer.PointsCost,
             DiscountPerLiter = rate,
             MaxLiters = liters,
+            MinLiters = minLiters,
             Status = status,
             PurchasedAt = now.AddMinutes(-10),
             Code = active ? CouponCode.Generate() : null,
@@ -418,6 +425,45 @@ public sealed class CouponRedemptionTests(ApiFactory factory) : IAsyncLifetime
             await StateAsync(customer, coupon.Id, cashierId)
         );
         Assert.Equal(first.PurchaseId, (await StoredAsync(coupon.Id)).RedeemedPurchaseId);
+    }
+
+    [Fact]
+    public async Task Below_the_coupons_minimum_liters_the_purchase_is_rejected_and_the_coupon_stays_active()
+    {
+        var customer = await CustomerAsync();
+        var (cashier, cashierId) = await CashierAsync();
+        var coupon = await CouponAsync(customer, liters: 20m, minLiters: 30m);
+        var before = await StateAsync(customer, coupon.Id, cashierId);
+
+        var response = await cashier.PurchaseAsync(
+            CashierTestHelpers.Sale(customer.CardCode, coupon.Code, liters: 29.999m)
+        );
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var problem = await ProblemOf(response);
+        Assert.Equal("rewards.min_liters_not_reached", problem.Code);
+        Assert.Equal(30m, problem.MinLiters);
+        var after = await StateAsync(customer, coupon.Id, cashierId);
+        Assert.Equal(before with { CashierRecords = after.CashierRecords }, after);
+        Assert.Equal(CouponStatus.Active, after.Coupon);
+    }
+
+    [Fact]
+    public async Task At_the_minimum_liters_the_discount_still_covers_only_max_liters()
+    {
+        var customer = await CustomerAsync();
+        var (cashier, _) = await CashierAsync();
+        var coupon = await CouponAsync(customer, liters: 20m, minLiters: 30m);
+
+        var body = await CreatedBody(
+            await cashier.PurchaseAsync(
+                CashierTestHelpers.Sale(customer.CardCode, coupon.Code, amount: 200m, liters: 30m)
+            )
+        );
+
+        Assert.Equal(4.00m, body.Discount);
+        Assert.Equal(196.00m, body.PaidAmount);
+        Assert.Equal(CouponStatus.Redeemed, (await StoredAsync(coupon.Id)).Status);
     }
 
     [Fact]

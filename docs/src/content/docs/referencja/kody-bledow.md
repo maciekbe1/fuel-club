@@ -67,6 +67,9 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.discount_per_liter_precision` | `discountPerLiter` | maks. 2 miejsca po przecinku |
 | `rewards.max_liters_out_of_range` | `maxLiters` | `0 < limit ≤ 1000` l |
 | `rewards.max_liters_precision` | `maxLiters` | maks. 3 miejsca po przecinku |
+| `rewards.min_liters_out_of_range` | `minLiters` | opcjonalny próg: `0 < próg ≤ 1000` l |
+| `rewards.min_liters_precision` | `minLiters` | maks. 3 miejsca po przecinku |
+| `rewards.min_liters_not_reached` | - | `409`: litry zakupu (albo podglądu z kwotą) poniżej `minLiters` kuponu; odpowiedź ma `minLiters`; nic nie zapisano, kupon zostaje aktywny |
 | `rewards.version_out_of_range` | `version` | wersja `< 1` |
 | `rewards.offer_not_found` | - | `404`: brak oferty |
 | `rewards.offer_version_conflict` | - | `409`: wersja z formularza nie jest aktualna; nic nie zapisano |
@@ -77,7 +80,7 @@ Kody walidacji tankowania (`FuelPurchaseRules`). Zwróci je planowany endpoint t
 | `rewards.coupon_not_found` | - | `404`: brak kuponu albo cudzy kupon (także kupon innego klienta przy zakupie) |
 | `rewards.coupon_redeemed` | - | `409`: kupon już odebrany (aktywacja, podgląd, zakup, wydanie); przy nagrodzie w wydaniu i podglądzie także `handedOverAt`, `stationCode` i `registerCode` (`RewardsConflictProblem`) |
 | `rewards.coupon_busy` | - | `503` + `Retry-After`: wiersz kuponu zablokowany dłużej niż `Rewards:CouponLockTimeout` przez inną transakcję (nie przez aktywację - kod trwającej aktywacji nie jest jeszcze widoczny, więc zakup dostaje `404`); ponów zakup z tym samym kluczem (niezapisywany) |
-| `rewards.not_for_product` | `discountPerLiter`, `maxLiters` | nagroda produktowa nie ma stawki ani limitu |
+| `rewards.not_for_product` | `discountPerLiter`, `maxLiters`, `minLiters` | nagroda produktowa nie ma stawki ani limitu |
 | `rewards.kind_immutable` | `kind` | `PUT` z innym rodzajem niż zapisany |
 | `rewards.coupon_wrong_kind` | - | `409`: kod nagrody przy zakupie paliwa (także podgląd z kwotą) albo kod rabatu przy wydaniu nagrody; po sprawdzeniu właściciela |
 | `rewards.invalid_format` | `couponCode`, `kind` | kod nie jest kodem kuponu (`K` + 26 znaków; np. kod karty); przy zakupie także pusty tekst - brak kuponu to brak pola albo `null` |

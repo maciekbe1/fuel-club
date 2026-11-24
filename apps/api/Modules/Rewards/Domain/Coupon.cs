@@ -28,6 +28,7 @@ public sealed class Coupon
     public RewardKind Kind { get; set; }
     public decimal? DiscountPerLiter { get; set; }
     public decimal? MaxLiters { get; set; }
+    public decimal? MinLiters { get; set; }
 
     public CouponStatus Status { get; set; }
 

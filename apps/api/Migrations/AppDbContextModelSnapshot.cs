@@ -662,6 +662,10 @@ namespace FuelClub.Api.Migrations
                         .HasPrecision(7, 3)
                         .HasColumnType("numeric(7,3)");
 
+                    b.Property<decimal?>("MinLiters")
+                        .HasPrecision(7, 3)
+                        .HasColumnType("numeric(7,3)");
+
                     b.Property<Guid>("OfferId")
                         .HasColumnType("uuid");
 
@@ -726,9 +730,11 @@ namespace FuelClub.Api.Migrations
 
                             t.HasCheckConstraint("CK_Coupons_Kind", "\"Kind\" IN ('FuelDiscount', 'Product')");
 
-                            t.HasCheckConstraint("CK_Coupons_KindTerms", "(\"Kind\" = 'FuelDiscount' AND \"DiscountPerLiter\" IS NOT NULL AND \"MaxLiters\" IS NOT NULL)\nOR (\"Kind\" = 'Product' AND \"DiscountPerLiter\" IS NULL AND \"MaxLiters\" IS NULL)");
+                            t.HasCheckConstraint("CK_Coupons_KindTerms", "(\"Kind\" = 'FuelDiscount' AND \"DiscountPerLiter\" IS NOT NULL AND \"MaxLiters\" IS NOT NULL)\nOR (\"Kind\" = 'Product' AND \"DiscountPerLiter\" IS NULL AND \"MaxLiters\" IS NULL AND \"MinLiters\" IS NULL)");
 
                             t.HasCheckConstraint("CK_Coupons_MaxLiters_Range", "\"MaxLiters\" > 0 AND \"MaxLiters\" <= 1000");
+
+                            t.HasCheckConstraint("CK_Coupons_MinLiters_Range", "\"MinLiters\" > 0 AND \"MinLiters\" <= 1000");
 
                             t.HasCheckConstraint("CK_Coupons_PointsCost_Range", "\"PointsCost\" >= 1 AND \"PointsCost\" <= 1000000");
 
@@ -820,6 +826,10 @@ namespace FuelClub.Api.Migrations
                         .HasPrecision(7, 3)
                         .HasColumnType("numeric(7,3)");
 
+                    b.Property<decimal?>("MinLiters")
+                        .HasPrecision(7, 3)
+                        .HasColumnType("numeric(7,3)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -847,9 +857,11 @@ namespace FuelClub.Api.Migrations
 
                             t.HasCheckConstraint("CK_RewardOffers_Kind", "\"Kind\" IN ('FuelDiscount', 'Product')");
 
-                            t.HasCheckConstraint("CK_RewardOffers_KindTerms", "(\"Kind\" = 'FuelDiscount' AND \"DiscountPerLiter\" IS NOT NULL AND \"MaxLiters\" IS NOT NULL)\nOR (\"Kind\" = 'Product' AND \"DiscountPerLiter\" IS NULL AND \"MaxLiters\" IS NULL)");
+                            t.HasCheckConstraint("CK_RewardOffers_KindTerms", "(\"Kind\" = 'FuelDiscount' AND \"DiscountPerLiter\" IS NOT NULL AND \"MaxLiters\" IS NOT NULL)\nOR (\"Kind\" = 'Product' AND \"DiscountPerLiter\" IS NULL AND \"MaxLiters\" IS NULL AND \"MinLiters\" IS NULL)");
 
                             t.HasCheckConstraint("CK_RewardOffers_MaxLiters_Range", "\"MaxLiters\" > 0 AND \"MaxLiters\" <= 1000");
+
+                            t.HasCheckConstraint("CK_RewardOffers_MinLiters_Range", "\"MinLiters\" > 0 AND \"MinLiters\" <= 1000");
 
                             t.HasCheckConstraint("CK_RewardOffers_Name_NotBlank", "btrim(\"Name\") <> ''");
 

@@ -110,6 +110,7 @@ export type OfferTerms = {
   kind?: "FuelDiscount" | "Product";
   discountPerLiter?: number;
   maxLiters?: number;
+  minLiters?: number;
   isActive?: boolean;
 };
 
@@ -199,12 +200,14 @@ export async function buyCoupon(
   staff: Staff,
   baseURL: string,
   name = offerName("Kupon"),
+  terms: Partial<OfferTerms> = {},
 ) {
   const offer = await staff.createOffer({
     name,
     pointsCost: 500,
     discountPerLiter: 0.2,
     maxLiters: 50,
+    ...terms,
   });
   const card = await issueCard(page);
   const pos = await cashier(baseURL);

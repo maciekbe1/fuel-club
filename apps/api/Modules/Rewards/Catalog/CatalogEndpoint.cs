@@ -12,6 +12,7 @@ public sealed record RewardResponse(
     string Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
+    decimal? MinLiters,
     int Version
 );
 
@@ -49,6 +50,7 @@ public static class CatalogEndpoint
                 offer.Kind.ToString(),
                 offer.DiscountPerLiter,
                 offer.MaxLiters,
+                offer.MinLiters,
                 offer.Version
             ));
 }

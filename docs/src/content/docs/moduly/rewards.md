@@ -67,6 +67,7 @@ Zaokrąglenie połówek od zera, nie bankierskie (0,045 → 0,05, a nie 0,04).
 | `Kind` | `varchar(16)` | `FuelDiscount` albo `Product` (`CK_*_Kind`); niezmienny po utworzeniu |
 | `DiscountPerLiter` | `numeric(4,2)` NULL | `CHECK (> 0 AND <= 10)`; `CK_*_KindTerms`: wymagane przy `FuelDiscount`, puste przy `Product` |
 | `MaxLiters` | `numeric(7,3)` NULL | `CHECK (> 0 AND <= 1000)`; jak wyżej |
+| `MinLiters` | `numeric(7,3)` NULL | opcjonalny próg rabatu: działa od tylu litrów jednego tankowania (`NULL` = od pierwszego litra); `CHECK (> 0 AND <= 1000)`, pusty przy `Product`; może być większy niż `MaxLiters` („od 30 l, rabat na 20 l”) |
 | `IsActive` | `boolean` | wyłączona: brak nowych wymian, wydane kupony działają |
 | `CreatedAt`, `UpdatedAt` | `timestamptz` | |
 | `Version` | `integer` | `CHECK (>= 1)`; wersja edycji, start od 1 |
@@ -80,7 +81,7 @@ Oferty nie usuwamy: kupony mają FK `RESTRICT`.
 | `Id` | `uuid` | PK |
 | `UserId` | `text` | FK `AspNetUsers` (RESTRICT) |
 | `OfferId` | `uuid` | FK `RewardOffers` (RESTRICT) |
-| `OfferName`, `PointsCost`, `Kind`, `DiscountPerLiter`, `MaxLiters` | | snapshot z chwili wymiany, te same `CHECK` co oferta; FK `(OfferId, Kind)` → `RewardOffers (Id, Kind)`: rodzaj kuponu = rodzaj oferty |
+| `OfferName`, `PointsCost`, `Kind`, `DiscountPerLiter`, `MaxLiters`, `MinLiters` | | snapshot z chwili wymiany, te same `CHECK` co oferta; FK `(OfferId, Kind)` → `RewardOffers (Id, Kind)`: rodzaj kuponu = rodzaj oferty |
 | `Status` | `varchar(16)` | `Purchased`, `Active`, `Redeemed` |
 | `Code` | `char(27)` | `NULL` przed aktywacją; `CHECK (~ '^K[0-7][0-9A-HJKMNP-TV-Z]{25}$')`, `UNIQUE` |
 | `PurchasedAt`, `ActivatedAt`, `RedeemedAt` | `timestamptz` | `CHECK` kolejności |
@@ -173,7 +174,7 @@ Wszystko w jednej transakcji: nieudana próba nie zostawia ani obciążenia, ani
 
 ### Interfejs - katalog i wymiana
 
-`/oferty` (odnośnik „Oferty” na ekranie głównym klienta): saldo i lista aktywnych ofert (nazwa, opis, koszt, „0,20 zł/l, do 50 l (maks. 10,00 zł)”). Stany: szkielet ładowania, pusta lista, błąd z ponowieniem, ostrzeżenie o nieudanym odświeżeniu przy pokazanych danych.
+`/oferty` (odnośnik „Oferty” na ekranie głównym klienta): saldo i lista aktywnych ofert (nazwa, opis, koszt, „0,20 zł/l, do 50 l (maks. 10,00 zł)”, z progiem „0,20 zł/l przy tankowaniu od 30 l, do 20 l (maks. 4,00 zł)”; maksimum = stawka × limit litrów). Stany: szkielet ładowania, pusta lista, błąd z ponowieniem, ostrzeżenie o nieudanym odświeżeniu przy pokazanych danych.
 
 - „Wymień punkty” otwiera potwierdzenie z kosztem i warunkami. Wysyłana jest wersja z tego potwierdzenia, nie z listy odświeżonej w międzyczasie. Przycisk potwierdzenia dostaje fokus (Enter potwierdza).
 - Klucz: `useIdempotentMutation` z danymi `{ id, version }` - ten sam klucz do ostatecznej odpowiedzi.
@@ -218,7 +219,8 @@ Ekran `/kupony` (skrót na ekranie głównym, odnośnik w komunikacie po wymiani
 2. Aktywna karta → właściciel; brak albo unieważniona → `404 loyalty.card_not_found`.
 3. Kupon o tym kodzie **należący do właściciela karty**; cudzy i nieistniejący → identyczne `404 rewards.coupon_not_found` - kod nie zdradza, czyj jest kupon.
 4. Odebrany → `409 rewards.coupon_redeemed`. Kupon `Purchased` nie ma kodu, więc nie da się go znaleźć.
-5. `200 { offerName, discountPerLiter, maxLiters, calculation }`; `calculation` = `null` bez kwoty i litrów, inaczej `{ discount, paidAmount, pointsAwarded }` z `CouponDiscount` i `PointsPolicy` - tych samych co przy zakupie. Bez danych klienta i `id` kuponu.
+5. Z kwotą i litrami poniżej `minLiters` kuponu → `409 rewards.min_liters_not_reached` z `minLiters` (ta sama reguła co zakup).
+6. `200 { offerName, discountPerLiter, maxLiters, minLiters, calculation }`; `calculation` = `null` bez kwoty i litrów, inaczej `{ discount, paidAmount, pointsAwarded }` z `CouponDiscount` i `PointsPolicy` - tych samych co przy zakupie. Bez danych klienta i `id` kuponu.
 
 Podgląd niczego nie zmienia ani nie rezerwuje (bez blokad); zakup sprawdza kupon i liczy rabat od nowa.
 
@@ -231,6 +233,7 @@ Opcjonalne `couponCode` w `POST /api/cashier/fuel-purchases` (przepływ zakupu: 
 Loyalty zna tylko interfejs `ICouponRedemption`; implementację (`CouponRedemption`, scoped) dostarcza Rewards. Obie metody działają na `AppDbContext` żądania i w transakcji zakupu:
 
 1. `HoldAsync` - po blokadzie klienta, ponownym sprawdzeniu karty i sprawdzeniu paragonu: `SELECT … FOR UPDATE` po kodzie **i właścicielu karty**, z `SET LOCAL lock_timeout = Rewards:CouponLockTimeout`. Cudzy i nieistniejący → identyczne `404 rewards.coupon_not_found`; odebrany → `409 rewards.coupon_redeemed`; przekroczony czas → `503 rewards.coupon_busy` z `Retry-After` (niezapisywane, ten sam klucz działa później). Rabat liczy `CouponDiscount` z migawki kuponu.
+   Litry poniżej `MinLiters` kuponu → `409 rewards.min_liters_not_reached` z `minLiters`; nic nie zapisano, kupon zostaje aktywny (kasjer zapisuje tankowanie bez kodu albo klient tankuje więcej).
 2. Zapis zakupu z `Discount` i `PaidAmount`; punkty od `PaidAmount`.
 3. `MarkRedeemedAsync` - warunkowe `UPDATE … SET Status = 'Redeemed', RedeemedAt = clock_timestamp(), RedeemedPurchaseId = … WHERE Id AND UserId AND Status = 'Active'`; brak zmienionego wiersza → wyjątek (`500`, wszystko wycofane). Odrzucone także bez blokady w bieżącej transakcji.
 
@@ -294,6 +297,8 @@ Decyzja: [ADR 0013](/decyzje/0013-nagrody-produktowe/).
 
 | Plik | Sprawdza |
 | --- | --- |
+| `RewardsRulesTests`, `RewardOfferTests`, `RewardExchangeTests`, `CouponPreviewTests`, `CouponRedemptionTests` (próg) | `minLiters`: opcjonalny, może przekraczać limit, zakres i precyzja, nie dla nagrody; zapis, katalog, usunięcie przez formularz bez pola; snapshot w kuponie; poniżej progu podgląd i zakup → `409`, kupon aktywny; na progu rabat tylko do `maxLiters` |
+| `e2e/cashier-coupon.spec.ts` (próg) | warunki z progiem u klienta i w kasie, odmowa poniżej progu, kupon aktywny, rabat 4,00 zł przy 30 l |
 | `RewardsRulesTests.cs` - `CouponDiscountTests` | przykłady z tabeli, limit litrów, zaokrąglenie połówek (0,045 → 0,05; 0,005 → 0,01), ograniczenie do brutto i zapłata 0 → 0 pkt, punkty od kwoty zapłaconej, odrzucenie niezwalidowanych danych |
 | `RewardsRulesTests.cs` - `CouponCodeTests` | 27 znaków z prefiksem `K`, część losowa to pełny kod w formacie karty, unikalność; kod karty ≠ kod kuponu (w obie strony); normalizacja wpisanych wariantów |
 | `RewardsRulesTests.cs` - `RewardOfferRulesTests` | wymagana nazwa, długości, zakres kosztu, stawki i limitu; precyzja (0,205 zł/l, 50,0005 l) odrzucona |

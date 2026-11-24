@@ -86,6 +86,8 @@ public sealed class CouponRedemption(AppDbContext db, IOptions<RewardsOptions> o
         // Only an active coupon is usable; any other state with a code is treated as missing.
         if (coupon.Status != CouponStatus.Active)
             return new CouponHoldResult(null, RewardsProblems.CouponNotFound());
+        if (coupon.MinLiters is { } minLiters && liters < minLiters)
+            return new CouponHoldResult(null, RewardsProblems.MinLitersNotReached(minLiters));
 
         var result = CouponDiscount.Calculate(
             coupon.DiscountPerLiter!.Value,

@@ -21,6 +21,7 @@ import {
 import {
   looksLikeCardCode,
   looksLikeCouponCode,
+  minLitersMessage,
   normalizeCode,
   parseDecimal,
 } from "../schemas";
@@ -35,6 +36,11 @@ function previewError(error: unknown) {
     return "Nie znaleziono aktywnego kuponu tego klienta o tym kodzie. Kupon musi być aktywowany w telefonie klienta.";
   if (error instanceof ApiError && error.code === "rewards.coupon_redeemed")
     return "Ten kupon został już wykorzystany.";
+  if (
+    error instanceof ApiError &&
+    error.code === "rewards.min_liters_not_reached"
+  )
+    return minLitersMessage(error);
   if (error instanceof ApiError && error.code === "rewards.coupon_wrong_kind")
     return "To kod nagrody - rabatu nie da się przeliczyć. Wydaj nagrodę przyciskiem.";
   if (error instanceof ApiError && error.code === "loyalty.card_not_found")

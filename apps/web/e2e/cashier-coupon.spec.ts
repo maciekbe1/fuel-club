@@ -1,14 +1,33 @@
 import { chromium, type Page } from "@playwright/test";
 import { TRACK_STREAMS, writeQrVideo } from "./camera";
-import { buyCoupon, cashier, expect, test, type Staff } from "./fixtures";
+import {
+  buyCoupon,
+  cashier,
+  expect,
+  offerName,
+  test,
+  type OfferTerms,
+  type Staff,
+} from "./fixtures";
 import { openRegister } from "./register";
 
 const PURCHASES = "**/api/cashier/fuel-purchases";
 const PREVIEW = "**/api/cashier/coupons/preview";
 
 /** A purchased coupon activated on the customer's phone; returns the card and coupon codes. */
-async function activeCoupon(page: Page, staff: Staff, baseURL: string) {
-  const { name, card } = await buyCoupon(page, staff, baseURL);
+async function activeCoupon(
+  page: Page,
+  staff: Staff,
+  baseURL: string,
+  terms: Partial<OfferTerms> = {},
+) {
+  const { name, card } = await buyCoupon(
+    page,
+    staff,
+    baseURL,
+    offerName("Kupon"),
+    terms,
+  );
   await page.goto("/kupony");
   const coupon = page.getByTestId("coupon").filter({ hasText: name });
   await coupon.getByRole("button", { name: "Aktywuj kupon" }).click();
@@ -350,5 +369,49 @@ test("coupon redeemed elsewhere after the preview: the refused save clears the s
   await expect(till.getByTestId("coupon-calculation")).toHaveCount(0);
   await expect(till.getByTestId("coupon-terms")).toHaveCount(0);
   await expect(till.getByTestId("purchase-result")).toHaveCount(0);
+  await register.context.close();
+});
+
+test("minimum liters: shown to the customer and the cashier, below it the coupon is refused and stays active", async ({
+  page,
+  browser,
+  customer,
+  staff,
+  baseURL,
+}) => {
+  void customer;
+  const { card, code, coupon } = await activeCoupon(page, staff, baseURL!, {
+    maxLiters: 20,
+    minLiters: 30,
+  });
+  await expect(coupon).toContainText(
+    "0,20 zł/l przy tankowaniu od 30 l, do 20 l (maks. 4,00 zł)",
+  );
+  const register = await openRegister(browser, baseURL!);
+  const till = register.page;
+
+  await till.getByLabel("Kod karty klienta").fill(card);
+  await fillSale(till, "150", "25");
+  await till.getByLabel("Kod kuponu").fill(code);
+  await expect(till.getByTestId("coupon-terms")).toContainText(
+    "przy tankowaniu od 30 l",
+  );
+  await till.getByRole("button", { name: "Przelicz rabat" }).click();
+  const refused = "Ten kupon działa przy tankowaniu od 30 l.";
+  await expect(till.getByRole("main")).toContainText(refused);
+  await till.getByRole("button", { name: "Zapisz zakup" }).click();
+  await expect(till.getByRole("main").getByRole("alert").first()).toContainText(
+    refused,
+  );
+  await expect(till.getByTestId("purchase-result")).toHaveCount(0);
+
+  await page.reload();
+  await expect(coupon.getByTestId("coupon-status")).toHaveText("Aktywny");
+
+  await till.getByLabel("Litry").fill("30");
+  await till.getByRole("button", { name: "Zapisz zakup" }).click();
+  await expect(till.getByTestId("purchase-result")).toHaveText(
+    "Rabat z kuponu 4,00 zł · do zapłaty 146,00 zł",
+  );
   await register.context.close();
 });

@@ -13,6 +13,7 @@ public sealed record AdminRewardResponse(
     string Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
+    decimal? MinLiters,
     bool IsActive,
     int Version,
     DateTimeOffset CreatedAt,
@@ -25,6 +26,7 @@ public sealed record AdminRewardsResponse(IReadOnlyList<AdminRewardResponse> Ite
 /// The whole form. Numbers and <c>IsActive</c> are nullable only to report a missing field as
 /// required (not as "out of range", and a missing isActive must not deactivate an offer).
 /// <c>Kind</c>: FuelDiscount (default) or Product; a product sends no per-liter terms.
+/// <c>MinLiters</c>: optional threshold of a fuel discount (null or absent = from the first liter).
 /// </summary>
 public sealed record CreateRewardRequest(
     string? Name,
@@ -33,12 +35,14 @@ public sealed record CreateRewardRequest(
     string? Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
-    bool? IsActive
+    bool? IsActive,
+    decimal? MinLiters = null
 );
 
 /// <summary>
 /// The whole form plus the version it was loaded with (PUT, also for activate/deactivate).
 /// <c>Kind</c> may be sent but must match the offer: it never changes (400 rewards.kind_immutable).
+/// <c>MinLiters</c> is part of the whole form: absent or null removes the threshold.
 /// </summary>
 public sealed record UpdateRewardRequest(
     string? Name,
@@ -48,7 +52,8 @@ public sealed record UpdateRewardRequest(
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
     bool? IsActive,
-    int? Version
+    int? Version,
+    decimal? MinLiters = null
 );
 
 /// <summary>
@@ -109,6 +114,7 @@ public static class AdminRewardEndpoints
             kind ?? RewardKind.FuelDiscount,
             request.DiscountPerLiter,
             request.MaxLiters,
+            request.MinLiters,
             request.IsActive
         );
         if (kind is null)
@@ -116,7 +122,7 @@ public static class AdminRewardEndpoints
             // Unknown kind: "required" per-liter errors would point at fields a product must not
             // have; real value errors (range, precision) stay.
             errors.RemoveAll(error =>
-                error.Field is "discountPerLiter" or "maxLiters"
+                error.Field is "discountPerLiter" or "maxLiters" or "minLiters"
                 && error.Code == RewardsErrorCodes.RequiredField
             );
             errors.Add(new("kind", RewardsErrorCodes.InvalidFormat));
@@ -133,6 +139,7 @@ public static class AdminRewardEndpoints
             Kind = input.Kind,
             DiscountPerLiter = input.DiscountPerLiter,
             MaxLiters = input.MaxLiters,
+            MinLiters = input.MinLiters,
             IsActive = request.IsActive!.Value,
             Version = 1,
         };
@@ -168,6 +175,7 @@ public static class AdminRewardEndpoints
             offerKind,
             request.DiscountPerLiter,
             request.MaxLiters,
+            request.MinLiters,
             request.IsActive
         );
         if (request.Kind is not null)
@@ -192,10 +200,11 @@ public static class AdminRewardEndpoints
                 UPDATE "RewardOffers"
                 SET "Name" = {input.Name}, "Description" = {input.Description}, "PointsCost" = {input.PointsCost},
                     "DiscountPerLiter" = {input.DiscountPerLiter}, "MaxLiters" = {input.MaxLiters},
+                    "MinLiters" = {input.MinLiters},
                     "IsActive" = {request.IsActive!.Value}, "Version" = "Version" + 1, "UpdatedAt" = now()
                 WHERE "Id" = {id} AND "Version" = {request.Version!.Value}
                 RETURNING "Id", "Name", "Description", "PointsCost", "Kind", "DiscountPerLiter", "MaxLiters",
-                          "IsActive", "Version", "CreatedAt", "UpdatedAt"
+                          "MinLiters", "IsActive", "Version", "CreatedAt", "UpdatedAt"
                 """
             )
             .ToListAsync(cancellationToken);
@@ -223,6 +232,7 @@ public static class AdminRewardEndpoints
         offer.Kind.ToString(),
         offer.DiscountPerLiter,
         offer.MaxLiters,
+        offer.MinLiters,
         offer.IsActive,
         offer.Version,
         offer.CreatedAt,
@@ -236,6 +246,7 @@ public static class AdminRewardEndpoints
         RewardKind kind,
         decimal? discountPerLiter,
         decimal? maxLiters,
+        decimal? minLiters,
         bool? isActive
     )
     {
@@ -247,7 +258,8 @@ public static class AdminRewardEndpoints
                 pointsCost ?? 0,
                 kind,
                 discountPerLiter,
-                maxLiters
+                maxLiters,
+                minLiters
             )
         );
         var missing = new List<string>();

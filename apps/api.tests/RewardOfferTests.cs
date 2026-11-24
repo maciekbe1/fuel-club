@@ -39,6 +39,7 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         int PointsCost,
         decimal? DiscountPerLiter,
         decimal? MaxLiters,
+        decimal? MinLiters,
         bool IsActive,
         int Version,
         DateTimeOffset CreatedAt,
@@ -51,7 +52,8 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         string Description,
         int PointsCost,
         decimal? DiscountPerLiter,
-        decimal? MaxLiters
+        decimal? MaxLiters,
+        decimal? MinLiters = null
     );
 
     private sealed record ListBody<T>(List<T> Items);
@@ -86,7 +88,8 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
         decimal rate = 0.20m,
         decimal liters = 50m,
         bool? active = true,
-        string description = "Na dowolne paliwo"
+        string description = "Na dowolne paliwo",
+        decimal? minLiters = null
     ) =>
         new
         {
@@ -95,6 +98,7 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
             pointsCost = cost,
             discountPerLiter = rate,
             maxLiters = liters,
+            minLiters,
             isActive = active,
         };
 
@@ -635,6 +639,47 @@ public sealed class RewardOfferTests(ApiFactory factory) : IAsyncLifetime
                 stored.MaxLiters,
                 stored.Status
             )
+        );
+    }
+
+    [Fact]
+    public async Task Minimum_liters_are_stored_shown_in_the_catalog_and_removed_by_a_form_without_them()
+    {
+        var admin = await AccountAsync(RoleNames.Admin);
+        var customer = await AccountAsync(RoleNames.User);
+
+        var offer = await CreateAsync(admin, Form(liters: 20m, minLiters: 30m));
+        Assert.Equal(30m, offer.MinLiters);
+        var catalog = (
+            await customer.GetFromJsonAsync<ListBody<CatalogItem>>("/api/rewards")
+        )!.Items.Single(i => i.Id == offer.Id);
+        Assert.Equal(30m, catalog.MinLiters);
+
+        var response = await PutAsync(admin, offer.Id, Form(liters: 20m), offer.Version);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null((await response.Content.ReadFromJsonAsync<Offer>())!.MinLiters);
+        Assert.Null((await StoredAsync(offer.Id)).MinLiters);
+    }
+
+    [Fact]
+    public async Task Invalid_minimum_liters_are_a_field_error()
+    {
+        var admin = await AccountAsync(RoleNames.Admin);
+
+        var response = await SendAsync(
+            admin,
+            HttpMethod.Post,
+            Admin,
+            Form(minLiters: 0m),
+            NewKey()
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = (await response.Content.ReadFromJsonAsync<ProblemBody>())!;
+        Assert.Equal("rewards.validation_failed", problem.Code);
+        Assert.Equal(
+            "rewards.min_liters_out_of_range",
+            Assert.Single(problem.Errors!["minLiters"]).Code
         );
     }
 

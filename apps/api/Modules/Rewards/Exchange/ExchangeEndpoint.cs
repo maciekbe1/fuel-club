@@ -87,6 +87,7 @@ public static class ExchangeEndpoint
             Kind = offer.Kind,
             DiscountPerLiter = offer.DiscountPerLiter,
             MaxLiters = offer.MaxLiters,
+            MinLiters = offer.MinLiters,
             Status = CouponStatus.Purchased,
         };
 

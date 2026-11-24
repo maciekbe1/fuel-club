@@ -138,6 +138,52 @@ public sealed class RewardOfferRulesTests
         string code
     ) => Assert.Equal([new RewardsValidationError(field, code)], errors);
 
+    private static IReadOnlyList<RewardsValidationError> ValidateMin(
+        decimal? minLiters,
+        RewardKind kind = RewardKind.FuelDiscount
+    ) =>
+        RewardOfferRules.Validate(
+            new RewardOfferInput(
+                "Oferta",
+                "",
+                100,
+                kind,
+                kind == RewardKind.Product ? null : 0.20m,
+                kind == RewardKind.Product ? null : 20m,
+                minLiters
+            )
+        );
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0.001")]
+    [InlineData("30")] // above MaxLiters: "from 30 l, discount on 20 l"
+    [InlineData("1000")]
+    public void Minimum_liters_are_optional_and_may_exceed_max_liters(string? min) =>
+        Assert.Empty(
+            ValidateMin(min is null ? null : decimal.Parse(min, CultureInfo.InvariantCulture))
+        );
+
+    [Theory]
+    [InlineData("0", RewardsErrorCodes.MinLitersOutOfRange)]
+    [InlineData("-1", RewardsErrorCodes.MinLitersOutOfRange)]
+    [InlineData("1000.001", RewardsErrorCodes.MinLitersOutOfRange)]
+    [InlineData("10.0005", RewardsErrorCodes.MinLitersPrecision)]
+    public void Rejects_invalid_minimum_liters(string min, string code) =>
+        AssertSingle(
+            ValidateMin(decimal.Parse(min, CultureInfo.InvariantCulture)),
+            "minLiters",
+            code
+        );
+
+    [Fact]
+    public void A_product_has_no_minimum_liters() =>
+        AssertSingle(
+            ValidateMin(30m, RewardKind.Product),
+            "minLiters",
+            RewardsErrorCodes.NotForProduct
+        );
+
     [Fact]
     public void Accepts_a_valid_offer_and_the_limits()
     {

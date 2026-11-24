@@ -137,6 +137,20 @@ export function RewardFields({
                 {...form.register("maxLiters")}
               />
             </FormField>
+            <FormField
+              id="minLiters"
+              label="Od ilu litrów (opcjonalnie)"
+              error={errors.minLiters}
+            >
+              <Input
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="np. 30 - puste: od pierwszego litra"
+                className={fieldClass}
+                {...fieldA11y("minLiters", errors.minLiters)}
+                {...form.register("minLiters")}
+              />
+            </FormField>
           </>
         )}
       </div>

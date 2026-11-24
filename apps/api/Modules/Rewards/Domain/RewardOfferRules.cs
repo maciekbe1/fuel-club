@@ -8,7 +8,8 @@ public sealed record RewardOfferInput(
     int PointsCost,
     RewardKind Kind,
     decimal? DiscountPerLiter,
-    decimal? MaxLiters
+    decimal? MaxLiters,
+    decimal? MinLiters = null
 );
 
 public sealed record RewardsValidationError(string Field, string Code)
@@ -61,6 +62,8 @@ public static class RewardOfferRules
                 errors.Add(new("discountPerLiter", RewardsErrorCodes.NotForProduct));
             if (input.MaxLiters is not null)
                 errors.Add(new("maxLiters", RewardsErrorCodes.NotForProduct));
+            if (input.MinLiters is not null)
+                errors.Add(new("minLiters", RewardsErrorCodes.NotForProduct));
             return errors;
         }
 
@@ -77,6 +80,15 @@ public static class RewardOfferRules
             errors.Add(new("maxLiters", RewardsErrorCodes.MaxLitersOutOfRange));
         else if (!FuelPurchaseRules.HasAtMostDecimals(liters, MaxLitersScale))
             errors.Add(new("maxLiters", RewardsErrorCodes.MaxLitersPrecision));
+
+        // Optional; may be above MaxLiters ("from 30 l, discount on 20 l").
+        if (input.MinLiters is { } min)
+        {
+            if (min <= 0m || min > MaxDiscountLiters)
+                errors.Add(new("minLiters", RewardsErrorCodes.MinLitersOutOfRange));
+            else if (!FuelPurchaseRules.HasAtMostDecimals(min, MaxLitersScale))
+                errors.Add(new("minLiters", RewardsErrorCodes.MinLitersPrecision));
+        }
 
         return errors;
     }

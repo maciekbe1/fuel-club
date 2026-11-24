@@ -6,7 +6,8 @@ namespace FuelClub.Api.Modules.Rewards;
 
 /// <summary>
 /// The 409 of the cashier's coupon endpoints in OpenAPI: a problem with a code, plus, for a
-/// handed-over product reward (rewards.coupon_redeemed), when and where it was handed over.
+/// handed-over product reward (rewards.coupon_redeemed), when and where it was handed over; for
+/// rewards.min_liters_not_reached, the coupon's minLiters.
 /// Documentation only - the responses are ProblemDetails with these extensions.
 /// </summary>
 public sealed record RewardsConflictProblem(
@@ -16,7 +17,8 @@ public sealed record RewardsConflictProblem(
     int? Status = null,
     DateTimeOffset? HandedOverAt = null,
     string? StationCode = null,
-    string? RegisterCode = null
+    string? RegisterCode = null,
+    decimal? MinLiters = null
 );
 
 /// <summary>Error responses shared by Rewards endpoints.</summary>
@@ -73,6 +75,21 @@ internal static class RewardsProblems
     /// A product at the fuel purchase or a fuel discount at the handover. Checked only after the
     /// owner, so it never reveals someone else's coupon.
     /// </summary>
+    /// <summary>
+    /// The purchase has fewer liters than the coupon's threshold. The coupon stays active: the
+    /// customer can fill up more or keep it for later.
+    /// </summary>
+    public static ProblemHttpResult MinLitersNotReached(decimal minLiters) =>
+        TypedResults.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            title: "The purchase is below the coupon's minimum liters",
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = RewardsErrorCodes.MinLitersNotReached,
+                ["minLiters"] = minLiters,
+            }
+        );
+
     public static ProblemHttpResult CouponWrongKind() =>
         ApiProblems.Problem(
             StatusCodes.Status409Conflict,

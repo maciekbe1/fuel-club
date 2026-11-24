@@ -36,6 +36,7 @@ public sealed record ChatConfirmationEvent(
     string Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
+    decimal? MinLiters,
     DateTimeOffset ExpiresAt,
     string Token
 );

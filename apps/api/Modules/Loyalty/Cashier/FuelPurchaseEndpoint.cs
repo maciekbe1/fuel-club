@@ -45,7 +45,8 @@ public static class FuelPurchaseEndpoint
     public const string Description =
         "Registers a fuel purchase for the scanned card. An optional couponCode (omitted or null = no "
         + "coupon) redeems the card owner's active coupon on this purchase: the server computes the "
-        + "discount, points are awarded on the paid amount.";
+        + "discount, points are awarded on the paid amount. Liters below the coupon's minLiters give 409 "
+        + "rewards.min_liters_not_reached with minLiters; nothing is saved and the coupon stays active.";
 
     public static async Task<Results<Created<FuelPurchaseResponse>, ProblemHttpResult>> Handle(
         FuelPurchaseRequest request,

@@ -9,6 +9,7 @@ import { keepsIdempotencyKey } from "@/lib/idempotency";
 import { queryKeys } from "@/lib/query-keys";
 import { useForgetCouponPreviews, useRegisterPurchase } from "../hooks";
 import {
+  minLitersMessage,
   purchaseMessages,
   purchaseSchema,
   warsawToday,
@@ -97,6 +98,10 @@ export function usePurchaseFlow() {
       const code = error instanceof ApiError ? error.code : undefined;
       form.setError("root", {
         message:
+          (error instanceof ApiError &&
+          code === "rewards.min_liters_not_reached"
+            ? minLitersMessage(error)
+            : undefined) ??
           (code && purchaseMessages[code]) ??
           (code === "loyalty.cashier_station_missing"
             ? "To konto nie ma przypisanego stanowiska kasjera."

@@ -312,7 +312,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Registers a fuel purchase for the scanned card. An optional couponCode (omitted or null = no coupon) redeems the card owner's active coupon on this purchase: the server computes the discount, points are awarded on the paid amount. */
+        /** @description Registers a fuel purchase for the scanned card. An optional couponCode (omitted or null = no coupon) redeems the card owner's active coupon on this purchase: the server computes the discount, points are awarded on the paid amount. Liters below the coupon's minLiters give 409 rewards.min_liters_not_reached with minLiters; nothing is saved and the coupon stays active. */
         post: {
             parameters: {
                 query?: never;
@@ -906,7 +906,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind; a handed-over one gives 409 rewards.coupon_redeemed with handedOverAt, stationCode and registerCode. Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429). */
+        /** @description Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind; a handed-over one gives 409 rewards.coupon_redeemed with handedOverAt, stationCode and registerCode. With liters below the coupon's minLiters gives 409 rewards.min_liters_not_reached with minLiters (the purchase too; the coupon stays active). Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429). */
         post: {
             parameters: {
                 query?: never;
@@ -2418,6 +2418,8 @@ export interface components {
             discountPerLiter: null | number;
             /** Format: double */
             maxLiters: null | number;
+            /** Format: double */
+            minLiters: null | number;
             isActive: boolean;
             /** Format: int32 */
             version: number;
@@ -2471,6 +2473,8 @@ export interface components {
             discountPerLiter: null | number;
             /** Format: double */
             maxLiters: null | number;
+            /** Format: double */
+            minLiters: null | number;
             /** Format: date-time */
             expiresAt: string;
             token: string;
@@ -2621,6 +2625,8 @@ export interface components {
             discountPerLiter: null | number;
             /** Format: double */
             maxLiters: null | number;
+            /** Format: double */
+            minLiters: null | number;
             calculation: null | components["schemas"]["CouponPreviewCalculation"];
         };
         CouponResponse: {
@@ -2636,6 +2642,8 @@ export interface components {
             discountPerLiter: null | number;
             /** Format: double */
             maxLiters: null | number;
+            /** Format: double */
+            minLiters: null | number;
             status: string;
             code: null | string;
             /** Format: date-time */
@@ -2659,6 +2667,8 @@ export interface components {
             /** Format: double */
             maxLiters: null | number;
             isActive: null | boolean;
+            /** Format: double */
+            minLiters?: null | number;
         };
         CreateSupportCaseRequest: {
             message: null | string;
@@ -2815,6 +2825,8 @@ export interface components {
             discountPerLiter: null | number;
             /** Format: double */
             maxLiters: null | number;
+            /** Format: double */
+            minLiters: null | number;
             /** Format: int32 */
             version: number;
         };
@@ -2828,6 +2840,8 @@ export interface components {
             handedOverAt?: null | string;
             stationCode?: null | string;
             registerCode?: null | string;
+            /** Format: double */
+            minLiters?: null | number;
         };
         RewardsResponse: {
             items: components["schemas"]["RewardResponse"][];
@@ -3045,6 +3059,8 @@ export interface components {
             isActive: null | boolean;
             /** Format: int32 */
             version: null | number;
+            /** Format: double */
+            minLiters?: null | number;
         };
         WalletResponse: {
             /** Format: int32 */

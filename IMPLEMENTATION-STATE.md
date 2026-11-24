@@ -207,6 +207,11 @@ Stabilność E2E:
 
 Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane przez `proxy.ts` na `/api`.
 
+## Próg litrów kuponu (2026-11-24)
+
+- Oferta paliwowa ma opcjonalne `minLiters` („rabat przy tankowaniu od 30 l”), kopiowane do kuponu przy wymianie. Poniżej progu podgląd i zakup → `409 rewards.min_liters_not_reached` z `minLiters`, kupon zostaje aktywny. Migracja `RewardMinLiters` (kolumny nullable, zgodna wstecz).
+- Asystent: progi w ofertach, kuponach i porównaniu (poniżej progu rabat 0). Web: pole w formularzu admina, warunki „przy tankowaniu od X l” wszędzie przez `formatTerms`, komunikat w kasie.
+
 ## Rozmowa w trakcie wdrożenia (2026-11-24)
 
 - Pomiar na Cloud Run: przy nowej rewizji api WebSocket klienta zostaje na starej instancji - hub milczy bez rozłączenia, rozmowa z konsultantem stała u klienta do 300 s (12/45 powiadomień). Zapis 45/45 bez strat i duplikatów.

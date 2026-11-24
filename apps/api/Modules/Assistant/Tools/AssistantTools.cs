@@ -60,16 +60,21 @@ public sealed record RewardSummary(
     string Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
+    decimal? MinLiters,
     int PointsMissing
 );
 
-/// <summary>A coupon the user already has (Purchased or Active), with its discount for the fill-up.</summary>
+/// <summary>
+/// A coupon the user already has (Purchased or Active), with its discount for the fill-up. Below
+/// MinLiters the discount is 0: the till would reject the coupon for this fill-up.
+/// </summary>
 public sealed record CouponOption(
     Guid CouponId,
     string OfferName,
     string Status,
     decimal Discount,
-    decimal LitersCovered
+    decimal LitersCovered,
+    decimal? MinLiters
 );
 
 /// <summary>An offer that costs points first; Discount is what its coupon would give.</summary>
@@ -78,7 +83,8 @@ public sealed record OfferOption(
     int PointsCost,
     int PointsMissing,
     decimal Discount,
-    decimal LitersCovered
+    decimal LitersCovered,
+    decimal? MinLiters
 );
 
 /// <summary>
@@ -110,7 +116,8 @@ public sealed record CouponSummary(
     string Kind,
     string Status,
     decimal? DiscountPerLiter,
-    decimal? MaxLiters
+    decimal? MaxLiters,
+    decimal? MinLiters
 );
 
 public sealed record ProposalData(Guid ProposalId, Guid CouponId, string OfferName);
@@ -252,6 +259,7 @@ public sealed class AssistantTools(
                 offer.Kind,
                 offer.DiscountPerLiter,
                 offer.MaxLiters,
+                offer.MinLiters,
                 Missing(offer.PointsCost, balance)
             ))
             .ToList();
@@ -290,8 +298,14 @@ public sealed class AssistantTools(
         )
             return Reject(call.Name, "invalid_arguments");
 
-        (decimal Discount, decimal Covered) Benefit(decimal perLiter, decimal maxLiters)
+        (decimal Discount, decimal Covered) Benefit(
+            decimal perLiter,
+            decimal maxLiters,
+            decimal? minLiters
+        )
         {
+            if (minLiters is { } min && liters < min)
+                return (0m, 0m);
             var covered = Math.Min(liters, maxLiters);
             var discount = gross is { } total
                 ? CouponDiscount.Calculate(perLiter, maxLiters, liters, total).Discount
@@ -313,13 +327,21 @@ public sealed class AssistantTools(
                     c.Status,
                     DiscountPerLiter = c.DiscountPerLiter!.Value,
                     MaxLiters = c.MaxLiters!.Value,
+                    c.MinLiters,
                 })
                 .ToListAsync(ct)
         )
             .Select(c =>
             {
-                var (discount, covered) = Benefit(c.DiscountPerLiter, c.MaxLiters);
-                return new CouponOption(c.Id, c.OfferName, c.Status.ToString(), discount, covered);
+                var (discount, covered) = Benefit(c.DiscountPerLiter, c.MaxLiters, c.MinLiters);
+                return new CouponOption(
+                    c.Id,
+                    c.OfferName,
+                    c.Status.ToString(),
+                    discount,
+                    covered,
+                    c.MinLiters
+                );
             })
             .OrderByDescending(c => c.Discount)
             .ThenBy(c => c.OfferName, StringComparer.Ordinal)
@@ -329,13 +351,18 @@ public sealed class AssistantTools(
             .Where(o => o.Kind == nameof(RewardKind.FuelDiscount))
             .Select(o =>
             {
-                var (discount, covered) = Benefit(o.DiscountPerLiter!.Value, o.MaxLiters!.Value);
+                var (discount, covered) = Benefit(
+                    o.DiscountPerLiter!.Value,
+                    o.MaxLiters!.Value,
+                    o.MinLiters
+                );
                 return new OfferOption(
                     o.Name,
                     o.PointsCost,
                     Missing(o.PointsCost, balance),
                     discount,
-                    covered
+                    covered,
+                    o.MinLiters
                 );
             })
             .OrderByDescending(o => o.Discount)
@@ -426,7 +453,8 @@ public sealed class AssistantTools(
                 coupon.Kind.ToString(),
                 coupon.Status.ToString(),
                 coupon.DiscountPerLiter,
-                coupon.MaxLiters
+                coupon.MaxLiters,
+                coupon.MinLiters
             ))
             .ToListAsync(ct);
         return new(ListMyCoupons, ToolStatus.Ok, coupons);
@@ -485,6 +513,7 @@ public sealed class AssistantTools(
                 c.Kind,
                 c.DiscountPerLiter,
                 c.MaxLiters,
+                c.MinLiters,
             })
             .SingleOrDefaultAsync(ct);
         // Someone else's and missing coupons look the same.
@@ -508,6 +537,7 @@ public sealed class AssistantTools(
                 coupon.Kind.ToString(),
                 coupon.DiscountPerLiter,
                 coupon.MaxLiters,
+                coupon.MinLiters,
                 proposal.ExpiresAt,
                 token
             )

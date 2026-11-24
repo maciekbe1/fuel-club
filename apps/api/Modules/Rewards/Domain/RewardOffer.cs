@@ -27,6 +27,12 @@ public sealed class RewardOffer
     /// <summary>Liters of one purchase covered by the discount. Only for a fuel discount.</summary>
     public decimal? MaxLiters { get; set; }
 
+    /// <summary>
+    /// Optional threshold: the discount applies only to a purchase of at least this many liters.
+    /// Null = from the first liter. Only for a fuel discount; may exceed MaxLiters.
+    /// </summary>
+    public decimal? MinLiters { get; set; }
+
     /// <summary>Inactive: no new exchanges. Coupons already issued stay valid.</summary>
     public bool IsActive { get; set; }
 

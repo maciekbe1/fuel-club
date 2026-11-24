@@ -31,6 +31,7 @@ public sealed record CouponPreviewResponse(
     string Kind,
     decimal? DiscountPerLiter,
     decimal? MaxLiters,
+    decimal? MinLiters,
     CouponPreviewCalculation? Calculation
 );
 
@@ -38,7 +39,7 @@ public sealed record CouponPreviewResponse(
 /// Read-only: no lock, nothing reserved or changed. Order: validation (400) -> active card (404) ->
 /// coupon of the card owner (404, the same for someone else's coupon, so a code does not reveal its
 /// owner) -> with amount and liters, a product reward (409 wrong kind, the same order as the purchase)
-/// -> redeemed (409). A purchased coupon has no code, so it cannot be found by one.
+/// -> redeemed (409) -> with liters below the coupon's minimum, 409 rewards.min_liters_not_reached. A purchased coupon has no code, so it cannot be found by one.
 /// </summary>
 public static class CouponPreviewEndpoint
 {
@@ -48,6 +49,7 @@ public static class CouponPreviewEndpoint
         "Shows a coupon's kind and discount for the scanned card. Without amount and liters returns the terms only; "
         + "a product reward has kind Product and null terms, and amount with liters for it gives 409 rewards.coupon_wrong_kind; "
         + "a handed-over one gives 409 rewards.coupon_redeemed with handedOverAt, stationCode and registerCode. "
+        + "With liters below the coupon's minLiters gives 409 rewards.min_liters_not_reached with minLiters (the purchase too; the coupon stays active). "
         + "Changes and reserves nothing: the purchase checks the coupon again. Limited per cashier (429).";
 
     public static async Task<Results<Ok<CouponPreviewResponse>, ProblemHttpResult>> Handle(
@@ -123,6 +125,9 @@ public static class CouponPreviewEndpoint
         CouponPreviewCalculation? calculation = null;
         if (request is { Amount: { } gross, Liters: { } litres })
         {
+            // Same rule as the purchase: below the threshold there is no discount to show.
+            if (coupon.MinLiters is { } minLiters && litres < minLiters)
+                return RewardsProblems.MinLitersNotReached(minLiters);
             var result = CouponDiscount.Calculate(
                 coupon.DiscountPerLiter!.Value,
                 coupon.MaxLiters!.Value,
@@ -142,6 +147,7 @@ public static class CouponPreviewEndpoint
                 coupon.Kind.ToString(),
                 coupon.DiscountPerLiter,
                 coupon.MaxLiters,
+                coupon.MinLiters,
                 calculation
             )
         );

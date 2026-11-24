@@ -494,6 +494,11 @@ public sealed partial class DemoChatModel : IChatModel
                         + (
                             o is { DiscountPerLiter: { } rate, MaxLiters: { } liters }
                                 ? $"{rate.ToString("0.00", Polish)} zł/l do {liters.ToString("0.###", Polish)} l"
+                                    + (
+                                        o.MinLiters is { } min
+                                            ? $" przy tankowaniu od {min.ToString("0.###", Polish)} l"
+                                            : ""
+                                    )
                                 : "nagroda"
                         )
                         + (
@@ -548,6 +553,7 @@ public sealed partial class DemoChatModel : IChatModel
                         "; ",
                         c.OwnCoupons.Select(o =>
                             $"{o.OfferName} ({StatusLabel(o.Status)}) - rabat {Money(o.Discount)}"
+                            + BelowMinimum(c.Liters, o.MinLiters)
                         )
                     )
                     + ".";
@@ -559,6 +565,7 @@ public sealed partial class DemoChatModel : IChatModel
                         "; ",
                         c.OffersForPoints.Select(o =>
                             $"{o.Name} - {o.PointsCost.ToString("N0", Polish)} pkt, rabat {Money(o.Discount)}"
+                            + BelowMinimum(c.Liters, o.MinLiters)
                             + (
                                 o.PointsMissing > 0
                                     ? $", brakuje {o.PointsMissing.ToString("N0", Polish)} pkt"
@@ -569,6 +576,11 @@ public sealed partial class DemoChatModel : IChatModel
                     + ".";
         return $"{head} {own} {offers}";
     }
+
+    private static string BelowMinimum(decimal liters, decimal? minLiters) =>
+        minLiters is { } min && liters < min
+            ? $" (działa od {min.ToString("0.###", Polish)} l)"
+            : "";
 
     private static string StatusLabel(string status) =>
         status switch

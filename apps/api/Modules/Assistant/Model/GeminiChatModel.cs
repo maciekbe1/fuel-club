@@ -190,12 +190,12 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
             Declaration(AssistantTools.GetMyBalance, "Saldo punktów zalogowanego klienta.", null),
             Declaration(
                 AssistantTools.ListAvailableRewards,
-                "Aktywne oferty: nazwa, koszt w punktach, rodzaj (kind); przy FuelDiscount rabat zł/l i limit litrów, przy Product (nagroda) brak.",
+                "Aktywne oferty: nazwa, koszt w punktach, rodzaj (kind); przy FuelDiscount rabat zł/l, limit litrów (maxLiters) i opcjonalny próg minLiters (rabat działa tylko przy tankowaniu od tylu litrów; null = od pierwszego litra), przy Product (nagroda) brak.",
                 null
             ),
             Declaration(
                 AssistantTools.ListMyCoupons,
-                "Kupony i nagrody klienta (bez kodów), z rodzajem (kind). Opcjonalnie filtr stanu.",
+                "Kupony i nagrody klienta (bez kodów), z rodzajem (kind) i warunkami rabatu (minLiters: próg litrów jednego tankowania, null = brak). Opcjonalnie filtr stanu.",
                 new JsonObject
                 {
                     ["type"] = "object",
@@ -211,7 +211,7 @@ public sealed class GeminiChatModel(HttpClient http, IOptions<AssistantOptions> 
             ),
             Declaration(
                 AssistantTools.CompareCoupons,
-                "Rabat każdego kuponu rabatowego klienta i każdej oferty rabatowej dla planowanego tankowania (bez nagród). Liczy serwer.",
+                "Rabat każdego kuponu rabatowego klienta i każdej oferty rabatowej dla planowanego tankowania (bez nagród). Liczy serwer; poniżej progu minLiters rabat wynosi 0.",
                 new JsonObject
                 {
                     ["type"] = "object",

@@ -28,6 +28,7 @@ const FIELDS = [
   "kind",
   "discountPerLiter",
   "maxLiters",
+  "minLiters",
   "isActive",
 ] as const;
 

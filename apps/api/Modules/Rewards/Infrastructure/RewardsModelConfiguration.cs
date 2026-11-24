@@ -22,7 +22,7 @@ internal static class RewardsSql
             $"CK_{name}_KindTerms",
             """
             ("Kind" = 'FuelDiscount' AND "DiscountPerLiter" IS NOT NULL AND "MaxLiters" IS NOT NULL)
-            OR ("Kind" = 'Product' AND "DiscountPerLiter" IS NULL AND "MaxLiters" IS NULL)
+            OR ("Kind" = 'Product' AND "DiscountPerLiter" IS NULL AND "MaxLiters" IS NULL AND "MinLiters" IS NULL)
             """
         );
         table.HasCheckConstraint(
@@ -32,6 +32,10 @@ internal static class RewardsSql
         table.HasCheckConstraint(
             $"CK_{name}_MaxLiters_Range",
             $"\"MaxLiters\" > 0 AND \"MaxLiters\" <= {Num(RewardOfferRules.MaxDiscountLiters)}"
+        );
+        table.HasCheckConstraint(
+            $"CK_{name}_MinLiters_Range",
+            $"\"MinLiters\" > 0 AND \"MinLiters\" <= {Num(RewardOfferRules.MaxDiscountLiters)}"
         );
         table.HasCheckConstraint(
             $"CK_{name}_PointsCost_Range",
@@ -68,6 +72,9 @@ internal sealed class RewardOfferConfiguration : IEntityTypeConfiguration<Reward
             );
         builder
             .Property(offer => offer.MaxLiters)
+            .HasPrecision(RewardOfferRules.MaxLitersPrecision, RewardOfferRules.MaxLitersScale);
+        builder
+            .Property(offer => offer.MinLiters)
             .HasPrecision(RewardOfferRules.MaxLitersPrecision, RewardOfferRules.MaxLitersScale);
         builder.Property(offer => offer.Kind).HasConversion<string>().HasMaxLength(16);
         // Target of the coupon's (OfferId, Kind) key: a coupon's kind is its offer's kind.
@@ -131,6 +138,9 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
             );
         builder
             .Property(coupon => coupon.MaxLiters)
+            .HasPrecision(RewardOfferRules.MaxLitersPrecision, RewardOfferRules.MaxLitersScale);
+        builder
+            .Property(coupon => coupon.MinLiters)
             .HasPrecision(RewardOfferRules.MaxLitersPrecision, RewardOfferRules.MaxLitersScale);
         builder.Property(coupon => coupon.Status).HasConversion<string>().HasMaxLength(16);
         builder.Property(coupon => coupon.Kind).HasConversion<string>().HasMaxLength(16);
