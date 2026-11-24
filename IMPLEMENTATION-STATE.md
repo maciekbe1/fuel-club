@@ -211,6 +211,7 @@ Przeglądarka (Chrome): logowanie Anny, oferty, czat - saldo strumieniowane prze
 
 - Przycisk w pustym polu „Numer paragonu” wpisuje `PAR/<data>/<6 znaków>`; po nieznanym wyniku przycisku nie ma (review: inaczej drugi paragon dla tego samego zakupu).
 - ADR 0021: hub `/api/loyalty/hub` (rola `User`), `pointsAwarded` po commicie zakupu do właściciela karty; ochrona originu wspólna z hubem konsultanta (`GuardedHub`, `HubOriginGuard`). Front: sonner, toast 10 s z zamknięciem, odświeża saldo i historię.
+- Na Cloud Run: kasjer rejestruje zakup przez API, klient dostaje `pointsAwarded` przez WebSocket (87 pkt, 14,2 l, DEMO-01); WebSocket przez rewrite Next trwa do 301 s (timeout usługi), potem ponowne połączenie.
 - Testy: `LoyaltyHubTests` (tylko właściciel, raz, nie po odtworzeniu i `409`; obcy origin, zła rola; próba negatywna bez rejestracji huba w ochronie originu pada), E2E kasy z toastem.
 
 ## Wyszukiwanie regulaminu - „zbieranie punktów” (2026-11-24)

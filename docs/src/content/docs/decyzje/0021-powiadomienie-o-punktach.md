@@ -31,7 +31,8 @@ Klient pokazuje kartę, kasjer rejestruje zakup na innym urządzeniu. Klient dow
 
 ## Konsekwencje
 
-- WebSocket przez rewrite Next na Cloud Run: sprawdzone 75 s otwartego połączenia z pingami (limit 30 s rewrite dotyczy żądań HTTP, nie WebSocket). Według dokumentacji Cloud Run timeout usługi (300 s) obejmuje też WebSocket - nie sprawdzone; klient łączy się wtedy ponownie sam (`withAutomaticReconnect`).
+- WebSocket przez rewrite Next na Cloud Run: sprawdzone 75 s otwartego połączenia z pingami (limit 30 s rewrite dotyczy żądań HTTP, nie WebSocket). Timeout usługi (300 s) obejmuje też WebSocket: sprawdzone, połączenie zamknięte po 301 s (kod 1006). Klient łączy się wtedy ponownie sam (`withAutomaticReconnect`) i czyta saldo, historię i kupony jeszcze raz.
+- Koszt: otwarte połączenie to trwające żądanie. Przy rozliczaniu CPU w trakcie żądań instancja api (i web, który pośredniczy) jest rozliczana jako aktywna, dopóki jakiś klient ma otwartą kartę - web nie schodzi wtedy do zera.
 - Każdy zalogowany klient trzyma połączenie z hubem. Jedna instancja api (Cloud Run `max=1`) - bez backplane'u. Więcej instancji wymaga backplane'u albo affinity, jak hub konsultanta.
 - Zdarzenie wysłane, gdy klient był rozłączony, przepada: brak toastu, ale po ponownym połączeniu saldo, historia i kupony są czytane z API.
 - Wylogowanie w jednej karcie nie zamyka połączeń w innych kartach tej przeglądarki: do wygaśnięcia ciasteczka mogą tam przyjść toasty poprzedniego użytkownika. Akceptowane w demo; rozwiązanie to zamykanie połączeń użytkownika przy wylogowaniu.
